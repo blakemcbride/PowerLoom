@@ -1,0 +1,9 @@
+edu/isi/powerloom/rdbms/RelationColumnInfo.class
+edu/isi/powerloom/rdbms/_StartupOntology.class
+edu/isi/powerloom/rdbms/StartupRdbmsSystem.class
+edu/isi/powerloom/rdbms/_StartupFetchInterface.class
+edu/isi/powerloom/rdbms/_StartupRdbms.class
+edu/isi/powerloom/rdbms/RelationTableInfo.class
+edu/isi/powerloom/rdbms/PLDB.class
+edu/isi/powerloom/rdbms/ConnectionWrapper.class
+edu/isi/powerloom/rdbms/RDBMS.class

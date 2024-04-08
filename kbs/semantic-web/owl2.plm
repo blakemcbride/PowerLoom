@@ -1,0 +1,398 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;; Extended OWL definitions supporting OWL-2 knowledge bases.
+
+;;; Dependencies: webcore.plm
+
+;;; TO DO, NOTES:
+;;; - this is not yet complete
+;;; - the names used in here follow the RDF syntax, but maybe the better thing to do would be to
+;;;   follow the functional syntax, e.g., ReflexiveProperty vs. ReflexiveObjectProperty?
+;;; - Useful references:
+;;;   - http://www.w3.org/TR/2009/WD-owl2-new-features-20090611/
+;;;   - http://www.w3.org/TR/2009/WD-owl2-primer-20090611/
+;;;   - http://viatra.inf.mit.bme.hu/sites/viatra.inf.mit.bme.hu/files/publications/models11/mapping/ontology2vpmgp_ref.html
+;;;   - http://www.w3.org/2007/OWL/wiki/Owl2.owl
+
+
+(IN-PACKAGE "STELLA")
+
+(IN-MODULE "/PL-KERNEL/WEB-CORE")
+
+(IN-DIALECT :KIF)
+
+
+(ASSERT (DOCUMENTATION /PL-KERNEL/WEB-CORE "OWL definitions.  Version $Id$."))
+
+(DEFCONCEPT /XMLNS/OWL/Class (?x /XMLNS/RDFS/Class)
+  :DOCUMENTATION "The class of all \"object\" classes (one of six entity categories)."
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/Class)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/Class "Class")))
+
+(DEFCONCEPT /XMLNS/OWL/Datatype (?x /XMLNS/RDFS/Class)
+  :DOCUMENTATION "The class of all datatype classes (one of six entity categories)."
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/Datatype)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/Datatype "Datatype")))
+
+(DEFCONCEPT /XMLNS/OWL/NamedIndividual (?x /XMLNS/RDFS/Class)
+  :DOCUMENTATION "The class of all named individual (one of six entity categories)."
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/NamedIndividual)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/NamedIndividual "NamedIndividual")))
+
+(DEFCONCEPT /XMLNS/OWL/Thing (?x)
+  :DOCUMENTATION "The most general (object) class.
+This is equal to the union of any class and its complement."
+;  :<=> (OR (/XMLNS/OWL/Nothing ?x) (NOT (/XMLNS/OWL/Nothing ?x)))
+  :AXIOMS (AND (/XMLNS/OWL/Class /XMLNS/OWL/Thing)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/Thing "Thing")))
+
+(DEFCONCEPT /XMLNS/OWL/Nothing (?x)
+  :DOCUMENTATION "the class with no things in it."
+  ; :<=> (NOT (/XMLNS/OWL/Thing ?x))
+  :AXIOMS (AND (/XMLNS/OWL/Class /XMLNS/OWL/Nothing)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/Nothing "Nothing")))
+
+(DEFCONCEPT /XMLNS/OWL/DataRange (?x /XMLNS/OWL/Thing)
+  :DOCUMENTATION "The class of all range enumerations."
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/DataRange)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/DataRange "DataRange")))
+
+(DEFRELATION /XMLNS/OWL/sameAs (?x ?y)
+  :DOCUMENTATION "for sameAs(X, Y), read X is an equivalent individual to Y."
+  ;:<<=>> (= ?x ?y)			;; PL's unique names assumption would cause clashes
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/sameAs)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/sameAs "sameAs")))
+
+(DEFRELATION /XMLNS/OWL/equivalentClass (?x ?y)
+  :DOCUMENTATION "for equivalentClass(X, Y), read X is an equivalent class to Y.
+cf OIL Equivalent"
+  :=>> (AND (/XMLNS/RDFS/subClassOf ?x ?y) (/XMLNS/RDFS/subClassOf ?y ?x))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/equivalentClass)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/equivalentClass "equivalentClass")
+	       (NTH-DOMAIN /XMLNS/OWL/equivalentClass 0 /XMLNS/OWL/Class)
+	       (NTH-DOMAIN /XMLNS/OWL/equivalentClass 1 /XMLNS/OWL/Class)))
+
+(DEFRELATION /XMLNS/OWL/equivalentProperty (?x ?y)
+  :DOCUMENTATION "for equivalentProperty(P, R), read P is an equivalent property to R."
+  ;:=>> (/XMLNS/OWL/sameAs ?x ?y)
+  :=>> (/XMLNS/RDFS/subPropertyOf ?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/equivalentProperty)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/equivalentProperty "equivalentProperty")))
+
+(DEFRELATION /XMLNS/OWL/sameIndividualAs (?x ?y)
+  :DOCUMENTATION "for sameIndividualAs(a, b), read a is the same individual as b."
+  :=>> (/XMLNS/OWL/sameAs ?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/sameIndividualAs)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/sameIndividualAs "sameIndividualAs")
+	       (NTH-DOMAIN /XMLNS/OWL/sameIndividualAs 0 /XMLNS/OWL/Thing)
+	       (NTH-DOMAIN /XMLNS/OWL/sameIndividualAs 1 /XMLNS/OWL/Thing)))
+
+(DEFRELATION /XMLNS/OWL/disjointWith (?x ?y)
+  :DOCUMENTATION "for disjointWith(X, Y) read: X and Y have no members in common.
+cf OIL Disjoint"
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/disjointWith)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/disjointWith "disjointWith")
+	       (NTH-DOMAIN /XMLNS/OWL/disjointWith 0 /XMLNS/OWL/Class)
+	       (NTH-DOMAIN /XMLNS/OWL/disjointWith 1 /XMLNS/OWL/Class)))
+
+(DEFRELATION /XMLNS/OWL/differentFrom (?x ?y)
+  :DOCUMENTATION "for differentFrom(a, b), read a is not the same individual as b."
+  :<<=>> (NOT (= ?x ?y))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/differentFrom)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/differentFrom "differentFrom")
+	       (NTH-DOMAIN /XMLNS/OWL/differentFrom 0 /XMLNS/OWL/Thing)
+	       (NTH-DOMAIN /XMLNS/OWL/differentFrom 1 /XMLNS/OWL/Thing)))
+
+(DEFRELATION /XMLNS/OWL/unionOf (?x ?y)
+  :DOCUMENTATION "for unionOf(X, Y) read: X is the union of the classes in the list Y;
+i.e. if something is in any of the classes in Y, it's in X, and vice versa.
+cf OIL OR"
+  :<<=>> (AND (HOLDS ?x ?z) (EXISTS ?c (AND (MEMBER-OF ?c ?y) (HOLDS ?c ?z))))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/unionOf)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/unionOf "unionOf")
+	       (NTH-DOMAIN /XMLNS/OWL/unionOf 0 /XMLNS/OWL/Class)
+	       (NTH-DOMAIN /XMLNS/OWL/unionOf 1 /XMLNS/OWL/List)))
+
+(DEFRELATION /XMLNS/OWL/disjointUnionOf (?x ?y)
+  :DOCUMENTATION "for disjointUnionOf(X, Y) read: X is the disjoint union of the classes in
+the list Y: (a) for any c1 and c2 in Y, disjointWith(c1, c2),
+and (b) unionOf(X, Y). i.e. if something is in any of the classes in Y, it's
+in X, and vice versa.
+cf OIL disjoint-covered"
+  :<<=>> (AND (/XMLNS/OWL/unionOf ?x ?y) (MUTUALLY-DISJOINT-COLLECTION ?y))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/disjointUnionOf)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/disjointUnionOf "disjointUnionOf")
+	       (NTH-DOMAIN /XMLNS/OWL/disjointUnionOf 0 /XMLNS/OWL/Class)
+	       (NTH-DOMAIN /XMLNS/OWL/disjointUnionOf 1 /XMLNS/OWL/List)))
+
+(DEFRELATION /XMLNS/OWL/intersectionOf (?x ?y)
+  :DOCUMENTATION "for intersectionOf(X, Y) read: X is the intersection of the classes in the list Y;
+i.e. if something is in all the classes in Y, then it's in X, and vice versa.
+cf OIL AND"
+  :<<=>> (AND (HOLDS ?x ?z) (FORALL ?c (=> (MEMBER-OF ?c ?y) (HOLDS ?c ?z))))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/intersectionOf)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/intersectionOf "intersectionOf")
+	       (NTH-DOMAIN /XMLNS/OWL/intersectionOf 0 /XMLNS/OWL/Class)
+	       (NTH-DOMAIN /XMLNS/OWL/intersectionOf 1 /XMLNS/OWL/List)))
+
+(DEFRELATION /XMLNS/OWL/complementOf (?x ?y)
+  :DOCUMENTATION "for complementOf(X, Y) read: X is the complement of Y; if something is in Y,
+then it's not in X, and vice versa.
+cf OIL NOT"
+  :<<=>> (AND (HOLDS ?x ?z) (NOT (HOLDS ?y ?z)))
+  :<<=>> (AND (NOT (HOLDS ?x ?z)) (HOLDS ?y ?z))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/complementOf)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/complementOf "complementOf")
+	       (NTH-DOMAIN /XMLNS/OWL/complementOf 0 /XMLNS/OWL/Class)
+	       (NTH-DOMAIN /XMLNS/OWL/complementOf 1 /XMLNS/OWL/Class)))
+
+(DEFRELATION /XMLNS/OWL/oneOf (?x ?y)
+  :DOCUMENTATION "for oneOf(C, L) read everything in C is one of the
+things in L;
+This lets us define classes by enumerating the members.
+cf OIL OneOf"
+  :<<=>> (<=> (HOLDS ?x ?z) (MEMBER-OF ?z ?y))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/oneOf)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/oneOf "oneOf")
+	       (NTH-DOMAIN /XMLNS/OWL/oneOf 0 /XMLNS/OWL/Class)
+	       (NTH-DOMAIN /XMLNS/OWL/oneOf 1 /XMLNS/OWL/List)))
+
+(DEFCONCEPT /XMLNS/OWL/Restriction (?x)
+  :DOCUMENTATION "something is in the class R if it satisfies the attached restrictions, 
+and vice versa."
+  :=>> (/XMLNS/OWL/Class ?x)
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/Restriction)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/Restriction "Restriction")))
+
+(DEFRELATION /XMLNS/OWL/onProperty (?r ?p)
+  :DOCUMENTATION "for onProperty(R, P), read:
+R is a restricted with respect to property P."
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/onProperty)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/onProperty "onProperty")
+	       (NTH-DOMAIN /XMLNS/OWL/onProperty 0 /XMLNS/OWL/Restriction)
+	       (NTH-DOMAIN /XMLNS/OWL/onProperty 1 /XMLNS/RDF/Property)))
+
+#|
+(DEFRELATION /XMLNS/OWL/toClass (?r ?x)
+  :DOCUMENTATION "for onProperty(R, P) and toClass(R, X), read:
+i is in class R if and only if for all j, P(i, j) implies type(j, X).
+This has been renamed to `allValuesFrom' (also cf. OIL ValueType)."
+;  :<=> (=> (AND (/XMLNS/OWL/onProperty ?r ?p) (/XMLNS/OWL/toClass ?r ?x))
+;	   (<=> (HOLDS ?r ?i) (RANGE-TYPE ?p ?i ?x)))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/toClass)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/toClass "toClass")
+	       (NTH-DOMAIN /XMLNS/OWL/toClass 0 /XMLNS/OWL/Restriction)
+	       (NTH-DOMAIN /XMLNS/OWL/toClass 1 /XMLNS/RDFS/Class)))
+|#
+
+(DEFRELATION /XMLNS/OWL/hasValue (?r ?v)
+  :DOCUMENTATION "for onProperty(R, P) and hasValue(R, V), read:
+i is in class R if and only if P(i, V).
+cf OIL HasFiller"
+;  :<=> (=> (AND (/XMLNS/OWL/onProperty ?r ?p) (/XMLNS/OWL/hasValue ?r ?v))
+;	   (<=> (HOLDS ?r ?i) (HOLDS ?p ?i ?v)))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/hasValue)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/hasValue "hasValue")
+	       (NTH-DOMAIN /XMLNS/OWL/hasValue 0 /XMLNS/OWL/Restriction)))
+
+(DEFRELATION /XMLNS/OWL/allValuesFrom (?r ?v)
+  :DOCUMENTATION "for onProperty(R, P) and allValuesFrom(R, V), read:
+i is in class R if and only if P(i, V)."
+;  :<=> (=> (AND (/XMLNS/OWL/onProperty ?r ?p) (/XMLNS/OWL/allValuesFrom ?r ?v))
+;	   (<=> (HOLDS ?r ?i) (HOLDS ?p ?i ?v)))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/allValuesFrom)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/allValuesFrom "allValuesFrom")
+	       (NTH-DOMAIN /XMLNS/OWL/allValuesFrom 0 /XMLNS/OWL/Restriction)))
+
+(DEFRELATION /XMLNS/OWL/someValuesFrom (?r ?v)
+  :DOCUMENTATION "for onProperty(R, P) and someValuesFrom(R, V), read:
+i is in class R if and only if P(i, V)."
+;  :<=> (=> (AND (/XMLNS/OWL/onProperty ?r ?p) (/XMLNS/OWL/someValuesFrom ?r ?v))
+;	   (<=> (HOLDS ?r ?i) (HOLDS ?p ?i ?v)))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/someValuesFrom)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/someValuesFrom "someValuesFrom")
+	       (NTH-DOMAIN /XMLNS/OWL/someValuesFrom 0 /XMLNS/OWL/Restriction)))
+
+#|
+(DEFRELATION /XMLNS/OWL/hasClass (?x ?y)
+  :DOCUMENTATION "for onProperty(R, P) and hasClass(R, X), read:
+i is in class R if and only if for some j, P(i, j) and type(j, X).
+This has been renamed to `someValuesFrom' (also cf. OIL HasValue)."
+;  :<=> (=> (AND (/XMLNS/OWL/onProperty ?r ?p) (/XMLNS/OWL/hasClass ?r ?x))
+;	   (<=> (HOLDS ?r ?i) (EXISTS ?j (AND (HOLDS ?p ?i ?j) (HOLDS ?y ?j)))))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/hasClass)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/hasClass "hasClass")
+	       (NTH-DOMAIN /XMLNS/OWL/hasClass 0 /XMLNS/OWL/Restriction)
+	       (NTH-DOMAIN /XMLNS/OWL/hasClass 1 /XMLNS/RDFS/Class)))
+|#
+
+(DEFRELATION /XMLNS/OWL/minCardinality (?r ?n)
+  :DOCUMENTATION "for onProperty(R, P) and minCardinality(R, n), read:
+i is in class R if and only if there are at least n distinct j with P(i, j).
+cf OIL MinCardinality"
+;    :<=> (=> (AND (/XMLNS/OWL/onProperty ?r ?p) (/XMLNS/OWL/minCardinality ?r ?n))
+;	     (<=> (HOLDS ?r ?i) (RANGE-MIN-CARDINALITY ?p ?i ?n)))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/minCardinality)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/minCardinality "minCardinality")
+	       (NTH-DOMAIN /XMLNS/OWL/minCardinality 0 /XMLNS/OWL/Restriction)
+	       (NTH-DOMAIN /XMLNS/OWL/minCardinality 1 /XMLNS/XMLS/nonNegativeInteger)))
+
+(DEFRELATION /XMLNS/OWL/maxCardinality (?r ?n)
+  :DOCUMENTATION "for onProperty(R, P) and maxCardinality(R, n), read:
+i is in class R if and only if there are at most n distinct j with P(i, j).
+cf OIL MaxCardinality"
+;  :<=> (=> (AND (/XMLNS/OWL/onProperty ?r ?p) (/XMLNS/OWL/maxCardinality ?r ?n))
+;	   (<=> (HOLDS ?r ?i) (RANGE-MAX-CARDINALITY ?p ?i ?n)))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/maxCardinality)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/maxCardinality "maxCardinality")
+	       (NTH-DOMAIN /XMLNS/OWL/maxCardinality 0 /XMLNS/OWL/Restriction)
+	       (NTH-DOMAIN /XMLNS/OWL/maxCardinality 1 /XMLNS/XMLS/nonNegativeInteger)))
+
+(DEFRELATION /XMLNS/OWL/cardinality (?r ?n)
+  :DOCUMENTATION "for onProperty(R, P) and cardinality(R, n), read:
+i is in class R if and only if there are exactly n distinct j with P(i, j).
+cf OIL Cardinality"
+  :<=> (AND (/XMLNS/OWL/minCardinality ?r ?n)
+	    (/XMLNS/OWL/maxCardinality ?r ?n))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/cardinality)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/cardinality "cardinality")
+	       (NTH-DOMAIN /XMLNS/OWL/cardinality 0 /XMLNS/OWL/Restriction)
+	       (NTH-DOMAIN /XMLNS/OWL/cardinality 1 /XMLNS/XMLS/nonNegativeInteger)))
+
+
+(DEFCONCEPT /XMLNS/OWL/ObjectProperty (?x /XMLNS/RDF/Property)
+  :DOCUMENTATION "if P is an ObjectProperty, and P(x, y), then y is an object (one of six entity categories)."
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/ObjectProperty)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/ObjectProperty "ObjectProperty")))
+
+(DEFCONCEPT /XMLNS/OWL/DatatypeProperty (?p /XMLNS/RDF/Property)
+  :DOCUMENTATION "if P is a DatatypeProperty, and P(x, y), then y is a data value (one of six entity categories)."
+  :<<=>> (AND (/XMLNS/RDF/Property ?p)
+              (NTH-DOMAIN ?p 1 /XMLNS/OWL/Datatype))
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/DatatypeProperty)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/DatatypeProperty "DatatypeProperty")))
+
+(DEFCONCEPT /XMLNS/OWL/AnnotationProperty (?p /XMLNS/RDF/Property)
+  :DOCUMENTATION "(one of six entity categories)"
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/AnnotationProperty)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/AnnotationProperty "AnnotationProperty")
+               (/XMLNS/OWL/AnnotationProperty /XMLNS/RDFS/label)
+               (/XMLNS/OWL/AnnotationProperty /XMLNS/RDFS/comment)
+               (/XMLNS/OWL/AnnotationProperty /XMLNS/RDFS/isDefinedBy)
+               (/XMLNS/OWL/AnnotationProperty /XMLNS/RDFS/seeAlso)))
+
+(DEFRELATION /XMLNS/OWL/inverseOf (?r ?s)
+  :DOCUMENTATION "for inverseOf(R, S) read: R is the inverse of S; i.e.
+if R(x, y) then S(y, x) and vice versa.
+cf OIL inverseRelationOf"
+  :<<=>> (AND (INVERSE ?r ?s)
+              (/XMLNS/OWL/ObjectProperty ?r)
+              (/XMLNS/OWL/ObjectProperty ?s))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/inverseOf)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/inverseOf "inverseOf")
+	       (NTH-DOMAIN /XMLNS/OWL/inverseOf 0 /XMLNS/OWL/ObjectProperty)
+	       (NTH-DOMAIN /XMLNS/OWL/inverseOf 1 /XMLNS/OWL/ObjectProperty)))
+
+(DEFCONCEPT /XMLNS/OWL/ReflexiveProperty (?p /XMLNS/OWL/ObjectProperty)
+  :DOCUMENTATION "if P is a ReflexiveProperty, then P(x, x) for all x."
+  :<<=>> (AND (REFLEXIVE ?p) (/XMLNS/OWL/ObjectProperty ?p))
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/ReflexiveProperty)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/ReflexiveProperty "ReflexiveProperty")))
+
+(DEFCONCEPT /XMLNS/OWL/IrreflexiveProperty (?p /XMLNS/OWL/ObjectProperty)
+  :DOCUMENTATION "if P is an IrreflexiveProperty, then not P(x, x) for all x."
+  :<<=>> (AND (IRREFLEXIVE ?p) (/XMLNS/OWL/ObjectProperty ?p))
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/IrreflexiveProperty)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/IrreflexiveProperty "IrreflexiveProperty")))
+
+(DEFCONCEPT /XMLNS/OWL/SymmetricProperty (?p /XMLNS/OWL/ObjectProperty)
+  :DOCUMENTATION "if P is a SymmetricProperty, then if P(x, y) and P(x, z) then y=z."
+  :<<=>> (AND (SYMMETRIC ?p) (/XMLNS/OWL/ObjectProperty ?p))
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/SymmetricProperty)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/SymmetricProperty "SymmetricProperty")))
+
+(DEFCONCEPT /XMLNS/OWL/AsymmetricProperty (?p /XMLNS/OWL/ObjectProperty)
+  :DOCUMENTATION "if P is an AsymmetricProperty, then, if P(x, y) then not P(y, x) unless x=y."
+  :<<=>> (AND (ANTISYMMETRIC ?p) (/XMLNS/OWL/ObjectProperty ?p))
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/AsymmetricProperty)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/AsymmetricProperty "AsymmetricProperty")))
+
+(DEFCONCEPT /XMLNS/OWL/TransitiveProperty (?p /XMLNS/OWL/ObjectProperty)
+  :DOCUMENTATION "if P is a TransitiveProperty, then if P(x, y) and P(y, z) then P(x, z).
+cf OIL TransitiveProperty."
+  :<<=>> (AND (TRANSITIVE ?p) (/XMLNS/OWL/ObjectProperty ?p))
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/TransitiveProperty)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/TransitiveProperty "TransitiveProperty")))
+
+(DEFCONCEPT /XMLNS/OWL/FunctionalProperty (?p /XMLNS/RDF/Property)
+  :DOCUMENTATION "if P is a FunctionalProperty, then if P(x, y) and P(x, z) then y=z."
+  :=>> (FUNCTION ?p)
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/FunctionalProperty)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/FunctionalProperty "FunctionalProperty")))
+
+(DEFCONCEPT /XMLNS/OWL/InverseFunctionalProperty (?p /XMLNS/RDF/Property)
+  :DOCUMENTATION "if P is a InverseFunctionalProperty, then if P(y, x) and P(y, x) then y=z."
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/InverseFunctionalProperty)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/InverseFunctionalProperty "InverseFunctionalProperty")))
+
+#|
+(DEFCONCEPT /XMLNS/OWL/UnambiguousProperty (?p /XMLNS/OWL/ObjectProperty)
+  :DOCUMENTATION "if P is an UnambiguousProperty, then if P(x, y) and P(z, y) then x=z.
+aka injective. e.g. if firstBorne(m, Susan) and firstBorne(n, Susan) then m and n are the same."
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/UnambiguousProperty)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/UnambiguousProperty "UnambiguousProperty")))
+|#
+
+#|
+
+(DEFCONCEPT /XMLNS/OWL/List (?x /XMLNS/RDF/Seq)
+  :axioms (/XMLNS/RDFS/Class /XMLNS/OWL/List))
+
+(DEFOBJECT /XMLNS/OWL/nil 
+    :AXIOMS (/XMLNS/OWL/List /XMLNS/OWL/nil))
+
+(DEFRELATION /XMLNS/OWL/first (?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/first)
+	       (NTH-DOMAIN /XMLNS/OWL/first 0 /XMLNS/OWL/List)))
+
+(DEFRELATION /XMLNS/OWL/rest (?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/rest)
+	       (NTH-DOMAIN /XMLNS/OWL/rest 0 /XMLNS/OWL/List)
+	       (NTH-DOMAIN /XMLNS/OWL/rest 1 /XMLNS/OWL/List)))
+
+(DEFRELATION /XMLNS/OWL/item (?l ?i)
+  :DOCUMENTATION "for item(L, I) read: I is an item in L; either first(L, I)
+or item(R, I) where rest(L, R)."
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/item)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/item "item")
+	       (NTH-DOMAIN /XMLNS/OWL/item 0 /XMLNS/OWL/List)))
+|#
+
+(DEFCONCEPT /XMLNS/OWL/Ontology (?x)
+  :DOCUMENTATION "An Ontology is a document that describes
+a vocabulary of terms for communication between
+(human and) automated agents."
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/OWL/Ontology)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/Ontology "Ontology")))
+
+(DEFRELATION /XMLNS/OWL/versionInfo (?x ?y)
+  :DOCUMENTATION "generally, a string giving information about this
+version; e.g. RCS/CVS keywords"
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/versionInfo)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/versionInfo "versionInfo")
+               (/XMLNS/OWL/AnnotationProperty /XMLNS/OWL/versionInfo)))
+
+(DEFRELATION /XMLNS/OWL/imports (?x ?y)
+  :DOCUMENTATION "for imports(X, Y) read: X imports Y;
+i.e. X asserts the* contents of Y by reference;
+i.e. if imports(X, Y) and you believe X and Y says something,
+then you should believe it.
+Note: \"the contents\" is, in the general case,
+an il-formed definite description. Different
+interactions with a resource may expose contents
+that vary with time, data format, preferred language,
+requestor credentials, etc. So for \"the contents\",
+read \"any contents\". "
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/OWL/imports)
+	       (/XMLNS/RDFS/label /XMLNS/OWL/imports "imports")))
+

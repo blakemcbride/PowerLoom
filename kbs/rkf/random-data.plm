@@ -1,0 +1,137 @@
+;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                          ;
+;  COPYRIGHT (C) UNIVERSITY OF SOUTHERN CALIFORNIA, 2003                   ; 
+;  University of Southern California, Information Sciences Institute       ;
+;  4676 Admiralty Way                                                      ;
+;  Marina Del Rey, California 90292                                        ;
+;  All rights reserved.                                                    ;
+;                                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;; $Id$
+
+(IN-PACKAGE "STELLA")
+(IN-MODULE "LEARNING")
+
+(ASSERT (AND (Roadway r-1) (surfaceType r-1 hardRoadwaySurface) (widthOfObject-m r-1 5)))
+(ASSERT (AND (Roadway r-2) (surfaceType r-2 softRoadwaySurface) (widthOfObject-m r-2 2)))
+(ASSERT (AND (Roadway r-3) (surfaceType r-3 hardRoadwaySurface) (widthOfObject-m r-3 3)))
+(ASSERT (AND (Roadway r-4) (surfaceType r-4 softRoadwaySurface) (widthOfObject-m r-4 5)))
+(ASSERT (AND (Roadway r-5) (surfaceType r-5 hardRoadwaySurface) (widthOfObject-m r-5 4)))
+(ASSERT (AND (Roadway r-6) (surfaceType r-6 softRoadwaySurface) (widthOfObject-m r-6 3)))
+(ASSERT (AND (Roadway r-7) (surfaceType r-7 softRoadwaySurface) (widthOfObject-m r-7 6)))
+(ASSERT (AND (Roadway r-8) (surfaceType r-8 softRoadwaySurface) (widthOfObject-m r-8 2)))
+(ASSERT (AND (Roadway r-9) (surfaceType r-9 softRoadwaySurface) (widthOfObject-m r-9 7)))
+(ASSERT (AND (Roadway r-10) (surfaceType r-10 hardRoadwaySurface) (widthOfObject-m r-10 2)))
+(ASSERT (AND (Roadway r-11) (surfaceType r-11 hardRoadwaySurface) (widthOfObject-m r-11 3)))
+(ASSERT (AND (Roadway r-12) (surfaceType r-12 hardRoadwaySurface) (widthOfObject-m r-12 4)))
+(ASSERT (AND (Roadway r-13) (surfaceType r-13 softRoadwaySurface) (widthOfObject-m r-13 2)))
+(ASSERT (AND (Roadway r-14) (surfaceType r-14 hardRoadwaySurface) (widthOfObject-m r-14 6)))
+(ASSERT (AND (Roadway r-15) (surfaceType r-15 softRoadwaySurface) (widthOfObject-m r-15 7)))
+(ASSERT (AND (Roadway r-16) (surfaceType r-16 hardRoadwaySurface) (widthOfObject-m r-16 4)))
+(ASSERT (AND (Roadway r-17) (surfaceType r-17 softRoadwaySurface) (widthOfObject-m r-17 3)))
+(ASSERT (AND (Roadway r-18) (surfaceType r-18 hardRoadwaySurface) (widthOfObject-m r-18 3)))
+(ASSERT (AND (Roadway r-19) (surfaceType r-19 hardRoadwaySurface) (widthOfObject-m r-19 3)))
+(ASSERT (AND (Roadway r-20) (surfaceType r-20 softRoadwaySurface) (widthOfObject-m r-20 2)))
+
+;; Added by hAND vvv
+(ASSERT (RoadwaySupportsMovementOfMilitaryForces r-1))
+(ASSERT (RoadwaySupportsMovementOfMilitaryForces r-5))
+(ASSERT (RoadwaySupportsMovementOfMilitaryForces r-12))
+(ASSERT (RoadwaySupportsMovementOfMilitaryForces r-14))
+(ASSERT (RoadwaySupportsMovementOfMilitaryForces r-16))
+;; Added by hAND ^^^
+
+(ASSERT (Airfield a-1))
+(ASSERT (AND (Runway r-1-0) (hasRunway a-1 r-1-0) (widthOfObject-ft r-1-0 45) (lengthOfObject-ft r-1-0 3000)))
+(ASSERT (AND (Runway r-1-1) (hasRunway a-1 r-1-1) (widthOfObject-ft r-1-1 40) (lengthOfObject-ft r-1-1 5000)))
+
+(ASSERT (Airfield a-2))
+(ASSERT (AND (Runway r-2-0) (hasRunway a-2 r-2-0) (widthOfObject-ft r-2-0 85) (lengthOfObject-ft r-2-0 4000)))
+(ASSERT (AND (Runway r-2-1) (hasRunway a-2 r-2-1) (widthOfObject-ft r-2-1 75) (lengthOfObject-ft r-2-1 4000)))
+(ASSERT (AND (Runway r-2-2) (hasRunway a-2 r-2-2) (widthOfObject-ft r-2-2 45) (lengthOfObject-ft r-2-2 6000)))
+
+(ASSERT (Airfield a-3))
+(ASSERT (AND (Runway r-3-0) (hasRunway a-3 r-3-0) (widthOfObject-ft r-3-0 75) (lengthOfObject-ft r-3-0 5500)))
+(ASSERT (AND (Runway r-3-1) (hasRunway a-3 r-3-1) (widthOfObject-ft r-3-1 95) (lengthOfObject-ft r-3-1 4500)))
+(ASSERT (AND (Runway r-3-2) (hasRunway a-3 r-3-2) (widthOfObject-ft r-3-2 70) (lengthOfObject-ft r-3-2 7000)))
+
+(ASSERT (Airfield a-4))
+(ASSERT (AND (Runway r-4-0) (hasRunway a-4 r-4-0) (widthOfObject-ft r-4-0 80) (lengthOfObject-ft r-4-0 5500)))
+(ASSERT (AND (Runway r-4-1) (hasRunway a-4 r-4-1) (widthOfObject-ft r-4-1 75) (lengthOfObject-ft r-4-1 2000)))
+(ASSERT (AND (Runway r-4-2) (hasRunway a-4 r-4-2) (widthOfObject-ft r-4-2 80) (lengthOfObject-ft r-4-2 8500)))
+
+(ASSERT (Airfield a-5))
+(ASSERT (AND (Runway r-5-0) (hasRunway a-5 r-5-0) (widthOfObject-ft r-5-0 40) (lengthOfObject-ft r-5-0 6500)))
+(ASSERT (AND (Runway r-5-1) (hasRunway a-5 r-5-1) (widthOfObject-ft r-5-1 50) (lengthOfObject-ft r-5-1 7500)))
+(ASSERT (AND (Runway r-5-2) (hasRunway a-5 r-5-2) (widthOfObject-ft r-5-2 55) (lengthOfObject-ft r-5-2 4000)))
+
+(ASSERT (Airfield a-6))
+(ASSERT (AND (Runway r-6-0) (hasRunway a-6 r-6-0) (widthOfObject-ft r-6-0 40) (lengthOfObject-ft r-6-0 6000)))
+
+(ASSERT (Airfield a-7))
+(ASSERT (AND (Runway r-7-0) (hasRunway a-7 r-7-0) (widthOfObject-ft r-7-0 85) (lengthOfObject-ft r-7-0 6500)))
+(ASSERT (AND (Runway r-7-1) (hasRunway a-7 r-7-1) (widthOfObject-ft r-7-1 80) (lengthOfObject-ft r-7-1 2000)))
+(ASSERT (AND (Runway r-7-2) (hasRunway a-7 r-7-2) (widthOfObject-ft r-7-2 80) (lengthOfObject-ft r-7-2 3500)))
+
+(ASSERT (Airfield a-8))
+(ASSERT (AND (Runway r-8-0) (hasRunway a-8 r-8-0) (widthOfObject-ft r-8-0 85) (lengthOfObject-ft r-8-0 3500)))
+
+
+;;
+;; ASSERTions
+
+(ASSERT (AirfieldSuitableForMilitaryUse a-2))
+(ASSERT (AirfieldSuitableForMilitaryUse a-3))
+(ASSERT (AirfieldSuitableForMilitaryUse a-4))
+(ASSERT (AirfieldSuitableForMilitaryUse a-7))
+(ASSERT (AirfieldSuitableForMilitaryUse a-8))
+
+
+#|
+;; Adding irrelevant assertions to make the learning more difficult:
+(EVAL
+ (LET ((QI (PLI/S-RETRIEVE "ALL ?X (|Roadway| ?X)" NULL NULL))
+       (DIR (PLI/GET-RELATION "orientationOfObject" NULL NULL))
+       (LEN (PLI/GET-RELATION "lengthOfObject-ft" NULL NULL)))
+   (WHILE (NEXT? QI)
+     (PRINT "Adding values to " (/STELLA/VALUE QI) EOL)
+     (PLI/ASSERT-BINARY-PROPOSITION DIR (/STELLA/VALUE QI) (RANDOM 180) NULL NULL)
+     (PLI/ASSERT-BINARY-PROPOSITION LEN (/STELLA/VALUE QI) (/STELLA/+ 5000 (/STELLA/* 10 (RANDOM 2000))) NULL NULL)
+     )))
+
+(EVAL
+ (LET ((QI (PLI/S-RETRIEVE "ALL ?X (|Runway| ?X)" NULL NULL))
+       (DIR (PLI/GET-RELATION "orientationOfObject" NULL NULL)))
+   (WHILE (NEXT? QI)
+     (PRINT "Adding values to " (/STELLA/VALUE QI) EOL)
+     (PLI/ASSERT-BINARY-PROPOSITION DIR (/STELLA/VALUE QI) (RANDOM 180) NULL NULL)
+     )))
+
+
+(INDUCE-INFERENCE-RULES |RoadwaySupportsMovementOfMilitaryForces| |Roadway|)
+(INDUCE-INFERENCE-RULES |AirfieldSuitableForMilitaryUse| |Airfield|)
+
+(EVAL (LET ((lp (NEW /RKFLEARN/LEARNING-PARAMETERS)))
+        ; (SETF (/RKFLEARN/TABOO-OPERATORS lp) (QUOTE (ISA)))
+        (/RKFLEARN/BOTTOM-UP-RULE-INDUCTION-FROM-CONCEPTS
+         (QUOTE |AirfieldSuitableForMilitaryUse|)
+         (QUOTE |Airfield|)
+         lp
+         "LEARNING")))
+
+(EVAL (LET ((lp (NEW /RKFLEARN/LEARNING-PARAMETERS)))
+        ; (SETF (/RKFLEARN/TABOO-OPERATORS lp) (QUOTE (ISA)))
+        (SETF (/RKFLEARN/SIMPLIFY-RULE-ANTECEDENTS? lp) TRUE)
+        (SETF (/RKFLEARN/VERBOSITY lp) 1)
+        (/RKFLEARN/BOTTOM-UP-RULE-INDUCTION-FROM-CONCEPTS
+         (QUOTE |RoadwaySupportsMovementOfMilitaryForces|)
+         (QUOTE |Roadway|)
+         lp
+         "LEARNING")))
+
+
+|#

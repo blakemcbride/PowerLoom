@@ -1,0 +1,588 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;; BEGIN LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                            ;
+; Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          ;
+;                                                                            ;
+; The contents of this file are subject to the Mozilla Public License        ;
+; Version 1.1 (the "License"); you may not use this file except in           ;
+; compliance with the License. You may obtain a copy of the License at       ;
+; http://www.mozilla.org/MPL/                                                ;
+;                                                                            ;
+; Software distributed under the License is distributed on an "AS IS" basis, ;
+; WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   ;
+; for the specific language governing rights and limitations under the       ;
+; License.                                                                   ;
+;                                                                            ;
+; The Original Code is the STELLA Programming Language.                      ;
+;                                                                            ;
+; The Initial Developer of the Original Code is                              ;
+; UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          ;
+; 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               ;
+;                                                                            ;
+; Portions created by the Initial Developer are Copyright (C) 1996-2020      ;
+; the Initial Developer. All Rights Reserved.                                ;
+;                                                                            ;
+; Contributor(s):                                                            ;
+;                                                                            ;
+; Alternatively, the contents of this file may be used under the terms of    ;
+; either the GNU General Public License Version 2 or later (the "GPL"), or   ;
+; the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   ;
+; in which case the provisions of the GPL or the LGPL are applicable instead ;
+; of those above. If you wish to allow use of your version of this file only ;
+; under the terms of either the GPL or the LGPL, and not to allow others to  ;
+; use your version of this file under the terms of the MPL, indicate your    ;
+; decision by deleting the provisions above and replace them with the notice ;
+; and other provisions required by the GPL or the LGPL. If you do not delete ;
+; the provisions above, a recipient may use your version of this file under  ;
+; the terms of any one of the MPL, the GPL or the LGPL.                      ;
+;                                                                            ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; END LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; Translating Stella files into Java.
+
+(in-package "STELLA")
+
+(in-module "STELLA")
+
+(defspecial *CURRENT-JAVA-OUTPUT-CLASS* CLASS NULL
+	    :public? FALSE
+	    :documentation "Holds the current Stella class being output in Java")
+
+(defun clt () 
+  (change-module "STELLA")
+  (set-translator-output-language :common-lisp))
+
+(defun jt () 
+  (change-module "STELLA")
+  (set-translator-output-language :java))
+
+(defun jptrans ((statement OBJECT))
+  :command? TRUE :public? TRUE :evaluate-arguments? FALSE
+  :documentation "Translate `statement' to C++ and print the result."
+  (special ((*translatorOutputLanguage* *translatorOutputLanguage*)
+	    (*current-stream* STANDARD-OUTPUT))
+    (set-translator-output-language :java)
+    (incrementally-translate statement)))
+
+(defmethod (java-make-code-output-file-name FILE-NAME) ((bareFile FILE-NAME) (dontTruncate? BOOLEAN))
+  ;; Construct an absolute .java file name from 'bareFile'.
+  ;; Special don't truncate logic is used for printing file headers.
+  (safety 3 (eql? bareFile (relativize-file-name bareFile (root-source-directory))) 
+          "Absolute file where relative expected")
+  (if dontTruncate?
+    (special ((*dontTruncateFilenames?* TRUE))
+      (return (make-file-name-from-relative-path bareFile :java)))
+    (return (make-file-name-from-relative-path bareFile :java))))
+
+(defmethod (java-make-code-output-file-name FILE-NAME) ((source CLASS) (dontTruncate? BOOLEAN))
+  (let ((bareFile (java-translate-class-namestring (class-name source))))
+    (return (java-make-code-output-file-name (wrapper-value bareFile) dontTruncate?)) ))
+
+(defun (java-make-global-output-file-name FILE-NAME) ((module MODULE) (dontTruncate? BOOLEAN))
+  (return (java-make-code-output-file-name (java-yield-flotsam-class-name module)
+					   dontTruncate?)) )
+
+(defun java-output-flotsam-units-to-file ((globalsHT HASH-TABLE) 
+					  (functionHT HASH-TABLE)
+					  (codeModuleList (CONS of MODULE)))
+  (let ((functions (CONS of TRANSLATION-UNIT) nil)
+	(globals (CONS of TRANSLATION-UNIT) nil)
+	(filename FILE-NAME NULL)
+	(flotsam-files (CONS OF STRING-WRAPPER) nil))
+    (foreach module in codeModuleList
+	do (within-module module
+             (setq filename (java-make-global-output-file-name module FALSE))
+	     (when (member? flotsam-files (wrap-string filename))
+	       ;; Should this be an error??
+	       (warn "Overwriting Flotsam file " filename ".  This is surely bad."))
+	     (pushq flotsam-files (wrap-string filename))
+	     (setq globals (lookup globalsHT module))
+	     (unless (defined? globals)
+	       (setq globals nil))
+	     (setq functions (lookup functionHT module))
+	     (unless (defined? functions)
+	       (setq functions nil))
+	     (java-output-flotsam-units-to-file-for-module
+	      filename module NULL globals functions))) ))
+
+(defun java-output-flotsam-units-to-file-for-module ((classOutputFile FILE-NAME)
+						     (module MODULE)
+						     (classunit TRANSLATION-UNIT)
+						     (globals (CONS of TRANSLATION-UNIT)) 
+					             (functions (CONS of TRANSLATION-UNIT)))
+ (special ((*current-java-output-class* NULL))
+  (let ((translation NIL)
+	(class CLASS NULL)
+	(classTranslation NIL))
+    (within-module module
+      (with-output-file (classOutputStream classOutputFile :if-not-exists :create-path)
+        (when (defined? classunit)
+	  (setq *current-java-output-class* (the-object classunit))
+	  (inform "Translating " class "...")
+	  (setq classTranslation (rest (java-translate-define-native-class *current-java-output-class*))))
+       (special ((*current-stream* classOutputStream))
+	 (when (>= *translationVerbosityLevel* 1)
+	   (if (defined? classunit)
+	       (inform "    Writing " classOutputFile " ...")
+	     (inform "Writing " classOutputFile "...")))
+	 (java-output-file-header 
+	  classOutputStream (java-make-global-output-file-name module TRUE))
+
+	 (if (defined? classunit)
+	     (java-output-class-declaration classTranslation)
+	     (print-stream *current-stream*
+			   "public class " (java-yield-flotsam-class-name module) " "))
+	 (print-stream *current-stream* "{" EOL)
+	 
+	 (java-bump-indent)
+	
+	 ;; VARIABLES
+	 (when (defined? classunit)
+	   (java-output-class-variable-definitions 
+	    (cast (nth classtranslation 6) CONS)))
+	(foreach global in globals
+		 do (setq translation (java-translate-unit global))
+		 (java-output-global-definition (rest translation))
+		 (setf (translation global) NULL)
+		 (setf (code-register global) NULL))
+
+	;; CONSTRUCTORS AND METHODS
+	(when (defined? classunit)
+	  (java-output-class-constructors
+	   (cast (nth classtranslation 7) (CONS OF TRANSLATION-UNIT))
+	   (java-yield-flotsam-class-name module)
+	   (and (defined? *current-java-output-class*) 
+		(exception-class? *current-java-output-class*)))
+	  (foreach statement in (cast (nth classtranslation 8) (CONS OF TRANSLATION-UNIT))
+	     do (java-output-statement (java-translate-unit statement))
+		(setf (translation statement) NULL)
+		(setf (code-register statement) NULL)))
+	(foreach function in functions
+	   do (java-output-method (rest (java-translate-unit function)))
+	      (setf (translation function) NULL)
+	      (setf (code-register function) NULL))
+	(java-unbump-indent)
+	(print-stream *current-stream* "}" EOL) ))))))
+
+
+(defun java-output-file-header ((stream OUTPUT-STREAM) (fileName FILE-NAME))
+  ;; Output a Java file header for `fileName' to `stream'.
+  ;; Generate an `package' declaration for `package' and
+  ;;   also generate appropriate `import' statements.
+  (print-stream  stream "//  -*- Mode: Java -*-" EOL "//" EOL)
+  (when (defined? fileName)
+    ;; Don't write the full file name so we won't get diffs just from
+    ;;    building a release in a different directory:
+    (print-stream  stream "// " (file-name-without-directory fileName) EOL EOL))
+  (let ((package-name (java-package-prefix *module* "."))
+	(imported-packages (CONS OF STRING-WRAPPER) NIL)
+	(name STRING NULL))
+    (output-copyright-header stream)
+    (unless (or (null? package-name)
+		(string-eql? package-name ""))
+      (setq package-name (subsequence package-name 0 (- (length package-name) 1)))
+      (print-stream stream "package "  package-name ";" EOL EOL))
+    ;; No need to import, since most calls to javalib functions are
+    ;; fully qualified, except in certain Stella verbatim statements:
+    ;; TO DO:  If we move the convenience classes into the stella.utility package,
+    ;;         then we can probably do a full import of javalib into all packages.
+    (if (eq? *module* *stella-module*)
+      (print-stream stream "import " (java-stella-package) ".javalib.*;" EOL)
+      (progn
+	(when (and (null? (get-stella-class "NATIVE" FALSE))
+		   (not (inherited-class-name-conflicts? "NATIVE")))
+	  (print-stream stream "import " (java-stella-package) ".javalib.Native;" EOL))
+	(when (and (null? (get-stella-class "STELLA-SPECIAL-VARIABLE" FALSE))
+		   (not (inherited-class-name-conflicts? "STELLA-SPECIAL-VARIABLE")))
+	  (print-stream stream "import " (java-stella-package) ".javalib.StellaSpecialVariable;" EOL))))
+
+    (when (enabled-stella-feature? :minimize-java-prefixes)
+      (foreach module in (uses *module*)
+	  do (setq name (java-package-prefix module "."))
+	     (unless (or (string-eql? name package-name)
+			 (member? imported-packages name))
+	       (print-stream stream "import " name "*;" EOL)
+	       (pushq imported-packages name) ))
+      (foreach module in (all-super-contexts *module*)
+	  do (setq name (java-package-prefix module "."))
+	     (unless (or (string-eql? name package-name)
+			 (member? imported-packages name))
+	       (print-stream stream "import " name "*;" EOL)
+	       (pushq imported-packages name))))
+     (print-stream stream EOL)))
+
+(defun java-output-class-to-file ((class CLASS))
+ (special ((*current-java-output-class* class))
+  (within-context (home-module class)
+    (let ((classOutputFile (java-make-code-output-file-name class FALSE))
+	  (translation NIL))
+      (with-output-file (classOutputStream classOutputFile :if-not-exists :create-path)
+        (special ((*current-stream* classOutputStream))
+	  (inform "Translating " class "...")
+	  (setq translation (java-translate-define-native-class class))
+	  (when (>= *translationVerbosityLevel* 1)
+	    (inform "    Writing " classOutputFile "..."))
+	  (java-output-file-header 
+	   classOutputStream (java-make-code-output-file-name class TRUE))
+	  (java-output-class (rest translation) (exception-class? class)) ))))))
+
+(defun java-output-class-unit-to-file ((classUnit TRANSLATION-UNIT))
+  (java-output-class-to-file (cast (the-object classUnit) CLASS)) )
+
+(defun (java-flotsam-function? BOOLEAN) ((method METHOD-SLOT))
+  ;; Return true if `method' needs to go into the flotsam class.
+  ;; This will be true if any of the following conditions hold:
+  ;;    (1)  The method takes ZERO ARGUMENTS
+  ;;    (2)  The method's first argument is specialized on
+  ;;           a BUILT-IN TYPE
+  ;;    (3)  The method's first argument is specialized on a type
+  ;;           defined in a different module.
+  ;;  and none of these exceptions are true:
+  ;;    (e1)  The method is a constructor
+  ;;    (e2)  The method is a native method
+  ;;    (e3)  The method is a startup function
+  ;;
+  (return (and (not (method-constructor? method))
+	       (not (method-native? method))
+	       (not (method-startup-function? method))
+	       (or (zero-argument-function? method)
+		   (java-method-object-defined-on-native-type? method)
+		   (java-function-in-different-module? method)))) )
+
+(defun java-output-startup-units-to-file 
+    ((startupHT STRING-HASH-TABLE) (keyList (CONS of STRING-WRAPPER)))
+  (let ((classOutputFile FILE-NAME NULL)
+	(startupFunctions (CONS of TRANSLATION-UNIT) NULL))
+    (special ((*current-stream* NULL))
+      (foreach className in keyList
+	  do (setq startupFunctions (lookup startupHT className))
+	     (when (and (defined? startupFunctions)
+			(not (null? startupFunctions)))
+	       ;; All methods on this class are defined in the same MODULE:
+	       (within-module (home-module (first startupFunctions))
+		 (setq classOutputFile (java-make-code-output-file-name 
+					(wrapper-value className) FALSE))
+		 (with-output-file (classOutputStream  classOutputFile :if-not-exists :create-path)
+		   (setq *current-stream* classOutputStream)
+		   (when (>= *translationVerbosityLevel* 1)
+		     (inform "Writing " classOutputFile "..."))
+		   (java-output-file-header 
+		    classOutputStream (java-make-code-output-file-name (wrapper-value className) TRUE))
+              
+;; Nope:  Doesn't work if a module spans more than one Java package:
+;                 (unless (eql? (nth (wrapper-value className) 0) #\_)
+;                   ;; An internal class name
+;                   (print-stream *current-stream* "public "))
+		   (print-stream *current-stream* 
+				 "public class " (wrapper-value className) " {" EOL)
+		   (java-bump-indent)
+		   (foreach function in startupFunctions
+		      do (java-output-method (rest (java-translate-unit function)))
+			 (setf (translation function) NULL)
+			 (setf (code-register function) NULL))
+		   (java-unbump-indent)
+		   (print-stream *current-stream* "}" EOL)))))) ))
+
+(defun java-push-into-hash-table ((HT HASH-TABLE)
+				  (key OBJECT)
+				  (object OBJECT))
+  ;;  Pushes `object' into the appropriate bucket of `HT' for `key'
+  (let ((value CONS (lookup HT key)))
+    (if (defined? value)
+	(insert-at HT key (cons object value))
+      (insert-at HT key (cons object NIL)))))
+
+(defun java-push-into-string-hash-table ((HT STRING-HASH-TABLE)
+					 (key STRING)
+					 (object OBJECT))
+  ;;  Pushes `object' into the appropriate bucket of `HT' for `key'
+  (let ((value CONS (lookup HT key)))
+    (if (defined? value)
+	(insert-at HT key (cons object value))
+      (insert-at HT key (cons object NIL)))))
+
+(defun (java-class-unit-defines-flotsam-class? BOOLEAN) ((classUnit TRANSLATION-UNIT))
+  (let ((class CLASS (the-object classUnit))
+	(module (home-module classUnit)))
+    (return (string-eql? (java-translate-class-namestring 
+			  (symbol-name (symbolize (class-type class))))
+			 (java-yield-flotsam-class-name module))) ))
+
+(defun java-output-all-units-to-file ()
+  ;; Called by 'translate-file', produce a .java file
+  ;;   by iterating over translation units.
+  (let ((startupClassName STRING-WRAPPER NULL)
+	(startupHT (new STRING-HASH-TABLE))
+	(startupClassList nil)
+	(methods nil)
+	(flotsamFunctionHT (new HASH-TABLE))
+	(globalsHT (new HASH-TABLE))
+	(codeModulesList (LIST OF MODULE) (list))
+	;; Maybe use this for adding keyword variable definitions to
+	;;   all modules encountered in this translation?
+	; (universalGlobalList (CONS OF TRANSLATION-UNIT) nil)
+	(verbatimStatements nil)
+	(classes (CONS OF TRANSLATION-UNIT) nil)
+        (codeOutputModule MODULE NULL)
+	)
+
+    ;; Setup translation of STELLAROOT variable:
+    (insert-at *java-stella-package-mapping*
+	       "STELLAROOT"
+	       (java-stella-package))
+    ;; TODO: instead of sorting translated parse trees, sort the units
+    ;;   themselves.  This will allow annotations to be output during
+    ;;   code generation.
+    ;; Reverse before sorting- classes, etc get reversed during sort.
+    (setq *translationUnits* (reverse *translationUnits*))
+    (foreach unit in *translationUnits*
+     do (case (category unit)
+          ((METHOD MACRO)
+	   (cond ((java-flotsam-function? (the-object unit))
+                  (setq codeOutputModule (home-module (the-object unit)))
+		  (java-push-into-hash-table flotsamFunctionHT
+					     codeOutputModule
+					     unit)
+		  (insert-new codeModulesList codeOutputModule))
+		 ;; BUG:  This will break if the same filename appears
+		 ;;  in more than one module, since we don't distinguish
+		 ;;  among them here.
+		 ;; SOLUTION?  Maybe do the startup functions on a per-file
+		 ;;  basis instead of keeping them around until the end?
+		 ((method-startup-function? 
+		   (cast (the-object unit) METHOD-SLOT))
+		  (setq startupClassName 
+		    (java-translate-class-namestring
+		     (method-startup-classname
+		      (cast (the-object unit) METHOD-SLOT))))
+		  (java-push-into-string-hash-table
+		   startupHT
+		   (wrapper-value startupClassName)
+		   unit)
+		  (unless (member? startupClassList startupClassName)
+		    (pushq startupClassList startupClassName)))
+		 (otherwise
+		  (pushq methods unit))))
+	  (PRINT-METHOD
+	   (pushq methods unit))
+	  (TYPE NIL)  ; Ignore for now!
+	  (VERBATIM
+	   (pushq verbatimStatements unit))
+	  (CLASS
+	   (pushq classes unit))
+	  (GLOBAL-VARIABLE
+           (setq codeOutputModule (home-module (the-object unit)))
+	   (java-push-into-hash-table globalsHT
+				      codeOutputModule
+				      unit)
+	   (insert-new codeModulesList codeOutputModule))))
+
+    (foreach classUnit in classes 
+	do (if (java-class-unit-defines-flotsam-class? classUnit)
+	     (let ((module (home-module (the-object classUnit)))
+		   (globals (CONS OF TRANSLATION-UNIT) nil)
+		   (functions (CONS OF TRANSLATION-UNIT) nil))
+               (within-module module
+                 (setq globals (lookup globalsHT module))
+	         (unless (defined? globals)
+		   (setq globals nil))
+	         (setq functions (lookup flotsamFunctionHT module))
+	         (unless (defined? functions)
+		   (setq functions nil))
+	         (java-output-flotsam-units-to-file-for-module
+                  (java-make-global-output-file-name module FALSE)
+		  module classUnit globals functions)
+	         (remove codeModulesList module)))
+	     (java-output-class-unit-to-file classUnit)))
+    
+    ;; TODO: add stuff for collecting functions, globals, etc
+    
+    (java-output-flotsam-units-to-file
+     globalsHT flotsamFunctionHT (the-cons-list codeModulesList))
+    (java-output-startup-units-to-file startupHT startupClassList)
+    
+;    (foreach method in methods
+;	do (java-output-class-to-file 
+;	    (slot-owner (cast (the-object (cast method TRANSLATION-UNIT)) METHOD-SLOT))
+;	    
+;	    ))
+    
+    ;; VERY TEMPORARY.  JUST DO THIS TO GET OUTPUT FOR TESTING:
+;    (java-output-Herrenlose-Methoden methods)
+
+    ))
+
+(defun java-initialize-file-translation ()
+  (setq *java-indent-chars* 0) )
+
+(defun java-translate-file ((fileName FILE-NAME))
+  :public? TRUE
+  ;; Translate a stella file to Java
+  (translate-file fileName :java FALSE) )
+
+(defun java-translate-file-as-part-of-system ((fileName FILE-NAME))
+  ;; Translate a stella file to Java
+  (translate-file fileName :java TRUE) )
+
+(defun java-translate-walked-system-units ((systemUnits SYSTEM-UNITS-ALIST))
+  ;; Combine all walked translation units, then translate and output them.
+  (special ((*translationUnits* (concatenate-system-units systemUnits)))
+    (when (>= *translationVerbosityLevel* 1)
+      (inform "Generating Java translations..."))
+    (java-output-all-units-to-file)
+    (clean-up-translation-units-special)
+    (java-output-system-specific-files)))
+
+(defun java-output-system-specific-files ()
+  ;; Output all system-specific files for the currently translated system.
+  (case *java-build-method*
+    (:MAVEN 
+     (java-output-system-maven-files))
+    (otherwise NULL)))
+
+(defun java-translate-system ((systemName STRING))
+  :documentation "Translate the system `systemName' to Java."
+  :public? TRUE
+  (translate-system systemName :java
+                    :two-pass? TRUE
+                    :force-translation? TRUE
+                    :production-settings? TRUE))
+
+
+(defglobal *java-build-method* KEYWORD :MAVEN
+  :documentation "Indicates how JAVA translations of STELLA systems will be compiled and built.
+Controls the native java directory structure as well as generation of build files such as pom.xml.
+Currently supported methods are :JAVAC (the original) and :MAVEN."
+  :demon-property "stella.javaBuildMethod"
+  :public? TRUE)
+
+(defun (java-get-system-maven-template-file FILE-NAME) ()
+  ;; Access the template file `pom.xml.in' in the top-level current system directory, or,
+  ;; if no local template exists, the default template `pom.xml-default.in' in the STELLA directory.
+  (let ((pomFile (make-file-name "pom" :stella TRUE))
+        (templateFile
+         (concatenate (file-name-without-extension pomFile) ".xml.in")))
+    (unless (probe-file? templateFile)
+      (with-system-definition "STELLA"
+        (setq pomFile (make-file-name "pom" :stella TRUE))
+        (setq templateFile
+          (concatenate (file-name-without-extension pomFile) ".xml-default.in"))))
+    (return templateFile)))
+
+(defun (java-get-system-parent-maven-template-file FILE-NAME) ()
+  ;; Access the template file `pom.xml.parent.in' in the top-level current system directory, or,
+  ;; if no local template exists, the default template `pom.xml.parent-default.in' in the STELLA directory.
+  (let ((pomFile (make-file-name "pom" :stella TRUE))
+        (templateFile
+         (concatenate (file-name-without-extension pomFile) ".xml.parent.in")))
+    (unless (probe-file? templateFile)
+      (with-system-definition "STELLA"
+        (setq pomFile (make-file-name "pom" :stella TRUE))
+        (setq templateFile
+          (concatenate (file-name-without-extension pomFile) ".xml.parent-default.in"))))
+    (return templateFile)))
+
+(defslot SYSTEM-DEFINITION system-group-name :type STRING
+         :default "edu.isi.loom.stella" :option-keyword :group-name
+         :documentation "Used as the Maven groupId for this system.")
+
+(defun (java-yield-SYSTEM-GROUP-NAME STRING) ((system SYSTEM-DEFINITION))
+  ;; Yield the group name to use for `system' which can be set with the :group-name keyword.
+  ;; If it has been set to NULL, a default based on the java package prefix of the cardinal module is used.
+  (cond ((defined? (system-group-name system))
+         (return (system-group-name system)))
+        (otherwise
+         ;; compute a default based on the java package prefix of the cardinal module:
+         (let ((defaultGroupName (java-package-prefix (get-stella-module (cardinal-module system) TRUE) "."))
+               (pos 0))
+           (setq defaultGroupName (subsequence defaultGroupName 0 (1- (length defaultGroupName))))
+           (setq pos (last-position defaultGroupName #\. NULL))
+           (when (defined? pos)
+             (setq defaultGroupName (subsequence defaultGroupName 0 pos)))
+           (return defaultGroupName)))))
+
+(defun (java-yield-SYSTEM-VERSION STRING) ((system SYSTEM-DEFINITION))
+  ;; Yield a version identifier for `system'.
+  (return (get-system-version-string system)))
+
+(defun (java-yield-SYSTEM-PARENT-NAME STRING) ((system SYSTEM-DEFINITION))
+  ;; Yield a name to use for `system's parent pom.  This will try to use the name of the top-level
+  ;; STELLA directory containing the current native tree, or otherwise some dummy default value.
+  ;; Parents are only used for building and therefore less critical, however, they have to be consistently
+  ;; named across all their children which is a bit of a pain for automatic generation.
+  (ignore system)
+  (let ((parentName
+         (file-name-without-directory (directory-file-name (directory-parent-directory (root-native-directory) 1)))))
+    (when (blank-string? parentName)
+      (setq parentName "stella"))
+    (return (concatenate parentName "-parent-system"))))
+
+(defun substitute-template-variables-to-maven-file ((templateFile STRING)
+                                                    (outputFile STRING)
+                                                    (variables (KEY-VALUE-LIST OF STRING-WRAPPER STRING-WRAPPER)))
+  ;; Read `templateFile', substitute any defined template `variables' with their
+  ;; supplied values and write the result to a Maven pom file named `outputFile'.
+  (with-input-file (in templateFile)
+    (with-output-file (out outputFile :if-not-exists :create-path)
+      (substitute-template-variables-to-stream in out variables))))
+
+(defun java-output-system-maven-files ()
+  ;; Create Apache Maven pom.xml files for the currently translated system.
+  ;; This uses the files `pom.xml.in' and/or `pom.xml.parent.in' in the top-level
+  ;; system directory as a template, or, if no local template exists, the respective
+  ;; files `XXX-default.in' in the STELLA directory (which should work for most cases).
+  ;; The actual pom.xml files are created by substituting the following variables:
+  ;;    SYSTEM-NAME, SYSTEM-GROUP-NAME, SYSTEM-VERSION, REQUIRED-SYSTEMS, CHILD-SYSTEMS,
+  ;;    SYSTEM-PARENT-NAME, SYSTEM-PARENT-GROUP-NAME, SYSTEM-PARENT-VERSION.
+  ;; Template variables have to be written as #$(VAR), e.g., #$(SYSTEM-NAME).
+  ;; After successful translation, the system can be Java-compiled like this:
+  ;;    % cd .../native/java/
+  ;;    % mvn -am install
+  (let ((system *currentSystemDefinition*)
+        (templateFile (java-get-system-maven-template-file))
+        (parentTemplateFile (java-get-system-parent-maven-template-file))
+        (variables (new (KEY-VALUE-LIST OF STRING-WRAPPER STRING-WRAPPER)))
+        (requiredSystems (new STRING-OUTPUT-STREAM))
+        (childSystems (new STRING-OUTPUT-STREAM))
+        (nativeRoot (root-native-directory))
+        (languageSubdir (get-language-subdirectory-from-file-type :java))
+        (languageDirectory (concatenate-file-names nativeRoot languageSubdir))
+        (systemSubdir (get-system-subdirectory-from-file-type :java))
+        (pomFile (concatenate-file-names languageDirectory systemSubdir "pom.xml"))
+        (parentPomFile (concatenate-file-names languageDirectory "pom.xml"))
+        (firstLine? TRUE))
+    (insert-at variables "SYSTEM-NAME" (name system))
+    (insert-at variables "SYSTEM-GROUP-NAME" (java-yield-SYSTEM-GROUP-NAME system))
+    (insert-at variables "SYSTEM-VERSION" (java-yield-SYSTEM-VERSION system))
+    ;; parent pom values:
+    (insert-at variables "SYSTEM-PARENT-NAME" (java-yield-SYSTEM-PARENT-NAME system))
+    ;; use a dummy group name value for now for simplicity, maybe we have to make this configurable at some point:
+    (insert-at variables "SYSTEM-PARENT-GROUP-NAME" "stella-parent-systems")
+    (insert-at variables "SYSTEM-PARENT-VERSION" (date-to-version-string (make-current-date-time) :minutes))
+    (when (defined? (required-systems system))
+      (setq firstLine? TRUE)
+      (foreach reqSys in (required-systems system)
+          do (setq system (get-system-definition reqSys TRUE))
+             (unless firstLine?
+               (print-stream requiredSystems EOL "    "))
+             (print-stream requiredSystems "<dependency>" EOL)
+             (print-stream requiredSystems "      <groupId>" (java-yield-SYSTEM-GROUP-NAME system) "</groupId>" EOL)
+             (print-stream requiredSystems "      <artifactId>" (name system) "</artifactId>" EOL)
+             ;; we don't have version dependencies in STELLA systems, so don't have them here either:
+             (print-stream requiredSystems "      <version>" "[0,10000]" "</version>" EOL)
+             (print-stream requiredSystems "    </dependency>")
+             (setq firstLine? FALSE)))
+    (insert-at variables "REQUIRED-SYSTEMS" (the-string requiredSystems))
+    (substitute-template-variables-to-maven-file templateFile pomFile variables)
+    ;; now generate a parent pom file for all submodules in native/java that have their own pom.xml:
+    (setq firstLine? TRUE)
+    (foreach dir in (list-directory-files languageDirectory)
+        where (probe-file? (concatenate-file-names languageDirectory dir "pom.xml"))
+        do (unless firstLine?
+             (print-stream childSystems EOL "    "))
+           (print-stream childSystems "<module>" (unwrap-string dir) "</module>")
+           (setq firstLine? FALSE))
+    (insert-at variables "CHILD-SYSTEMS" (the-string childSystems))
+    (substitute-template-variables-to-maven-file parentTemplateFile parentPomFile variables)))

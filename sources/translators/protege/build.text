@@ -1,0 +1,19 @@
+#
+#  Setup initial stuff
+# 
+mkdir /Applications/Protege_3.2.1/plugins/edu.isi.powerloom.protege
+cp edu.isi.powerloom.protege/plugin.properties /Applications/Protege_3.2.1/plugins/edu.isi.powerloom.protege/
+
+#
+#  Build and deploy Java code
+#
+
+javac -classpath /Applications/Protege_3.2.1/protege.jar:. edu/isi/powerloom/protege/*.java
+jar cmf PLExport-MANIFEST.MF edu.isi.powerloom.protege/PLExport.jar edu
+cp edu.isi.powerloom.protege/PLExport.jar /Applications/Protege_3.2.1/plugins/edu.isi.powerloom.protege/
+
+#
+#  Package for distribution
+#
+
+find edu.isi.powerloom.protege -name "CVS" -prune -o -print | zip powerloom-plugin.zip -@

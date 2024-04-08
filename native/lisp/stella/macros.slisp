@@ -1,0 +1,1043 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;; macros.slisp
+
+#|
++---------------------------- BEGIN LICENSE BLOCK ---------------------------+
+|                                                                            |
+| Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          |
+|                                                                            |
+| The contents of this file are subject to the Mozilla Public License        |
+| Version 1.1 (the "License"); you may not use this file except in           |
+| compliance with the License. You may obtain a copy of the License at       |
+| http://www.mozilla.org/MPL/                                                |
+|                                                                            |
+| Software distributed under the License is distributed on an "AS IS" basis, |
+| WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   |
+| for the specific language governing rights and limitations under the       |
+| License.                                                                   |
+|                                                                            |
+| The Original Code is the STELLA Programming Language.                      |
+|                                                                            |
+| The Initial Developer of the Original Code is                              |
+| UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          |
+| 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               |
+|                                                                            |
+| Portions created by the Initial Developer are Copyright (C) 1996-2023      |
+| the Initial Developer. All Rights Reserved.                                |
+|                                                                            |
+| Contributor(s):                                                            |
+|                                                                            |
+| Alternatively, the contents of this file may be used under the terms of    |
+| either the GNU General Public License Version 2 or later (the "GPL"), or   |
+| the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   |
+| in which case the provisions of the GPL or the LGPL are applicable instead |
+| of those above. If you wish to allow use of your version of this file only |
+| under the terms of either the GPL or the LGPL, and not to allow others to  |
+| use your version of this file under the terms of the MPL, indicate your    |
+| decision by deleting the provisions above and replace them with the notice |
+| and other provisions required by the GPL or the LGPL. If you do not delete |
+| the provisions above, a recipient may use your version of this file under  |
+| the terms of any one of the MPL, the GPL or the LGPL.                      |
+|                                                                            |
++---------------------------- END LICENSE BLOCK -----------------------------+
+|#
+
+(CL:IN-PACKAGE "STELLA")
+
+;;; Auxiliary variables:
+
+(CL:DEFVAR SYM-MACROS-STELLA-SETQ NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-CONS NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-VRLET NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-VALUE NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-REST NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-SETF NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-CHOOSE NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-MEMBER? NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-+ NULL)
+(CL:DEFVAR SYM-MACROS-STELLA--- NULL)
+(CL:DEFVAR KWD-MACROS-JAVA NULL)
+(CL:DEFVAR KWD-MACROS-FUNCTION NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-- NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-DEFINED? NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-NULL NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-FIRST-DEFINED NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-TRUE NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-AND NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-FOREACH NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-NIL NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-COLLECT NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-INTO NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-SPECIAL NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-*TRANSIENTOBJECTS?* NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-FALSE NULL)
+(CL:DEFVAR KWD-MACROS-READ-ONLY? NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-*CONTEXT* NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-SAFETY NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-EQL? NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-BASE-MODULE NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-CAST NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-WORLD NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-*MODULE* NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-IN NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-*CURRENTSYSTEMDEFINITION* NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-GET-SYSTEM-DEFINITION NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-*CURRENTSYSTEMDEFINITIONSUBDIRECTORY* NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-DIRECTORY NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-PROGN NULL)
+(CL:DEFVAR KWD-MACROS-STARTUP-SYSTEM? NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-IF-STELLA-FEATURE NULL)
+(CL:DEFVAR KWD-MACROS-SUPPORT-UNEXEC NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-VERBATIM NULL)
+(CL:DEFVAR KWD-MACROS-CPP NULL)
+(CL:DEFVAR KWD-MACROS-OTHERWISE NULL)
+(CL:DEFVAR KWD-MACROS-PUBLIC? NULL)
+(CL:DEFVAR KWD-MACROS-COMMON-LISP NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-DEFUN NULL)
+(CL:DEFVAR KWD-MACROS-CPP-STANDALONE NULL)
+(CL:DEFVAR KWD-MACROS-IDL NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-INTEGER NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-RETURN NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-ARRAY NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-OF NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-STRING NULL)
+(CL:DEFVAR |SYM-MACROS-STELLA-&REST| NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-%%ARGS NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-LET NULL)
+(CL:DEFVAR KWD-MACROS-INITIAL-CONTENTS NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-DEFMAIN NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-STARTUP-MACROS NULL)
+(CL:DEFVAR SYM-MACROS-STELLA-METHOD-STARTUP-CLASSNAME NULL)
+
+;;; Forward declarations:
+
+(CL:DECLAIM
+ (CL:SPECIAL *STELLA-MODULE* *MODULE* *CURRENTSYSTEMDEFINITION*
+  *METHODBEINGWALKED* *CURRENT-STELLA-FEATURES*
+  *TRANSLATOROUTPUTLANGUAGE* FALSE-WRAPPER STANDARD-ERROR EOL
+  ONE-WRAPPER NIL))
+
+;;; (DEFMACRO PUSHQ ...)
+
+(CL:DEFUN PUSHQ (VARIABLE VALUE)
+  "Push 'value' onto the cons list 'variable'."
+  (CL:RETURN-FROM PUSHQ
+   (LIST* SYM-MACROS-STELLA-SETQ VARIABLE
+    (CONS (LIST* SYM-MACROS-STELLA-CONS VALUE (CONS VARIABLE NIL))
+     NIL))))
+
+;;; (DEFMACRO POPQ ...)
+
+(CL:DEFUN POPQ (VARIABLE)
+  "Pops a value from the cons list 'variable'."
+  (CL:LET* ((VALUEVAR (LOCAL-GENSYM "HEAD")))
+   (CL:RETURN-FROM POPQ
+    (LIST* SYM-MACROS-STELLA-VRLET
+     (CONS
+      (CONS VALUEVAR
+       (CONS (LIST* SYM-MACROS-STELLA-VALUE VARIABLE NIL) NIL))
+      NIL)
+     (LIST* SYM-MACROS-STELLA-SETQ VARIABLE
+      (CONS (LIST* SYM-MACROS-STELLA-REST VARIABLE NIL) NIL))
+     VALUEVAR NIL))))
+
+;;; (DEFMACRO PUSHF ...)
+
+(CL:DEFUN PUSHF (PLACE VALUE)
+  "Push 'value' onto the cons list 'place'."
+  (CL:LET* ((PLACECOPY (COPY-CONS-TREE PLACE)))
+   (CL:RETURN-FROM PUSHF
+    (LIST* SYM-MACROS-STELLA-SETF PLACE
+     (CONS (LIST* SYM-MACROS-STELLA-CONS VALUE (CONS PLACECOPY NIL))
+      NIL)))))
+
+;;; (DEFMACRO PUSHQ-NEW ...)
+
+(CL:DEFUN PUSHQ-NEW (VARIABLE VALUE)
+  "Push `value' onto the cons list `variable', unless `value'
+is already a member of the list."
+  (CL:IF (CONS? VALUE)
+   (CL:LET* ((VALUEVAR (LOCAL-GENSYM "VALUE")))
+    (CL:RETURN-FROM PUSHQ-NEW
+     (LIST* SYM-MACROS-STELLA-VRLET
+      (CONS (CONS VALUEVAR (CONS VALUE NIL)) NIL)
+      (LIST* SYM-MACROS-STELLA-SETQ VARIABLE
+       (CONS
+        (LIST* SYM-MACROS-STELLA-CHOOSE
+         (LIST* SYM-MACROS-STELLA-MEMBER? VARIABLE (CONS VALUEVAR NIL))
+         VARIABLE
+         (CONS
+          (LIST* SYM-MACROS-STELLA-CONS VALUEVAR (CONS VARIABLE NIL))
+          NIL))
+        NIL))
+      NIL)))
+   (CL:RETURN-FROM PUSHQ-NEW
+    (LIST* SYM-MACROS-STELLA-SETQ VARIABLE
+     (CONS
+      (LIST* SYM-MACROS-STELLA-CHOOSE
+       (LIST* SYM-MACROS-STELLA-MEMBER? VARIABLE (CONS VALUE NIL))
+       VARIABLE
+       (CONS (LIST* SYM-MACROS-STELLA-CONS VALUE (CONS VARIABLE NIL))
+        NIL))
+      NIL)))))
+
+;;; (DEFMACRO ++ ...)
+
+(CL:DEFUN ++ (PLACE INCREMENT)
+  "Increment the value of `place' and return the result.
+`place' can be either a variable name or a slot reference.  Increment by
+the optional `increment' (which can be a float) or 1 otherwise."
+  (CL:LET* ((INCR (%%VALUE INCREMENT)))
+   (CL:WHEN (CL:NOT (CL:OR (SYMBOL? PLACE) (CONS? PLACE)))
+    (CL:IF (CL:EQ PLACE NULL)
+     (CL:LET* ((*PRINTREADABLY?* CL:T))
+      (CL:DECLARE (CL:SPECIAL *PRINTREADABLY?*))
+      (SIGNAL-TRANSLATION-ERROR)
+      (CL:WHEN (CL:NOT (SUPPRESS-WARNINGS?))
+       (PRINT-ERROR-CONTEXT ">> ERROR: " STANDARD-ERROR)
+       (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-ERROR)
+        EOL " Missing place in `++' expression." EOL)))
+     (CL:LET* ((*PRINTREADABLY?* CL:T))
+      (CL:DECLARE (CL:SPECIAL *PRINTREADABLY?*))
+      (SIGNAL-TRANSLATION-ERROR)
+      (CL:WHEN (CL:NOT (SUPPRESS-WARNINGS?))
+       (PRINT-ERROR-CONTEXT ">> ERROR: " STANDARD-ERROR)
+       (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-ERROR)
+        EOL " Illegal place in `++' expression: `"
+        (DE-UGLIFY-PARSE-TREE PLACE) "'." EOL))))
+    (CL:RETURN-FROM ++ NIL))
+   (CL:WHEN (CL:EQ INCR NULL) (CL:SETQ INCR ONE-WRAPPER))
+   (CL:RETURN-FROM ++
+    (CL:IF (SYMBOL? PLACE)
+     (LIST* SYM-MACROS-STELLA-SETQ PLACE
+      (CONS (LIST* SYM-MACROS-STELLA-+ PLACE (CONS INCR NIL)) NIL))
+     (LIST* SYM-MACROS-STELLA-SETF PLACE
+      (CONS
+       (LIST* SYM-MACROS-STELLA-+ (COPY-CONS-TREE PLACE)
+        (CONS INCR NIL))
+       NIL))))))
+
+;;; (DEFMACRO -- ...)
+
+(CL:DEFUN -- (PLACE DECREMENT)
+  "Decrement the value of `place' and return the result.
+`place' can be either a variable name or a slot reference.  Decrement by
+the optional `decrement' (which can be a float) or 1 otherwise."
+  (CL:LET* ((DECR (%%VALUE DECREMENT)))
+   (CL:WHEN (CL:NOT (CL:OR (SYMBOL? PLACE) (CONS? PLACE)))
+    (CL:IF (CL:EQ PLACE NULL)
+     (CL:LET* ((*PRINTREADABLY?* CL:T))
+      (CL:DECLARE (CL:SPECIAL *PRINTREADABLY?*))
+      (SIGNAL-TRANSLATION-ERROR)
+      (CL:WHEN (CL:NOT (SUPPRESS-WARNINGS?))
+       (PRINT-ERROR-CONTEXT ">> ERROR: " STANDARD-ERROR)
+       (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-ERROR)
+        EOL " Missing place in `--' expression." EOL)))
+     (CL:LET* ((*PRINTREADABLY?* CL:T))
+      (CL:DECLARE (CL:SPECIAL *PRINTREADABLY?*))
+      (SIGNAL-TRANSLATION-ERROR)
+      (CL:WHEN (CL:NOT (SUPPRESS-WARNINGS?))
+       (PRINT-ERROR-CONTEXT ">> ERROR: " STANDARD-ERROR)
+       (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-ERROR)
+        EOL " Illegal place in `--' expression: `"
+        (DE-UGLIFY-PARSE-TREE PLACE) "'." EOL))))
+    (CL:RETURN-FROM -- NIL))
+   (CL:WHEN (CL:EQ DECR NULL) (CL:SETQ DECR ONE-WRAPPER))
+   (CL:RETURN-FROM --
+    (CL:IF (SYMBOL? PLACE)
+     (LIST* SYM-MACROS-STELLA-SETQ PLACE
+      (CONS (LIST* SYM-MACROS-STELLA-- PLACE (CONS DECR NIL)) NIL))
+     (LIST* SYM-MACROS-STELLA-SETF PLACE
+      (CONS
+       (LIST* SYM-MACROS-STELLA-- (COPY-CONS-TREE PLACE)
+        (CONS DECR NIL))
+       NIL))))))
+
+;;; (DEFMACRO 1+ ...)
+
+(CL:DEFUN 1+ (EXPRESSION)
+  "Add 1 to 'expression' and return the result."
+  (CL:RETURN-FROM 1+
+   (LIST* SYM-MACROS-STELLA-+ EXPRESSION (CONS (WRAP-INTEGER 1) NIL))))
+
+;;; (DEFMACRO 1- ...)
+
+(CL:DEFUN 1- (EXPRESSION)
+  "Subtract 1 from 'expression' and return the result."
+  (CL:RETURN-FROM 1-
+   (LIST* SYM-MACROS-STELLA-- EXPRESSION (CONS (WRAP-INTEGER 1) NIL))))
+
+;;; (DEFMACRO SETQ? ...)
+
+(CL:DEFUN SETQ? (VARIABLE EXPRESSION)
+  "Assign 'variable' the result of evaluating 'expression', 
+and return TRUE if 'expression' is not NULL else return FALSE."
+  (CL:RETURN-FROM SETQ?
+   (LIST* SYM-MACROS-STELLA-VRLET NIL
+    (LIST* SYM-MACROS-STELLA-SETQ VARIABLE (CONS EXPRESSION NIL))
+    (LIST* SYM-MACROS-STELLA-DEFINED? VARIABLE NIL) NIL)))
+
+;;; (DEFMACRO FIRST-DEFINED ...)
+
+(CL:DEFUN FIRST-DEFINED (FORMS)
+  "Return the result of the first form in `forms' whose value is defined
+or NULL otherwise."
+  (CL:CASE (LENGTH FORMS)
+   (0 (CL:RETURN-FROM FIRST-DEFINED SYM-MACROS-STELLA-NULL))
+   (1 (CL:RETURN-FROM FIRST-DEFINED (%%VALUE FORMS)))
+   (2
+    (CL:IF (SYMBOL? (%%VALUE FORMS))
+     (CL:RETURN-FROM FIRST-DEFINED
+      (LIST* SYM-MACROS-STELLA-CHOOSE
+       (LIST* SYM-MACROS-STELLA-DEFINED? (%%VALUE FORMS) NIL)
+       (%%VALUE FORMS) (CONS (%%VALUE (%%REST FORMS)) NIL)))
+     (CL:LET* ((LETVARIABLE (LOCAL-GENSYM "TEMP")))
+      (CL:RETURN-FROM FIRST-DEFINED
+       (LIST* SYM-MACROS-STELLA-VRLET
+        (CONS (CONS LETVARIABLE (CONS (%%VALUE FORMS) NIL)) NIL)
+        (LIST* SYM-MACROS-STELLA-CHOOSE
+         (LIST* SYM-MACROS-STELLA-DEFINED? LETVARIABLE NIL) LETVARIABLE
+         (CONS (%%VALUE (%%REST FORMS)) NIL))
+        NIL)))))
+   (CL:OTHERWISE
+    (CL:RETURN-FROM FIRST-DEFINED
+     (LIST* SYM-MACROS-STELLA-FIRST-DEFINED (%%VALUE FORMS)
+      (CONS
+       (CONS SYM-MACROS-STELLA-FIRST-DEFINED
+        (CONCATENATE (%%REST FORMS) NIL))
+       NIL))))))
+
+;;; (DEFMACRO ALL-DEFINED? ...)
+
+(CL:DEFUN ALL-DEFINED? (FORMS)
+  "Evaluate each of the forms in 'forms', and
+return TRUE if none of them are NULL."
+  (CL:CASE (LENGTH FORMS)
+   (0 (CL:RETURN-FROM ALL-DEFINED? SYM-MACROS-STELLA-TRUE))
+   (1
+    (CL:RETURN-FROM ALL-DEFINED?
+     (LIST* SYM-MACROS-STELLA-DEFINED? (%%VALUE FORMS) NIL)))
+   (CL:OTHERWISE
+    (CL:LET* ((TESTS NIL))
+     (CL:LET* ((F NULL) (ITER-000 FORMS) (COLLECT-000 NULL))
+      (CL:LOOP WHILE (CL:NOT (CL:EQ ITER-000 NIL)) DO
+       (CL:SETQ F (%%VALUE ITER-000))
+       (CL:IF (CL:EQ COLLECT-000 NULL)
+        (CL:PROGN
+         (CL:SETQ COLLECT-000
+          (CONS (LIST* SYM-MACROS-STELLA-DEFINED? F NIL) NIL))
+         (CL:IF (CL:EQ TESTS NIL) (CL:SETQ TESTS COLLECT-000)
+          (ADD-CONS-TO-END-OF-CONS-LIST TESTS COLLECT-000)))
+        (CL:PROGN
+         (CL:SETF (%%REST COLLECT-000)
+          (CONS (LIST* SYM-MACROS-STELLA-DEFINED? F NIL) NIL))
+         (CL:SETQ COLLECT-000 (%%REST COLLECT-000))))
+       (CL:SETQ ITER-000 (%%REST ITER-000))))
+     (CL:RETURN-FROM ALL-DEFINED?
+      (CONS SYM-MACROS-STELLA-AND (CONCATENATE TESTS NIL)))))))
+
+;;; (DEFMACRO EITHER ...)
+
+(CL:DEFUN EITHER (VALUE1 VALUE2)
+  "If 'value1' is defined, return that, else return 'value2'."
+  (CL:RETURN-FROM EITHER
+   (LIST* SYM-MACROS-STELLA-FIRST-DEFINED VALUE1 (CONS VALUE2 NIL))))
+
+;;; (DEFMACRO COLLECT ...)
+
+(CL:DEFUN COLLECT (BODY)
+  "Use a VRLET to collect values.  Input can have one of
+the following forms:
+	 
+  (collect <var> in <expression> [where <test> <var>])
+  (collect <collect-expression>
+           foreach <var> in <expression>
+           {as ...}*
+           [where <test> <var>]
+           [do ...])
+	
+The second form really accepts an arbitrary `foreach' expression following
+the `foreach' keyword."
+  (CL:LET* ((COLLECTION (LOCAL-GENSYM "VALUE")))
+   (CL:IF (CL:EQ (%%VALUE (%%REST BODY)) SYM-MACROS-STELLA-FOREACH)
+    (CL:RETURN-FROM COLLECT
+     (LIST* SYM-MACROS-STELLA-VRLET
+      (CONS (CONS COLLECTION (CONS SYM-MACROS-STELLA-NIL NIL)) NIL)
+      (CONS SYM-MACROS-STELLA-FOREACH
+       (CONCATENATE (%%REST (%%REST BODY))
+        (LIST* SYM-MACROS-STELLA-COLLECT (%%VALUE BODY)
+         (LIST* SYM-MACROS-STELLA-INTO COLLECTION NIL))))
+      COLLECTION NIL))
+    (CL:RETURN-FROM COLLECT
+     (LIST* SYM-MACROS-STELLA-VRLET
+      (CONS (CONS COLLECTION (CONS SYM-MACROS-STELLA-NIL NIL)) NIL)
+      (LIST* SYM-MACROS-STELLA-FOREACH (%%VALUE BODY)
+       (CONCATENATE (%%REST BODY)
+        (LIST* SYM-MACROS-STELLA-COLLECT (%%VALUE BODY)
+         (LIST* SYM-MACROS-STELLA-INTO COLLECTION NIL))))
+      COLLECTION NIL)))))
+
+;;; (DEFMACRO WITH-PERMANENT-OBJECTS ...)
+
+(CL:DEFUN WITH-PERMANENT-OBJECTS (BODY)
+  "Allocate 'permanent' (as opposed to 'transient')
+objects within the scope of this declaration."
+  (CL:RETURN-FROM WITH-PERMANENT-OBJECTS
+   (LIST* SYM-MACROS-STELLA-SPECIAL
+    (CONS
+     (LIST* SYM-MACROS-STELLA-*TRANSIENTOBJECTS?*
+      SYM-MACROS-STELLA-FALSE NIL)
+     NIL)
+    (CONCATENATE BODY NIL))))
+
+;;; (DEFMACRO WITH-TRANSIENT-OBJECTS ...)
+
+(CL:DEFUN WITH-TRANSIENT-OBJECTS (BODY)
+  "Allocate 'transient' (as opposed to 'permanent')
+objects within the scope of this declaration.
+CAUTION: The default assumption is the allocation of permanent objects.
+The scope of `with-transient-objects' should be as small as possible, and
+the user has to make sure that code that wasn't explicitly written to
+account for transient objects will continue to work correctly."
+  (CL:RETURN-FROM WITH-TRANSIENT-OBJECTS
+   (LIST* SYM-MACROS-STELLA-SPECIAL
+    (CONS
+     (LIST* SYM-MACROS-STELLA-*TRANSIENTOBJECTS?*
+      SYM-MACROS-STELLA-TRUE NIL)
+     NIL)
+    (CONCATENATE BODY NIL))))
+
+;;; (DEFMACRO IGNORE ...)
+
+(CL:DEFUN IGNORE (VARIABLES)
+  "Ignore unused 'variables' with NoOp 'setq' statements."
+  (CL:LET* ((IGNORETREES NIL))
+   (CL:LET* ((VARIABLE NULL) (ITER-000 VARIABLES) (COLLECT-000 NULL))
+    (CL:LOOP WHILE (CL:NOT (CL:EQ ITER-000 NIL)) DO
+     (CL:SETQ VARIABLE (%%VALUE ITER-000))
+     (SET-LOCAL-VARIABLE-INFO VARIABLE KWD-MACROS-READ-ONLY?
+      FALSE-WRAPPER)
+     (CL:IF (CL:EQ COLLECT-000 NULL)
+      (CL:PROGN
+       (CL:SETQ COLLECT-000
+        (CONS
+         (LIST* SYM-MACROS-STELLA-SETQ VARIABLE (CONS VARIABLE NIL))
+         NIL))
+       (CL:IF (CL:EQ IGNORETREES NIL) (CL:SETQ IGNORETREES COLLECT-000)
+        (ADD-CONS-TO-END-OF-CONS-LIST IGNORETREES COLLECT-000)))
+      (CL:PROGN
+       (CL:SETF (%%REST COLLECT-000)
+        (CONS
+         (LIST* SYM-MACROS-STELLA-SETQ VARIABLE (CONS VARIABLE NIL))
+         NIL))
+       (CL:SETQ COLLECT-000 (%%REST COLLECT-000))))
+     (CL:SETQ ITER-000 (%%REST ITER-000))))
+   (CL:RETURN-FROM IGNORE (PROGNIFY IGNORETREES))))
+
+;;; (DEFMACRO ONLY-IF ...)
+
+(CL:DEFUN ONLY-IF (TEST EXPRESSION)
+  "If 'test' is TRUE, return the result of evaluating 
+'expression'."
+  (CL:RETURN-FROM ONLY-IF
+   (LIST* SYM-MACROS-STELLA-CHOOSE TEST
+    (CONS EXPRESSION (CONS SYM-MACROS-STELLA-NULL NIL)))))
+
+;;; (DEFMACRO PHASE-TO-INTEGER ...)
+
+(CL:DEFUN PHASE-TO-INTEGER (STARTUPTIMEPHASE)
+  "Expands into the integer representing 'startupTimePhase'."
+  (CL:RETURN-FROM PHASE-TO-INTEGER
+   (WRAP-INTEGER (ENCODE-STARTUP-TIME-PHASE STARTUPTIMEPHASE))))
+
+;;; (DEFMACRO IF-OUTPUT-LANGUAGE ...)
+
+(CL:DEFUN IF-OUTPUT-LANGUAGE (LANGUAGE THENFORM ELSEFORM)
+  "Expand to 'thenForm' if the current translator output
+language equals 'language'.  Otherwise, expand to 'elseForm'.  This can
+be used to conditionally translate Stella code."
+  (CL:IF (CL:EQ LANGUAGE *TRANSLATOROUTPUTLANGUAGE*)
+   (CL:RETURN-FROM IF-OUTPUT-LANGUAGE
+    (CL:IF (CL:EQ THENFORM SYM-MACROS-STELLA-NULL) NULL THENFORM))
+   (CL:RETURN-FROM IF-OUTPUT-LANGUAGE
+    (CL:IF (CL:EQ ELSEFORM SYM-MACROS-STELLA-NULL) NULL ELSEFORM))))
+
+;;; (DEFMACRO IF-STELLA-FEATURE ...)
+
+(CL:DEFUN IF-STELLA-FEATURE (FEATURE THENFORM ELSEFORM)
+  "Expand to 'thenForm' if 'feature' is a currently enabled
+STELLA environment feature.  Otherwise, expand to 'elseForm'.  This can
+be used to conditionally translate Stella code."
+  (CL:IF (MEMB? *CURRENT-STELLA-FEATURES* FEATURE)
+   (CL:RETURN-FROM IF-STELLA-FEATURE
+    (CL:IF (CL:EQ THENFORM SYM-MACROS-STELLA-NULL) NULL THENFORM))
+   (CL:RETURN-FROM IF-STELLA-FEATURE
+    (CL:IF (CL:EQ ELSEFORM SYM-MACROS-STELLA-NULL) NULL ELSEFORM))))
+
+;;; (DEFMACRO WITHIN-WORLD ...)
+
+(CL:DEFUN WITHIN-WORLD (WORLDFORM BODY)
+  "Execute `body' within the world resulting from `worldForm'."
+  (CL:RETURN-FROM WITHIN-WORLD
+   (LIST* SYM-MACROS-STELLA-SPECIAL
+    (CONS (LIST* SYM-MACROS-STELLA-*CONTEXT* WORLDFORM NIL) NIL)
+    (LIST* SYM-MACROS-STELLA-SAFETY (WRAP-INTEGER 3)
+     (LIST* SYM-MACROS-STELLA-EQL?
+      (LIST* SYM-MACROS-STELLA-BASE-MODULE
+       (LIST* SYM-MACROS-STELLA-CAST SYM-MACROS-STELLA-*CONTEXT*
+        SYM-MACROS-STELLA-WORLD NIL)
+       NIL)
+      SYM-MACROS-STELLA-*MODULE* NIL)
+     (WRAP-STRING "within-world: The base module of world ")
+     SYM-MACROS-STELLA-*CONTEXT*
+     (WRAP-STRING " does not match the current module.") NIL)
+    (CONCATENATE BODY NIL))))
+
+;;; (DEFMACRO WITHIN-CONTEXT ...)
+
+(CL:DEFUN WITHIN-CONTEXT (CONTEXTFORM BODY)
+  "Execute `body' within the context resulting from `contextForm'."
+  (CL:RETURN-FROM WITHIN-CONTEXT
+   (LIST* SYM-MACROS-STELLA-SPECIAL
+    (LIST* (LIST* SYM-MACROS-STELLA-*CONTEXT* CONTEXTFORM NIL)
+     (LIST* SYM-MACROS-STELLA-*MODULE*
+      (LIST* SYM-MACROS-STELLA-BASE-MODULE SYM-MACROS-STELLA-*CONTEXT*
+       NIL)
+      NIL)
+     NIL)
+    (CONCATENATE BODY NIL))))
+
+;;; (DEFMACRO WITHIN-MODULE ...)
+
+(CL:DEFUN WITHIN-MODULE (MODULEFORM BODY)
+  "Execute `body' within the module resulting from `moduleForm'.
+`*module*' is an acceptable `moduleForm'.  It will locally rebind 
+`*module*' and `*context*' and shield the outer bindings from changes."
+  (CL:RETURN-FROM WITHIN-MODULE
+   (LIST* SYM-MACROS-STELLA-SPECIAL
+    (LIST* (LIST* SYM-MACROS-STELLA-*MODULE* MODULEFORM NIL)
+     (LIST* SYM-MACROS-STELLA-*CONTEXT* SYM-MACROS-STELLA-*MODULE* NIL)
+     NIL)
+    (CONCATENATE BODY NIL))))
+
+;;; (DEFMACRO |COERCE-&REST-TO-CONS| ...)
+
+(CL:DEFUN |COERCE-&REST-TO-CONS| (RESTVARIABLE)
+  "Coerce the argument list variable `restVariable' into a CONS
+list containing all its elements (uses argument list iteration to do so).  If
+`restVariable' already is a CONS due to argument listification, this is a no-op."
+  (CL:IF (PASS-VARIABLE-ARGUMENTS-AS-LIST? *METHODBEINGWALKED*)
+   (CL:RETURN-FROM |COERCE-&REST-TO-CONS|
+    (SYS-TREE (WALK-WITHOUT-TYPE-TREE RESTVARIABLE)
+     (YIELD-LISTIFIED-VARIABLE-ARGUMENTS-TYPE *METHODBEINGWALKED*)))
+   (CL:LET*
+    ((ARGVAR (LOCAL-GENSYM "ARG")) (LISTVAR (LOCAL-GENSYM "ARGLIST")))
+    (CL:RETURN-FROM |COERCE-&REST-TO-CONS|
+     (LIST* SYM-MACROS-STELLA-VRLET
+      (CONS
+       (CONS LISTVAR
+        (CONS
+         (YIELD-LISTIFIED-VARIABLE-ARGUMENTS-TYPE *METHODBEINGWALKED*)
+         (CONS SYM-MACROS-STELLA-NIL NIL)))
+       NIL)
+      (LIST* SYM-MACROS-STELLA-FOREACH ARGVAR
+       (LIST* SYM-MACROS-STELLA-IN RESTVARIABLE
+        (LIST* SYM-MACROS-STELLA-COLLECT ARGVAR
+         (LIST* SYM-MACROS-STELLA-INTO LISTVAR NIL))))
+      LISTVAR NIL)))))
+
+;;; (DEFMACRO WITH-SYSTEM-DEFINITION ...)
+
+(CL:DEFUN WITH-SYSTEM-DEFINITION (SYSTEMNAMEEXPRESSION BODY)
+  "Set *currentSystemDefinition* to the system definition named `system'.
+Set *currentSystemDefinitionSubdirectory* to match. Execute `body' within
+that scope."
+  (CL:RETURN-FROM WITH-SYSTEM-DEFINITION
+   (LIST* SYM-MACROS-STELLA-SPECIAL
+    (LIST*
+     (LIST* SYM-MACROS-STELLA-*CURRENTSYSTEMDEFINITION*
+      (LIST* SYM-MACROS-STELLA-GET-SYSTEM-DEFINITION
+       SYSTEMNAMEEXPRESSION (CONS SYM-MACROS-STELLA-TRUE NIL))
+      NIL)
+     (LIST* SYM-MACROS-STELLA-*CURRENTSYSTEMDEFINITIONSUBDIRECTORY*
+      (LIST* SYM-MACROS-STELLA-DIRECTORY
+       SYM-MACROS-STELLA-*CURRENTSYSTEMDEFINITION* NIL)
+      NIL)
+     NIL)
+    (CONS SYM-MACROS-STELLA-PROGN (CONCATENATE BODY NIL)) NIL)))
+
+;;; (DEFMACRO DEFMAIN ...)
+
+(CL:DEFUN %DEFMAIN (VARLIST BODY)
+  "Defines a function called MAIN which will have the appropriate
+signature for the target translation language.  The signature will be:
+  C++:   public static int main (int v1, char** v2) {<body>}
+  Java:  public static void main (String [] v2) {<body>}
+  Lisp:  (defun main (&rest args) <body>)
+The argument `varList' must have two symbols, which will be the names for the
+INTEGER argument count and an array of STRINGs with the argument values.  It
+can also be empty to indicate that no command line arguments will be handled.
+The startup function for the containing system will automatically be called
+before `body' is executed unless the option :STARTUP-SYSTEM? was supplied as
+FALSE.  There can only be one DEFMAIN per module."
+  (CL:LET*
+   ((PROCESSCMDLINEARGS? (CL:NOT (CL:EQ VARLIST NIL)))
+    (V1NAME (%%VALUE VARLIST)) (V2NAME (%%VALUE (%%REST VARLIST)))
+    (MAINNAME (INTERN-SYMBOL-IN-MODULE "MAIN" *MODULE* CL:T))
+    (BODYWITHHEADER (CONS NULL BODY)))
+   (CL:LET* ((SELF-000 (NEW-PROPERTY-LIST)))
+    (CL:SETF (%PROPERTY-LIST.THE-PLIST SELF-000)
+     (EXTRACT-OPTIONS BODYWITHHEADER NULL))
+    (CL:LET*
+     ((OPTIONS SELF-000)
+      (STARTUPFUNCTIONCALL
+       (CL:IF
+        (CL:AND (CL:NOT (CL:EQ *CURRENTSYSTEMDEFINITION* NULL))
+         (CL:NOT
+          (CL:EQ (LOOKUP OPTIONS KWD-MACROS-STARTUP-SYSTEM?)
+           SYM-MACROS-STELLA-FALSE)))
+        (CONS
+         (CONS
+          (SYSTEM-STARTUP-FUNCTION-SYMBOL *CURRENTSYSTEMDEFINITION*)
+          NIL)
+         NIL)
+        NIL)))
+     (CL:SETQ STARTUPFUNCTIONCALL
+      (CONS
+       (LIST* SYM-MACROS-STELLA-IF-STELLA-FEATURE
+        KWD-MACROS-SUPPORT-UNEXEC
+        (LIST* SYM-MACROS-STELLA-VERBATIM KWD-MACROS-CPP
+         (WRAP-STRING
+          "freopen (\"/dev/tty\",\"w\",stdout); freopen (\"/dev/tty\",\"w\",stderr); freopen (\"/dev/tty\",\"r\",stdin)")
+         KWD-MACROS-OTHERWISE SYM-MACROS-STELLA-NULL NIL)
+        SYM-MACROS-STELLA-NULL NIL)
+       (CONCATENATE STARTUPFUNCTIONCALL NIL)))
+     (REMOVE-AT OPTIONS KWD-MACROS-STARTUP-SYSTEM?)
+     (REMOVE-AT OPTIONS KWD-MACROS-PUBLIC?)
+     (CL:SETQ BODY
+      (CONCATENATE (%PROPERTY-LIST.THE-PLIST OPTIONS)
+       (%%REST BODYWITHHEADER)))
+     (CL:COND
+      ((CL:NOT PROCESSCMDLINEARGS?)
+       (CL:COND
+        ((CL:EQ *TRANSLATOROUTPUTLANGUAGE* KWD-MACROS-COMMON-LISP)
+         (CL:RETURN-FROM %DEFMAIN
+          (LIST* SYM-MACROS-STELLA-DEFUN MAINNAME
+           (LIST* NIL KWD-MACROS-PUBLIC? SYM-MACROS-STELLA-TRUE
+            (CONCATENATE STARTUPFUNCTIONCALL
+             (CONCATENATE BODY NIL))))))
+        ((CL:OR (CL:EQ *TRANSLATOROUTPUTLANGUAGE* KWD-MACROS-CPP)
+          (CL:EQ *TRANSLATOROUTPUTLANGUAGE* KWD-MACROS-CPP-STANDALONE)
+          (CL:EQ *TRANSLATOROUTPUTLANGUAGE* KWD-MACROS-IDL))
+         (CL:RETURN-FROM %DEFMAIN
+          (LIST* SYM-MACROS-STELLA-DEFUN
+           (CONS MAINNAME (CONS SYM-MACROS-STELLA-INTEGER NIL)) NIL
+           KWD-MACROS-PUBLIC? SYM-MACROS-STELLA-TRUE
+           (CONCATENATE STARTUPFUNCTIONCALL
+            (CONCATENATE BODY
+             (CONS
+              (LIST* SYM-MACROS-STELLA-RETURN (WRAP-INTEGER 1) NIL)
+              NIL))))))
+        ((CL:EQ *TRANSLATOROUTPUTLANGUAGE* KWD-MACROS-JAVA)
+         (CL:RETURN-FROM %DEFMAIN
+          (LIST* SYM-MACROS-STELLA-DEFUN MAINNAME
+           (LIST*
+            (CONS
+             (CONS (LOCAL-GENSYM "ARGV")
+              (CONS
+               (LIST* SYM-MACROS-STELLA-ARRAY NIL SYM-MACROS-STELLA-OF
+                SYM-MACROS-STELLA-STRING NIL)
+               NIL))
+             NIL)
+            KWD-MACROS-PUBLIC? SYM-MACROS-STELLA-TRUE
+            (CONCATENATE STARTUPFUNCTIONCALL
+             (CONCATENATE BODY NIL))))))
+        (CL:T)))
+      (CL:T
+       (CL:COND
+        ((CL:EQ *TRANSLATOROUTPUTLANGUAGE* KWD-MACROS-COMMON-LISP)
+         (CL:RETURN-FROM %DEFMAIN
+          (LIST* SYM-MACROS-STELLA-DEFUN MAINNAME
+           (LIST*
+            (LIST* |SYM-MACROS-STELLA-&REST|
+             (LIST* SYM-MACROS-STELLA-%%ARGS SYM-MACROS-STELLA-STRING
+              NIL)
+             NIL)
+            KWD-MACROS-PUBLIC? SYM-MACROS-STELLA-TRUE
+            (LIST* SYM-MACROS-STELLA-LET
+             (LIST*
+              (CONS V1NAME
+               (LIST* SYM-MACROS-STELLA-INTEGER
+                (LIST* SYM-MACROS-STELLA-VERBATIM
+                 KWD-MACROS-COMMON-LISP
+                 (LIST* (INTERN-COMMON-LISP-SYMBOL "LENGTH")
+                  SYM-MACROS-STELLA-%%ARGS NIL)
+                 NIL)
+                NIL))
+              (CONS V2NAME
+               (LIST*
+                (LIST* SYM-MACROS-STELLA-ARRAY NIL SYM-MACROS-STELLA-OF
+                 SYM-MACROS-STELLA-STRING NIL)
+                (LIST* SYM-MACROS-STELLA-VERBATIM
+                 KWD-MACROS-COMMON-LISP
+                 (LIST* (INTERN-COMMON-LISP-SYMBOL "MAKE-ARRAY")
+                  (LIST* (INTERN-COMMON-LISP-SYMBOL "LENGTH")
+                   SYM-MACROS-STELLA-%%ARGS NIL)
+                  KWD-MACROS-INITIAL-CONTENTS SYM-MACROS-STELLA-%%ARGS
+                  NIL)
+                 NIL)
+                NIL))
+              NIL)
+             (CONCATENATE STARTUPFUNCTIONCALL (CONCATENATE BODY NIL)))
+            NIL))))
+        ((CL:EQ *TRANSLATOROUTPUTLANGUAGE* KWD-MACROS-JAVA)
+         (CL:RETURN-FROM %DEFMAIN
+          (LIST* SYM-MACROS-STELLA-DEFUN MAINNAME
+           (LIST*
+            (CONS
+             (CONS V2NAME
+              (CONS
+               (LIST* SYM-MACROS-STELLA-ARRAY NIL SYM-MACROS-STELLA-OF
+                SYM-MACROS-STELLA-STRING NIL)
+               NIL))
+             NIL)
+            KWD-MACROS-PUBLIC? SYM-MACROS-STELLA-TRUE
+            (LIST* SYM-MACROS-STELLA-LET
+             (CONS
+              (CONS V1NAME
+               (LIST* SYM-MACROS-STELLA-INTEGER
+                (LIST* SYM-MACROS-STELLA-VERBATIM KWD-MACROS-JAVA
+                 (WRAP-STRING
+                  (CONCATENATE
+                   (%STRING-WRAPPER.WRAPPER-VALUE
+                    (JAVA-TRANSLATE-NAME V2NAME))
+                   ".length"))
+                 NIL)
+                NIL))
+              NIL)
+             (CONCATENATE STARTUPFUNCTIONCALL (CONCATENATE BODY NIL)))
+            NIL))))
+        ((CL:OR (CL:EQ *TRANSLATOROUTPUTLANGUAGE* KWD-MACROS-CPP)
+          (CL:EQ *TRANSLATOROUTPUTLANGUAGE* KWD-MACROS-CPP-STANDALONE)
+          (CL:EQ *TRANSLATOROUTPUTLANGUAGE* KWD-MACROS-IDL))
+         (CL:RETURN-FROM %DEFMAIN
+          (LIST* SYM-MACROS-STELLA-DEFUN
+           (CONS MAINNAME (CONS SYM-MACROS-STELLA-INTEGER NIL))
+           (LIST* (CONS V1NAME (CONS SYM-MACROS-STELLA-INTEGER NIL))
+            (CONS V2NAME
+             (CONS
+              (LIST* SYM-MACROS-STELLA-ARRAY NIL SYM-MACROS-STELLA-OF
+               SYM-MACROS-STELLA-STRING NIL)
+              NIL))
+            NIL)
+           KWD-MACROS-PUBLIC? SYM-MACROS-STELLA-TRUE
+           (CONCATENATE STARTUPFUNCTIONCALL
+            (CONCATENATE BODY
+             (CONS
+              (LIST* SYM-MACROS-STELLA-RETURN (WRAP-INTEGER 1) NIL)
+              NIL))))))
+        (CL:T))))
+     (CL:LET* ((*PRINTREADABLY?* CL:T))
+      (CL:DECLARE (CL:SPECIAL *PRINTREADABLY?*))
+      (SIGNAL-TRANSLATION-ERROR)
+      (CL:WHEN (CL:NOT (SUPPRESS-WARNINGS?))
+       (PRINT-ERROR-CONTEXT ">> ERROR: " STANDARD-ERROR)
+       (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-ERROR)
+        EOL " `defmain' is not supported for `"
+        *TRANSLATOROUTPUTLANGUAGE* "'." EOL)))
+     (CL:RETURN-FROM %DEFMAIN NULL)))))
+
+(CL:DEFMACRO DEFMAIN (CL:&WHOLE EXPRESSION CL:&REST IGNORE)
+  "Defines a function called MAIN which will have the appropriate
+signature for the target translation language.  The signature will be:
+  C++:   public static int main (int v1, char** v2) {<body>}
+  Java:  public static void main (String [] v2) {<body>}
+  Lisp:  (defun main (&rest args) <body>)
+The argument `varList' must have two symbols, which will be the names for the
+INTEGER argument count and an array of STRINGs with the argument values.  It
+can also be empty to indicate that no command line arguments will be handled.
+The startup function for the containing system will automatically be called
+before `body' is executed unless the option :STARTUP-SYSTEM? was supplied as
+FALSE.  There can only be one DEFMAIN per module."
+  (CL:DECLARE (CL:IGNORE IGNORE))
+  (CL:LET ((*IGNORETRANSLATIONERRORS?* TRUE))
+   (CL-INCREMENTALLY-TRANSLATE EXPRESSION)))
+
+(CL:SETF (CL:MACRO-FUNCTION (CL:QUOTE |/STELLA/DEFMAIN|)) (CL:MACRO-FUNCTION (CL:QUOTE DEFMAIN)))
+
+(CL:DEFUN HELP-STARTUP-MACROS1 ()
+  (CL:PROGN
+   (CL:SETQ SYM-MACROS-STELLA-SETQ
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "SETQ" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-CONS
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "CONS" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-VRLET
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "VRLET" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-VALUE
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "VALUE" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-REST
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "REST" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-SETF
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "SETF" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-CHOOSE
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "CHOOSE" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-MEMBER?
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "MEMBER?" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-+
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "+" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA---
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "--" NULL 0))
+   (CL:SETQ KWD-MACROS-JAVA
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "JAVA" NULL 2))
+   (CL:SETQ KWD-MACROS-FUNCTION
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "FUNCTION" NULL 2))
+   (CL:SETQ SYM-MACROS-STELLA--
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "-" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-DEFINED?
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "DEFINED?" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-NULL
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "NULL" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-FIRST-DEFINED
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "FIRST-DEFINED" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-TRUE
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "TRUE" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-AND
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "AND" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-FOREACH
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "FOREACH" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-NIL
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "NIL" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-COLLECT
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "COLLECT" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-INTO
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "INTO" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-SPECIAL
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "SPECIAL" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-*TRANSIENTOBJECTS?*
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "*TRANSIENTOBJECTS?*" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-FALSE
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "FALSE" NULL 0))
+   (CL:SETQ KWD-MACROS-READ-ONLY?
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "READ-ONLY?" NULL 2))
+   (CL:SETQ SYM-MACROS-STELLA-*CONTEXT*
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "*CONTEXT*" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-SAFETY
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "SAFETY" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-EQL?
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "EQL?" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-BASE-MODULE
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "BASE-MODULE" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-CAST
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "CAST" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-WORLD
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "WORLD" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-*MODULE*
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "*MODULE*" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-IN
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "IN" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-*CURRENTSYSTEMDEFINITION*
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "*CURRENTSYSTEMDEFINITION*" NULL
+     0))
+   (CL:SETQ SYM-MACROS-STELLA-GET-SYSTEM-DEFINITION
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "GET-SYSTEM-DEFINITION" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-*CURRENTSYSTEMDEFINITIONSUBDIRECTORY*
+    (INTERN-RIGID-SYMBOL-WRT-MODULE
+     "*CURRENTSYSTEMDEFINITIONSUBDIRECTORY*" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-DIRECTORY
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "DIRECTORY" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-PROGN
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PROGN" NULL 0))
+   (CL:SETQ KWD-MACROS-STARTUP-SYSTEM?
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "STARTUP-SYSTEM?" NULL 2))
+   (CL:SETQ SYM-MACROS-STELLA-IF-STELLA-FEATURE
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "IF-STELLA-FEATURE" NULL 0))
+   (CL:SETQ KWD-MACROS-SUPPORT-UNEXEC
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "SUPPORT-UNEXEC" NULL 2))
+   (CL:SETQ SYM-MACROS-STELLA-VERBATIM
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "VERBATIM" NULL 0))
+   (CL:SETQ KWD-MACROS-CPP
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "CPP" NULL 2))
+   (CL:SETQ KWD-MACROS-OTHERWISE
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "OTHERWISE" NULL 2))
+   (CL:SETQ KWD-MACROS-PUBLIC?
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PUBLIC?" NULL 2))
+   (CL:SETQ KWD-MACROS-COMMON-LISP
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "COMMON-LISP" NULL 2))
+   (CL:SETQ SYM-MACROS-STELLA-DEFUN
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "DEFUN" NULL 0))
+   (CL:SETQ KWD-MACROS-CPP-STANDALONE
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "CPP-STANDALONE" NULL 2))
+   (CL:SETQ KWD-MACROS-IDL
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "IDL" NULL 2))
+   (CL:SETQ SYM-MACROS-STELLA-INTEGER
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "INTEGER" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-RETURN
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "RETURN" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-ARRAY
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "ARRAY" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-OF
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "OF" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-STRING
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "STRING" NULL 0))
+   (CL:SETQ |SYM-MACROS-STELLA-&REST|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "&REST" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-%%ARGS
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "%%ARGS" NULL 0))
+   (CL:SETQ SYM-MACROS-STELLA-LET
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "LET" NULL 0))
+   (CL:SETQ KWD-MACROS-INITIAL-CONTENTS
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "INITIAL-CONTENTS" NULL 2))
+   (CL:SETQ SYM-MACROS-STELLA-DEFMAIN
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "DEFMAIN" NULL 0)))
+  :VOID)
+
+(CL:DEFUN STARTUP-MACROS ()
+  (CL:LET* ((*MODULE* *STELLA-MODULE*) (*CONTEXT* *MODULE*))
+   (CL:DECLARE (CL:SPECIAL *MODULE* *CONTEXT*))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 2) (HELP-STARTUP-MACROS1)
+    (CL:SETQ SYM-MACROS-STELLA-STARTUP-MACROS
+     (INTERN-RIGID-SYMBOL-WRT-MODULE "STARTUP-MACROS" NULL 0))
+    (CL:SETQ SYM-MACROS-STELLA-METHOD-STARTUP-CLASSNAME
+     (INTERN-RIGID-SYMBOL-WRT-MODULE "METHOD-STARTUP-CLASSNAME" NULL
+      0)))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 6) (FINALIZE-CLASSES))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 7)
+    (DEFINE-FUNCTION-OBJECT "PUSHQ"
+     "(DEFUN PUSHQ ((VARIABLE SYMBOL) (VALUE OBJECT)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Push 'value' onto the cons list 'variable'.\")"
+     (CL:FUNCTION PUSHQ) NULL)
+    (DEFINE-FUNCTION-OBJECT "POPQ"
+     "(DEFUN POPQ ((VARIABLE SYMBOL)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Pops a value from the cons list 'variable'.\")"
+     (CL:FUNCTION POPQ) NULL)
+    (DEFINE-FUNCTION-OBJECT "PUSHF"
+     "(DEFUN PUSHF ((PLACE CONS) (VALUE OBJECT)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Push 'value' onto the cons list 'place'.\")"
+     (CL:FUNCTION PUSHF) NULL)
+    (DEFINE-FUNCTION-OBJECT "PUSHQ-NEW"
+     "(DEFUN PUSHQ-NEW ((VARIABLE SYMBOL) (VALUE OBJECT)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Push `value' onto the cons list `variable', unless `value'
+is already a member of the list.\" :PUBLIC? TRUE)"
+     (CL:FUNCTION PUSHQ-NEW) NULL)
+    (DEFINE-FUNCTION-OBJECT "++"
+     "(DEFUN ++ ((PLACE OBJECT) |&BODY| (INCREMENT CONS)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Increment the value of `place' and return the result.
+`place' can be either a variable name or a slot reference.  Increment by
+the optional `increment' (which can be a float) or 1 otherwise.\")"
+     (CL:FUNCTION ++) NULL)
+    (DEFINE-FUNCTION-OBJECT "--"
+     "(DEFUN -- ((PLACE OBJECT) |&BODY| (DECREMENT CONS)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Decrement the value of `place' and return the result.
+`place' can be either a variable name or a slot reference.  Decrement by
+the optional `decrement' (which can be a float) or 1 otherwise.\")"
+     (CL:FUNCTION --) NULL)
+    (DEFINE-FUNCTION-OBJECT "1+"
+     "(DEFUN 1+ ((EXPRESSION OBJECT)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Add 1 to 'expression' and return the result.\")"
+     (CL:FUNCTION 1+) NULL)
+    (DEFINE-FUNCTION-OBJECT "1-"
+     "(DEFUN 1- ((EXPRESSION OBJECT)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Subtract 1 from 'expression' and return the result.\")"
+     (CL:FUNCTION 1-) NULL)
+    (DEFINE-FUNCTION-OBJECT "SETQ?"
+     "(DEFUN SETQ? ((VARIABLE SYMBOL) (EXPRESSION CONS)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Assign 'variable' the result of evaluating 'expression', 
+and return TRUE if 'expression' is not NULL else return FALSE.\")"
+     (CL:FUNCTION SETQ?) NULL)
+    (DEFINE-FUNCTION-OBJECT "FIRST-DEFINED"
+     "(DEFUN FIRST-DEFINED (|&BODY| (FORMS CONS)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Return the result of the first form in `forms' whose value is defined
+or NULL otherwise.\")" (CL:FUNCTION FIRST-DEFINED) NULL)
+    (DEFINE-FUNCTION-OBJECT "ALL-DEFINED?"
+     "(DEFUN ALL-DEFINED? (|&BODY| (FORMS CONS)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Evaluate each of the forms in 'forms', and
+return TRUE if none of them are NULL.\")" (CL:FUNCTION ALL-DEFINED?)
+     NULL)
+    (DEFINE-FUNCTION-OBJECT "EITHER"
+     "(DEFUN EITHER ((VALUE1 OBJECT) (VALUE2 OBJECT)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"If 'value1' is defined, return that, else return 'value2'.\")"
+     (CL:FUNCTION EITHER) NULL)
+    (DEFINE-FUNCTION-OBJECT "COLLECT"
+     "(DEFUN COLLECT (|&BODY| (BODY CONS)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Use a VRLET to collect values.  Input can have one of
+the following forms:
+	 
+  (collect <var> in <expression> [where <test> <var>])
+  (collect <collect-expression>
+           foreach <var> in <expression>
+           {as ...}*
+           [where <test> <var>]
+           [do ...])
+	
+The second form really accepts an arbitrary `foreach' expression following
+the `foreach' keyword.\")" (CL:FUNCTION COLLECT) NULL)
+    (DEFINE-FUNCTION-OBJECT "WITH-PERMANENT-OBJECTS"
+     "(DEFUN WITH-PERMANENT-OBJECTS (|&BODY| (BODY CONS)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Allocate 'permanent' (as opposed to 'transient')
+objects within the scope of this declaration.\" :PUBLIC? TRUE)"
+     (CL:FUNCTION WITH-PERMANENT-OBJECTS) NULL)
+    (DEFINE-FUNCTION-OBJECT "WITH-TRANSIENT-OBJECTS"
+     "(DEFUN WITH-TRANSIENT-OBJECTS (|&BODY| (BODY CONS)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Allocate 'transient' (as opposed to 'permanent')
+objects within the scope of this declaration.
+CAUTION: The default assumption is the allocation of permanent objects.
+The scope of `with-transient-objects' should be as small as possible, and
+the user has to make sure that code that wasn't explicitly written to
+account for transient objects will continue to work correctly.\" :PUBLIC? TRUE)"
+     (CL:FUNCTION WITH-TRANSIENT-OBJECTS) NULL)
+    (DEFINE-FUNCTION-OBJECT "IGNORE"
+     "(DEFUN IGNORE (|&BODY| (VARIABLES CONS)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Ignore unused 'variables' with NoOp 'setq' statements.\")"
+     (CL:FUNCTION IGNORE) NULL)
+    (DEFINE-FUNCTION-OBJECT "ONLY-IF"
+     "(DEFUN ONLY-IF ((TEST OBJECT) (EXPRESSION OBJECT)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"If 'test' is TRUE, return the result of evaluating 
+'expression'.\")" (CL:FUNCTION ONLY-IF) NULL)
+    (DEFINE-FUNCTION-OBJECT "PHASE-TO-INTEGER"
+     "(DEFUN PHASE-TO-INTEGER ((STARTUPTIMEPHASE KEYWORD)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Expands into the integer representing 'startupTimePhase'.\")"
+     (CL:FUNCTION PHASE-TO-INTEGER) NULL)
+    (DEFINE-FUNCTION-OBJECT "IF-OUTPUT-LANGUAGE"
+     "(DEFUN IF-OUTPUT-LANGUAGE ((LANGUAGE KEYWORD) (THENFORM OBJECT) (ELSEFORM OBJECT)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Expand to 'thenForm' if the current translator output
+language equals 'language'.  Otherwise, expand to 'elseForm'.  This can
+be used to conditionally translate Stella code.\")"
+     (CL:FUNCTION IF-OUTPUT-LANGUAGE) NULL)
+    (DEFINE-FUNCTION-OBJECT "IF-STELLA-FEATURE"
+     "(DEFUN IF-STELLA-FEATURE ((FEATURE KEYWORD) (THENFORM OBJECT) (ELSEFORM OBJECT)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Expand to 'thenForm' if 'feature' is a currently enabled
+STELLA environment feature.  Otherwise, expand to 'elseForm'.  This can
+be used to conditionally translate Stella code.\")"
+     (CL:FUNCTION IF-STELLA-FEATURE) NULL)
+    (DEFINE-FUNCTION-OBJECT "WITHIN-WORLD"
+     "(DEFUN WITHIN-WORLD ((WORLDFORM OBJECT) |&BODY| (BODY CONS)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Execute `body' within the world resulting from `worldForm'.\" :PUBLIC? TRUE)"
+     (CL:FUNCTION WITHIN-WORLD) NULL)
+    (DEFINE-FUNCTION-OBJECT "WITHIN-CONTEXT"
+     "(DEFUN WITHIN-CONTEXT ((CONTEXTFORM OBJECT) |&BODY| (BODY CONS)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Execute `body' within the context resulting from `contextForm'.\" :PUBLIC? TRUE)"
+     (CL:FUNCTION WITHIN-CONTEXT) NULL)
+    (DEFINE-FUNCTION-OBJECT "WITHIN-MODULE"
+     "(DEFUN WITHIN-MODULE ((MODULEFORM OBJECT) |&BODY| (BODY CONS)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Execute `body' within the module resulting from `moduleForm'.
+`*module*' is an acceptable `moduleForm'.  It will locally rebind 
+`*module*' and `*context*' and shield the outer bindings from changes.\" :PUBLIC? TRUE)"
+     (CL:FUNCTION WITHIN-MODULE) NULL)
+    (DEFINE-FUNCTION-OBJECT " |COERCE-&REST-TO-CONS|"
+     "(DEFUN |COERCE-&REST-TO-CONS| ((RESTVARIABLE SYMBOL)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Coerce the argument list variable `restVariable' into a CONS
+list containing all its elements (uses argument list iteration to do so).  If
+`restVariable' already is a CONS due to argument listification, this is a no-op.\" :PUBLIC? TRUE)"
+     (CL:FUNCTION |COERCE-&REST-TO-CONS|) NULL)
+    (DEFINE-FUNCTION-OBJECT "WITH-SYSTEM-DEFINITION"
+     "(DEFUN WITH-SYSTEM-DEFINITION ((SYSTEMNAMEEXPRESSION OBJECT) |&BODY| (BODY CONS)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Set *currentSystemDefinition* to the system definition named `system'.
+Set *currentSystemDefinitionSubdirectory* to match. Execute `body' within
+that scope.\" :PUBLIC? TRUE)" (CL:FUNCTION WITH-SYSTEM-DEFINITION)
+     NULL)
+    (DEFINE-FUNCTION-OBJECT "DEFMAIN"
+     "(DEFUN DEFMAIN ((VARLIST CONS) |&BODY| (BODY CONS)) :TYPE OBJECT :MACRO? TRUE :DOCUMENTATION \"Defines a function called MAIN which will have the appropriate
+signature for the target translation language.  The signature will be:
+  C++:   public static int main (int v1, char** v2) {<body>}
+  Java:  public static void main (String [] v2) {<body>}
+  Lisp:  (defun main (&rest args) <body>)
+The argument `varList' must have two symbols, which will be the names for the
+INTEGER argument count and an array of STRINGs with the argument values.  It
+can also be empty to indicate that no command line arguments will be handled.
+The startup function for the containing system will automatically be called
+before `body' is executed unless the option :STARTUP-SYSTEM? was supplied as
+FALSE.  There can only be one DEFMAIN per module.\" :PUBLIC? TRUE :LISP-MACRO? TRUE)"
+     (CL:FUNCTION %DEFMAIN) NULL)
+    (DEFINE-FUNCTION-OBJECT "STARTUP-MACROS"
+     "(DEFUN STARTUP-MACROS () :PUBLIC? TRUE)"
+     (CL:FUNCTION STARTUP-MACROS) NULL)
+    (CL:LET*
+     ((FUNCTION (LOOKUP-FUNCTION SYM-MACROS-STELLA-STARTUP-MACROS)))
+     (SET-DYNAMIC-SLOT-VALUE (%METHOD-SLOT.DYNAMIC-SLOTS FUNCTION)
+      SYM-MACROS-STELLA-METHOD-STARTUP-CLASSNAME
+      (WRAP-STRING "_StartupMacros") NULL-STRING-WRAPPER)))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 8) (FINALIZE-SLOTS)
+    (CLEANUP-UNFINALIZED-CLASSES))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 9)
+    (%IN-MODULE (COPY-CONS-TREE (WRAP-STRING "/STELLA")))
+    (REGISTER-NATIVE-NAME SYM-MACROS-STELLA--- KWD-MACROS-JAVA
+     KWD-MACROS-FUNCTION)
+    (REGISTER-NATIVE-NAME SYM-MACROS-STELLA-DEFMAIN
+     KWD-MACROS-COMMON-LISP KWD-MACROS-FUNCTION)))
+  :VOID)

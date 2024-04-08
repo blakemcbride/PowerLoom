@@ -1,0 +1,604 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;; BEGIN LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                            ;
+; Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          ;
+;                                                                            ;
+; The contents of this file are subject to the Mozilla Public License        ;
+; Version 1.1 (the "License"); you may not use this file except in           ;
+; compliance with the License. You may obtain a copy of the License at       ;
+; http://www.mozilla.org/MPL/                                                ;
+;                                                                            ;
+; Software distributed under the License is distributed on an "AS IS" basis, ;
+; WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   ;
+; for the specific language governing rights and limitations under the       ;
+; License.                                                                   ;
+;                                                                            ;
+; The Original Code is the PowerLoom KR&R System.                            ;
+;                                                                            ;
+; The Initial Developer of the Original Code is                              ;
+; UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          ;
+; 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               ;
+;                                                                            ;
+; Portions created by the Initial Developer are Copyright (C) 1997-2015      ;
+; the Initial Developer. All Rights Reserved.                                ;
+;                                                                            ;
+; Contributor(s):                                                            ;
+;                                                                            ;
+; Alternatively, the contents of this file may be used under the terms of    ;
+; either the GNU General Public License Version 2 or later (the "GPL"), or   ;
+; the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   ;
+; in which case the provisions of the GPL or the LGPL are applicable instead ;
+; of those above. If you wish to allow use of your version of this file only ;
+; under the terms of either the GPL or the LGPL, and not to allow others to  ;
+; use your version of this file under the terms of the MPL, indicate your    ;
+; decision by deleting the provisions above and replace them with the notice ;
+; and other provisions required by the GPL or the LGPL. If you do not delete ;
+; the provisions above, a recipient may use your version of this file under  ;
+; the terms of any one of the MPL, the GPL or the LGPL.                      ;
+;                                                                            ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; END LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; Version: $Id$
+
+(in-package "STELLA")
+
+(in-module "TIMEPOINT-SUPPORT")
+;; Note that this is not a case-sensitive module!
+
+
+;; TO DO:
+;;   o Integrate time durations with units for time.
+;;     Arithmetic needs to be upgraded.
+;;
+
+(defglobal *date-time-hash-table* 
+  (STELLA-HASH-TABLE OF DATE-TIME-OBJECT DATE-TIME-LOGIC-WRAPPER)
+  (new STELLA-HASH-TABLE)
+  :documentation "Table for interning date-time logic wrappers")
+
+(defclass DATE-TIME-LOGIC-WRAPPER (QUANTITY-LOGIC-WRAPPER)
+  :public-slots
+  ((wrapper-value :type DATE-TIME-OBJECT :required? TRUE))
+  :print-form (if *printreadably?*
+                (print-native-stream stream (wrapper-value self))
+                (print-native-stream stream "|tw|" (wrapper-value self))))
+
+(defmethod (generate-specialized-term OBJECT) ((self DATE-TIME-LOGIC-WRAPPER))
+  (let ((term (function-term self))
+        (datetime (wrapper-value self)))
+    (cond ((defined? term) (return term))
+          ((defined? datetime)
+           (typecase datetime
+             (CALENDAR-DATE 
+              (setq term (bquote (& (generate-term /timepoint-kb/@timepoint-of)
+                                    &  (calendar-date-to-string datetime 0.0 FALSE TRUE)))))
+             (TIME-DURATION
+              (setq term (bquote (& (generate-term /timepoint-kb/@duration-of)
+                                    & (time-duration-to-string datetime))))))
+           (setf (function-term self) term)
+           (return term))
+          (otherwise
+           (signal-exception (new TERM-GENERATION-EXCEPTION
+                                  :message "Date Time Number Wrapper doesn't have a value."
+                                  :offending-term self)))) ))
+
+(defmethod (hash-code INTEGER) ((self DATE-TIME-LOGIC-WRAPPER))
+  (if (defined? (wrapper-value self))
+    (return (hash-code (wrapper-value self)))
+    (return 0)))
+
+(defmethod (object-eql? BOOLEAN) ((self DATE-TIME-LOGIC-WRAPPER) (x OBJECT))
+  (typecase x
+    (DATE-TIME-LOGIC-WRAPPER
+     (return (object-eql? (wrapper-value self) (wrapper-value x))))
+    (otherwise
+     (return false))))
+
+(defun (wrap-date-time DATE-TIME-LOGIC-WRAPPER)  ((value DATE-TIME-OBJECT))
+  :public? TRUE
+  :documentation "Return an interned LOGIC-WRAPPER for `value'.  This assures us
+that all logic-wrapped DATE-TIME-OBJECTs are the same object."
+  (let ((wrapper (lookup *date-time-hash-table* value)))
+    (when (null? wrapper)
+      (setq wrapper
+            (new DATE-TIME-LOGIC-WRAPPER :wrapper-value value))
+      (insert-at *date-time-hash-table* value wrapper))
+    (return wrapper)))
+
+(defun (help-get-calendar-time DATE-TIME-LOGIC-WRAPPER) ((item OBJECT))
+  (typecase item
+    (STRING-WRAPPER
+     (let ((value (string-to-calendar-date item)))
+       (if (defined? value)
+	   (return (wrap-date-time value))
+	   ;; Complain about bad format?
+	   (return null))))
+    (PATTERN-VARIABLE
+     (let ((value (safe-bound-to item)))
+       (if (defined? value)
+	   (return (help-get-calendar-time value))
+	   (return NULL))))
+    (DATE-TIME-LOGIC-WRAPPER
+     (return item))
+    (SKOLEM
+     (let ((value (variable-value item)))
+       (when (null? value)
+         (return null))
+       (typecase value
+	 (DATE-TIME-LOGIC-WRAPPER
+	   (return value))
+	 (SKOLEM
+	  (if (isa? (variable-value value) @SKOLEM)
+	      (return null)
+	      (return (help-get-calendar-time (variable-value value)))))
+	 (otherwise
+	  (if (isa? (variable-value item) @SKOLEM)
+	      (return NULL)
+	      (return (help-get-calendar-time (variable-value item))))))))
+    (otherwise
+     (return null))))
+
+(defun (help-get-time-duration DATE-TIME-LOGIC-WRAPPER) ((item OBJECT))
+  (typecase item
+    (STRING-WRAPPER
+     (let ((value (string-to-time-duration item)))
+       (if (defined? value)
+	   (return (wrap-date-time value))
+	   ;; Complain about bad format?
+	   (return NULL))))
+    (PATTERN-VARIABLE
+     (let ((value (safe-bound-to item)))
+       (if (defined? value)
+	   (return (help-get-time-duration value))
+	   (return NULL))))
+    (DATE-TIME-LOGIC-WRAPPER
+     (return item))
+    (/UNIT-SUPPORT/DIM-NUMBER-LOGIC-WRAPPER
+     (exception-case 
+      (return (wrap-date-time (dim-to-time-duration (wrapper-value item))))
+      (/utilities/INCOMPATIBLE-UNITS-EXCEPTION ()
+        (return NULL))))
+    (SKOLEM
+     (let ((value (variable-value item)))
+       (when (null? value)
+         (return null))
+       (typecase value
+	 (DATE-TIME-LOGIC-WRAPPER
+	   (return value))
+	 (SKOLEM
+	  (if (isa? (variable-value value) @SKOLEM)
+	      (return null)
+	      (return (help-get-time-duration (variable-value value)))))
+	 (otherwise
+	  (if (isa? (variable-value item) @SKOLEM)
+	      (return null)
+	      (return (help-get-time-duration (variable-value item))))))))
+    (otherwise
+     (return NULL))))
+
+(defun (help-get-time-object DATE-TIME-LOGIC-WRAPPER) ((item OBJECT))
+  (typecase item
+    (STRING-WRAPPER
+     (let ((value DATE-TIME-OBJECT (string-to-calendar-date item)))
+       (when (null? value)
+         (setq value (string-to-time-duration item)))  
+       (if (defined? value)
+	 (return (wrap-date-time value))
+	   ;; Complain about bad format?
+         (return NULL))))
+    (PATTERN-VARIABLE
+     (let ((value (safe-bound-to item)))
+       (if (defined? value)
+	   (return (help-get-time-object value))
+	   (return null))))
+    (DATE-TIME-LOGIC-WRAPPER
+     (return item))
+    (/UNIT-SUPPORT/DIM-NUMBER-LOGiC-WRAPPER
+     (exception-case 
+      (return (wrap-date-time (dim-to-time-duration (wrapper-value item))))
+      (/utilities/INCOMPATIBLE-UNITS-EXCEPTION ()
+        (return NULL))))
+    (SKOLEM
+     (let ((value (variable-value item)))
+       (typecase value
+	 (DATE-TIME-LOGIC-WRAPPER
+	   (return value))
+	 (SKOLEM
+	  (if (isa? (variable-value value) @SKOLEM)
+	      (return NULL)
+	      (return (help-get-time-object (variable-value value)))))
+	 (otherwise
+	  (if (isa? (variable-value item) @SKOLEM)
+	      (return NULL)
+	      (return (help-get-time-object (variable-value item))))))))
+    (otherwise
+     (return NULL))))
+
+(defun (help-get-integer INTEGER) ((obj OBJECT))
+  (if (null? obj)
+    (return NULL)
+    (typecase obj
+      (FLOAT-WRAPPER
+       (if (integer-valued? (wrapper-value obj))
+         (return (floor (wrapper-value obj)))
+         (return NULL)))
+      (INTEGER-WRAPPER 
+       (return (wrapper-value obj)))
+      (otherwise
+       (return NULL)))))
+
+(defun (help-get-float FLOAT) ((obj OBJECT))
+  (if (null? obj)
+    (return NULL)
+    (typecase obj
+      (FLOAT-WRAPPER 
+       (return (wrapper-value obj)))
+      (INTEGER-WRAPPER
+       (return (wrapper-value obj)))
+      (otherwise
+       (return NULL)))))
+
+(defun (help-get-timezone FLOAT) ((obj OBJECT))
+  (if (null? obj)
+    (return NULL)
+    (typecase obj
+      (FLOAT-WRAPPER 
+       (return (wrapper-value obj)))
+      (INTEGER-WRAPPER 
+       (return (wrapper-value obj)))
+      (STRING-WRAPPER
+       ;; Use zone parser code from Stella's date-time parser.
+       ;; Tricky:  1)  zone assumes all strings are canonicalized to lower case
+       ;;          2)  zone returns float wrappers, which means it returns a
+       ;;              real NULL rather than a NULL-FLOAT-WRAPPER, so we need
+       ;;              to test for that explicitly to allow proper type coersion.
+       ;;          3)  we do get NULL-FLOAT-WRAPPER for `local'
+       (let ((decoded-zone (zone (string-downcase obj))))
+         (cond ((and (defined? decoded-zone)
+                     (not (null-wrapper? decoded-zone)))
+                (return (wrapper-value decoded-zone)))
+               ((defined? decoded-zone)
+                (return (get-local-time-zone)))
+               (otherwise
+                (return NULL)))))
+      (otherwise
+       (return NULL)))))
+
+(defun (is-current-time-spec? BOOLEAN) ((spec OBJECT))
+  ;; Return TRUE if `spec' means the current time.
+  (typecase spec
+    (STRING-WRAPPER
+     (return (string-equal? spec "now")))
+    (otherwise
+     (return FALSE))))
+
+
+  ;;
+;;;;;; Relation computations and constraints
+  ;;
+
+;;; Generally, all timepoint relations have either a computation or a computed
+;;; constraint associated with them that will compute an appropriate date/time
+;;; wrapper or determine input arguments from a given wrapper.  These computations
+;;; will do the right thing during both forward and backward inference.  The only
+;;; exception is `timepoint-of*' which currently can't be implemented as a constraint
+;;; due to its idiosyncratic binding patterns.  In that case we had to also provide
+;;; a specialized evaluator, since we can't have both a specialist and a computation
+;;; at the same time.  Once we generalize handling of binding patterns in computed
+;;; constraints, this problem will go away.
+
+(defun (can-bind-all? BOOLEAN) ((pl-objects CONS) (values CONS))
+  ;; Return TRUE if all objects in `pl-objects' can be bound to corresponding
+  ;; elements of `values'.
+  (foreach obj in pl-objects
+    as value in values
+    do (typecase obj
+         (PATTERN-VARIABLE
+          (unless (bind-variable-to-value? obj value TRUE)
+            (return FALSE)))
+         (SKOLEM
+          (setf (variable-value obj) value))
+         (otherwise
+          ;; we have an object for the first argument, but it isn't bindable.
+          ;; Unless it happens to be the same as the value, return FALSE.
+          (unless (object-eql? obj value)
+            (return FALSE)))))
+  (return TRUE))
+
+
+(define-computed-constraint timepoint-of-constraint ((x1 STRING-WRAPPER)
+                                                     (x2 DATE-TIME-LOGIC-WRAPPER))
+  ;; Constraint computation for `timepoint-of'.  Either computes a time wrapper
+  ;; from the time specification string, or vice versa, or checks their equivalence.
+  ;; Does not anymore explicitly handle the binding of skolems to the computed
+  ;; time wrappers, since that's taken care of by the forward chainer.
+  ;; all inputs bound:
+  (setq value
+    (or (object-eql? (wrapper-value (help-get-calendar-time x1)) (wrapper-value x2))
+        ;; VERY TRICKY: always succeed if x1=now; otherwise, we can very unpredictably fail
+        ;; during a query evaluation, where the time from an initial evaluation with x2
+        ;; unbound moved just far enough so that a subsequent evaluation with now x2 bound fails.
+        ;; We now introduced the `current-time' function to handle this situation more cleanly.
+        (is-current-time-spec? x1)))
+  ;; x1 unbound:
+  (let ((timePointWrapper (help-get-calendar-time x2)))
+    (setq value
+      (calendar-date-to-string (cast (wrapper-value timePointWrapper) CALENDAR-DATE)
+                               0.0 FALSE TRUE)))
+  ;; x2 unbound:
+  (let ((timePointSpecValue (value-of x1)))
+    (if (null? timePointSpecValue)
+        (setq value NULL)
+      (setq value (help-get-calendar-time timePointSpecValue)))))
+
+(defun (timepoint-of*-computation DATE-TIME-LOGIC-WRAPPER) ((yy INTEGER-WRAPPER)
+                                                            (mm INTEGER-WRAPPER)
+                                                            (dd INTEGER-WRAPPER)
+                                                            (hr INTEGER-WRAPPER)
+                                                            (min INTEGER-WRAPPER)
+                                                            (sec NUMBER-WRAPPER) 
+                                                            (tz OBJECT))
+  ;; Compute a timepoint object from the given inputs.  We need this, since
+  ;; currently we can't implement the specialist as a constraint due to its
+  ;; idiosyncratic binding patterns.  Instead, we are using a special-purpose
+  ;; evaluator that explicitly calls this function.
+  (let ((yy-value (value-of yy))
+        (mm-value (value-of mm))
+        (dd-value (value-of dd))
+        (hr-value (value-of hr))
+        (min-value (value-of min))
+        (sec-value (value-of sec))
+        (tz-value (value-of tz))
+        (year (help-get-integer yy-value))
+        (month (help-get-integer mm-value))
+        (day (help-get-integer dd-value))
+        (hour (help-get-integer hr-value))
+        (minute (help-get-integer min-value))
+        (second-float (help-get-float sec-value))
+        (zone (help-get-timezone tz-value))
+        (second 0)
+        (tp DATE-TIME-LOGIC-WRAPPER NULL))
+    (when (all-defined? year month day hour minute second-float zone)
+      (setq second (floor second-float))
+      (setq tp (wrap-date-time (make-date-time year month day hour minute
+                                               second
+                                               (floor (* 1000 (- second-float second)))
+                                               zone))))
+    (return tp)))
+
+(defun timepoint-of*-evaluator ((self PROPOSITION))
+  ;; Special-purpose version of `evaluate-FUNCTION-proposition'
+  ;; for `timepoint-of*' propositions.  This is needed, since we can't implement
+  ;; it (yet) via a computation or a constraint (see also general comment above).
+  (equate-equivalent-FUNCTION-propositions self)
+  (let ((storedValue (value-of (nth (arguments self) 7)))
+        (computation (lookup-function (quote timepoint-of*-computation)))
+        (computedValue
+         ;; use `compute-relation-value', since it does all the required type checking, etc.:
+         (compute-relation-value self computation FALSE)))
+    (when (and (defined? computedValue)
+               (not (eql? computedValue storedValue)))
+      (equate-values self computedValue storedValue))))
+
+(defun (timepoint-of*-specialist KEYWORD) ((frame CONTROL-FRAME) (lastMove KEYWORD))
+  ;; Compute a timepoint from the input arguments, or recover the input
+  ;; arguments from a given timepoint.  Can also be used to convert between
+  ;; time zones by supplying a time point and a time zone.
+  (let ((proposition (proposition frame))
+        (args (arguments proposition))
+        (year (help-get-integer (argument-bound-to (nth args 0))))
+        (month (help-get-integer (argument-bound-to (nth args 1))))
+        (day (help-get-integer (argument-bound-to (nth args 2))))
+        (hour (help-get-integer (argument-bound-to (nth args 3))))
+        (minute (help-get-integer (argument-bound-to (nth args 4))))
+        (second-float (help-get-float (argument-bound-to (nth args 5))))
+        (second 0)
+        (zone (help-get-timezone (argument-bound-to (nth args 6))))
+        (tp (argument-bound-to (nth args 7)))
+        (the-time DATE-TIME-LOGIC-WRAPPER NULL)
+        (calendar-date CALENDAR-DATE NULL))
+       (ignore lastmove)
+  (cond ((all-defined? year month day hour minute second-float zone)
+         (setq second (floor second-float))
+         (setq the-time (wrap-date-time (make-date-time year month day hour minute
+                                                        second
+                                                        (floor (* 1000 (- second-float second)))
+                                                        zone)))
+         (return (select-proof-result (bind-argument-to-value? (nth args 7) the-time TRUE)
+                                      FALSE TRUE)))
+	((defined? tp)
+	 (setq the-time (help-get-calendar-time tp))
+         (setq calendar-date (wrapper-value the-time))
+         (when (null? zone)
+           (setq zone 0.0)              ; Default UTC
+           (unless (bind-argument-to-value? (nth args 6) zone TRUE)
+             (return :FAILURE)))
+	 (if (defined? the-time)
+           (mv-bind (yy mm dd dow) (get-calendar-date calendar-date zone)
+             (ignore dow)
+             (mv-bind (h m s milli) (get-time calendar-date zone)
+               (return
+                (select-proof-result
+                 (can-bind-all? 
+                  (cons-list (nth args 0) (nth args 1) (nth args 2)
+                             (nth args 3) (nth args 4) (nth args 5))
+                  (cons-list yy mm dd
+                             h m (cast (+ s (* milli 0.001)) FLOAT)))
+                 FALSE TRUE))))
+           (return :TERMINAL-FAILURE)))
+	;; Should this be :TERMINAL-FAILURE?
+	(otherwise
+	 (return :FAILURE))) ))
+
+(define-computed-constraint duration-of-constraint ((x1 STRING-WRAPPER)
+                                                    (x2 DATE-TIME-LOGIC-WRAPPER))
+  ;; Constraint computation for `duration-of'.  Either computes a time wrapper
+  ;; from the specification string, or vice versa, or checks their equivalence.
+  ;; Does not anymore explicitly handle the binding of skolems to the computed
+  ;; time wrappers, since that's taken care of by the forward chainer.
+  ;; all inputs bound:
+  (setq value (object-eql? (wrapper-value (help-get-time-duration x1))
+                           (wrapper-value x2)))
+  ;; x1 unbound:
+  (let ((durationWrapper (help-get-time-duration x2)))
+    (setq value
+      (time-duration-to-string (cast (wrapper-value durationWrapper) TIME-DURATION))))
+  ;; x2 unbound:
+  (let ((durationSpecValue (value-of x1)))
+    (if (null? durationSpecValue)
+        (setq value NULL)
+      (setq value (help-get-time-duration durationSpecValue)))))
+
+
+;;;
+;;;  TIME Arithmetic Functions
+;;;
+
+(define-computed-constraint time-minus-constraint ((x1 DATE-TIME-LOGIC-WRAPPER)
+						   (x2 DATE-TIME-LOGIC-WRAPPER)
+						   (x3 DATE-TIME-LOGIC-WRAPPER))
+  (setq value
+      (object-eql? (time-subtract (wrapper-value x1) (wrapper-value x2)) (wrapper-value x3)))
+  (setq value (wrap-date-time (time-add (wrapper-value x2) (wrapper-value x3))))
+  (setq value (wrap-date-time (time-subtract (wrapper-value x1) (wrapper-value x3))))
+  (setq value (wrap-date-time (time-subtract (wrapper-value x1) (wrapper-value x2)))))
+
+(define-computed-constraint time-plus-constraint ((x1 DATE-TIME-LOGIC-WRAPPER)
+                                                  (x2 DATE-TIME-LOGIC-WRAPPER)
+                                                  (x3 DATE-TIME-LOGIC-WRAPPER))
+  (setq value
+    (object-eql? (time-add (wrapper-value x1) (wrapper-value x2)) (wrapper-value x3)))
+  (setq value (wrap-date-time (time-subtract (wrapper-value x3) (wrapper-value x2))))
+  (setq value (wrap-date-time (time-subtract (wrapper-value x3) (wrapper-value x1))))
+  (setq value (wrap-date-time (time-add (wrapper-value x1) (wrapper-value x2)))))
+
+
+;;;;
+;;;;  Time component accessors
+;;;;
+
+(defun (dow-keyword-to-instance LOGIC-OBJECT) ((dow KEYWORD))
+  (case dow
+    (:monday    (return (surrogate-value /TIMEPOINT-KB/@MONDAY)))
+    (:tuesday   (return (surrogate-value /TIMEPOINT-KB/@TUESDAY)))
+    (:wednesday (return (surrogate-value /TIMEPOINT-KB/@WEDNESDAY)))
+    (:thursday  (return (surrogate-value /TIMEPOINT-KB/@THURSDAY)))
+    (:friday    (return (surrogate-value /TIMEPOINT-KB/@FRIDAY)))
+    (:saturday  (return (surrogate-value /TIMEPOINT-KB/@SATURDAY)))
+    (:sunday    (return (surrogate-value /TIMEPOINT-KB/@SUNDAY)))))
+
+(defun (timepoint-year-computation INTEGER-WRAPPER) ((timepoint DATE-TIME-LOGIC-WRAPPER)
+                                                     (timeZone OBJECT))
+  ;; Compute and return the year portion of `timepoint' relative to `timeZone'.
+  (setq timeZone (help-get-timezone timeZone))
+  (if (not (null-wrapper? timeZone))
+      (mv-bind (year month day dow) 
+          (get-calendar-date (cast (wrapper-value timepoint) CALENDAR-DATE) timeZone)
+        (ignore month day dow)
+        (return year))
+    (return NULL)))
+
+(defun (timepoint-month-computation INTEGER-WRAPPER) ((timepoint DATE-TIME-LOGIC-WRAPPER)
+                                                      (timeZone OBJECT))
+  ;; Compute and return the month portion of `timepoint' relative to `timeZone'.
+  (setq timeZone (help-get-timezone timeZone))
+  (if (not (null-wrapper? timeZone))
+      (mv-bind (year month day dow)
+          (get-calendar-date (cast (wrapper-value timepoint) CALENDAR-DATE) timeZone)
+        (ignore year day dow)
+        (return month))
+    (return NULL)))
+
+(defun (timepoint-day-computation INTEGER-WRAPPER) ((timepoint DATE-TIME-LOGIC-WRAPPER)
+                                                    (timeZone OBJECT))
+  ;; Compute and return the day portion of `timepoint' relative to `timeZone'.
+  (setq timeZone (help-get-timezone timeZone))
+  (if (not (null-wrapper? timeZone))
+      (mv-bind (year month day dow) 
+          (get-calendar-date (cast (wrapper-value timepoint) CALENDAR-DATE) timeZone)
+        (ignore year month dow)
+        (return day))
+    (return NULL)))
+
+(defun (timepoint-day-of-week-computation LOGIC-OBJECT)
+    ((timepoint DATE-TIME-LOGIC-WRAPPER) (timeZone OBJECT))
+  ;; Compute and return the day of the week of `timepoint' relative to `timeZone'.
+  (setq timeZone (help-get-timezone timeZone))
+  (if (not (null-wrapper? timeZone))
+      (mv-bind (year month day dow) 
+          (get-calendar-date (cast (wrapper-value timepoint) CALENDAR-DATE) timeZone)
+        (ignore year month day)
+        (return (dow-keyword-to-instance dow)))
+    (return NULL)))
+
+(defun (timepoint-hour-computation INTEGER-WRAPPER) ((timepoint DATE-TIME-LOGIC-WRAPPER)
+                                                     (timeZone OBJECT))
+  ;; Compute and return the hour portion of `timepoint' relative to `timeZone'.
+  (setq timeZone (help-get-timezone timeZone))
+  (if (not (null-wrapper? timeZone))
+      (mv-bind (hour minute second millisecond)
+          (get-time (cast (wrapper-value timepoint) CALENDAR-DATE) timeZone)
+        (ignore minute second millisecond)
+        (return hour))
+    (return NULL)))
+
+(defun (timepoint-minute-computation INTEGER-WRAPPER) ((timepoint DATE-TIME-LOGIC-WRAPPER)
+                                                       (timeZone OBJECT))
+  ;; Compute and return the minute portion of `timepoint' relative to `timeZone'.
+  (setq timeZone (help-get-timezone timeZone))
+  (if (not (null-wrapper? timeZone))
+      (mv-bind (hour minute second millisecond)
+          (get-time (cast (wrapper-value timepoint) CALENDAR-DATE) timeZone)
+        (ignore hour second millisecond)
+        (return minute))
+    (return NULL)))
+
+(defun (timepoint-second-computation NUMBER-WRAPPER) ((timepoint DATE-TIME-LOGIC-WRAPPER)
+                                                      (timeZone OBJECT))
+  ;; Compute and return the second portion of `timepoint' relative to `timeZone'.
+  (setq timeZone (help-get-timezone timeZone))
+  (if (not (null-wrapper? timeZone))
+      (mv-bind (hour minute second millisecond)
+          (get-time (cast (wrapper-value timepoint) CALENDAR-DATE) timeZone)
+        (ignore hour minute)
+        (if (= millisecond 0)
+            (return second)
+          (return (+ second (* millisecond 0.001)))))
+    (return NULL)))
+
+(defun (timepoint-date-computation STRING-WRAPPER) ((timepoint DATE-TIME-LOGIC-WRAPPER)
+                                                    (timeZone OBJECT))
+  ;; Compute and return a string representation of the date of `timepoint'
+  ;; relative to `timeZone'.
+  (setq timeZone (help-get-timezone timeZone))
+  (if (not (null-wrapper? timeZone))
+      (return (calendar-date-to-date-string
+               (cast (wrapper-value timepoint) CALENDAR-DATE)
+               timeZone
+               FALSE))
+    (return NULL)))
+
+(defun (timepoint-time-computation STRING-WRAPPER) ((timepoint DATE-TIME-LOGIC-WRAPPER)
+                                                    (timeZone OBJECT))
+  ;; Compute and return a string representation of the time of `timepoint'
+  ;; relative to `timeZone'.
+  (setq timeZone (help-get-timezone timeZone))
+  (if (not (null-wrapper? timeZone))
+      (return (calendar-date-to-time-string
+               (cast (wrapper-value timepoint) CALENDAR-DATE)
+               timeZone
+               TRUE TRUE TRUE))
+    (return NULL)))
+
+(defun (format-timepoint-computation STRING-WRAPPER) ((timepoint DATE-TIME-LOGIC-WRAPPER)
+                                                      (timeZone OBJECT)
+                                                      (control STRING-WRAPPER))
+  ;; Call `format-date' on `timepoint', `timeZone' and `control'.
+  (setq timeZone (help-get-timezone timeZone))
+  (when (not (null-wrapper? timeZone))
+      (exception-case
+          (return (format-date (wrapper-value timepoint) timeZone control))
+        (NATIVE-EXCEPTION ())))
+  (return NULL))

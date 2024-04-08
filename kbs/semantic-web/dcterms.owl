@@ -1,0 +1,783 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:dcterms="http://purl.org/dc/terms/"
+	xmlns:dcmitype="http://purl.org/dc/dcmitype/"
+	xmlns:dcam="http://purl.org/dc/dcam/"
+	xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+	xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+	xmlns:owl="http://www.w3.org/2002/07/owl#"
+	xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+	xmlns:skos="http://www.w3.org/2004/02/skos/core#">
+
+<rdf:Description rdf:about="http://purl.org/NET/dc_owl2dl/terms">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Ontology"/>
+	<rdfs:label xml:lang="en">DCMI metadata terms</rdfs:label>
+	<rdfs:comment xml:lang="en">OWL 2 DL ontology for Dublin Core metadata terms from the http://purl.org/dc/terms/ namespace; this version is grounded in the DC elements ontology and only uses annotation properties.</rdfs:comment>
+	<dcterms:creator rdf:resource="http://simon-reinhardt.de/#me"/>
+	<dcterms:modified>2009-09-07</dcterms:modified>
+	<dcterms:license rdf:resource="http://creativecommons.org/licenses/by-sa/3.0/"/>
+	<owl:imports rdf:resource="http://purl.org/NET/dc_owl2dl/elements"/>
+	<owl:imports rdf:resource="http://purl.org/NET/dc_owl2dl/dcam"/>
+	<owl:imports rdf:resource="http://purl.org/NET/dc_owl2dl/dcmitype"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/abstract">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Abstract</rdfs:label>
+	<skos:definition xml:lang="en-us">A summary of the resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/description"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/accessRights">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Access Rights</rdfs:label>
+	<skos:definition xml:lang="en-us">Information about who can access the resource or an indication of its security status.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Access Rights may include information regarding access or restrictions based on privacy, security, or other policies.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/rights"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/RightsStatement"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/accrualMethod">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Accrual Method</rdfs:label>
+	<skos:definition xml:lang="en-us">The method by which items are added to a collection.</skos:definition>
+	<rdfs:domain rdf:resource="http://purl.org/dc/dcmitype/Collection"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/MethodOfAccrual"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/accrualPeriodicity">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Accrual Periodicity</rdfs:label>
+	<skos:definition xml:lang="en-us">The frequency with which items are added to a collection.</skos:definition>
+	<rdfs:domain rdf:resource="http://purl.org/dc/dcmitype/Collection"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/Frequency"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/accrualPolicy">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Accrual Policy</rdfs:label>
+	<skos:definition xml:lang="en-us">The policy governing the addition of items to a collection.</skos:definition>
+	<rdfs:domain rdf:resource="http://purl.org/dc/dcmitype/Collection"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/Policy"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/alternative">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Alternative Title</rdfs:label>
+	<skos:definition xml:lang="en-us">An alternative name for the resource.</skos:definition>
+	<rdfs:comment xml:lang="en-us">The distinction between titles and alternative titles is application-specific.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/title"/>
+	<skos:note xml:lang="en-us">In current practice, this term is used primarily with literal values; however, there are important uses with non-literal values as well. As of December 2007, the DCMI Usage Board is leaving this range unspecified pending an investigation of options.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/audience">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Audience</rdfs:label>
+	<skos:definition xml:lang="en-us">A class of entity for whom the resource is intended or useful.</skos:definition>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/AgentClass"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/available">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Date Available</rdfs:label>
+	<skos:definition xml:lang="en-us">Date (often a range) that the resource became or will become available.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/date"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/bibliographicCitation">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Bibliographic Citation</rdfs:label>
+	<skos:definition xml:lang="en-us">A bibliographic reference for the resource.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Recommended practice is to include sufficient bibliographic detail to identify the resource as unambiguously as possible.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/identifier"/>
+	<rdfs:domain rdf:resource="http://purl.org/dc/terms/BibliographicResource"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/conformsTo">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Conforms To</rdfs:label>
+	<skos:definition xml:lang="en-us">An established standard to which the described resource conforms.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/relation"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/Standard"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/contributor">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Contributor</rdfs:label>
+	<skos:definition xml:lang="en-us">An entity responsible for making contributions to the resource.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Examples of a Contributor include a person, an organization, or a service. Typically, the name of a Contributor should be used to indicate the entity.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/contributor"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/Agent"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/coverage">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Coverage</rdfs:label>
+	<skos:definition xml:lang="en-us">The spatial or temporal topic of the resource, the spatial applicability of the resource, or the jurisdiction under which the resource is relevant.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Spatial topic and spatial applicability may be a named place or a location specified by its geographic coordinates. Temporal topic may be a named period, date, or date range. A jurisdiction may be a named administrative entity or a geographic place to which the resource applies. Recommended best practice is to use a controlled vocabulary such as the Thesaurus of Geographic Names [TGN]. Where appropriate, named places or time periods can be used in preference to numeric identifiers such as sets of coordinates or date ranges.</rdfs:comment>
+	<dcterms:bibliographicCitation>[TGN] http://www.getty.edu/research/tools/vocabulary/tgn/index.html</dcterms:bibliographicCitation>
+	<rdfs:seeAlso rdf:resource="http://www.getty.edu/research/tools/vocabulary/tgn/index.html"/>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/coverage"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/LocationPeriodOrJurisdiction"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/created">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Date Created</rdfs:label>
+	<skos:definition xml:lang="en-us">Date of creation of the resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/date"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/creator">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Creator</rdfs:label>
+	<skos:definition xml:lang="en-us">An entity primarily responsible for making the resource.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Examples of a Creator include a person, an organization, or a service. Typically, the name of a Creator should be used to indicate the entity.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/creator"/>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/contributor"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/Agent"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/date">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Date</rdfs:label>
+	<skos:definition xml:lang="en-us">A point or period of time associated with an event in the lifecycle of the resource.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Date may be used to express temporal information at any level of granularity. Recommended best practice is to use an encoding scheme, such as the W3CDTF profile of ISO 8601 [W3CDTF].</rdfs:comment>
+	<dcterms:bibliographicCitation>[W3CDTF] http://www.w3.org/TR/NOTE-datetime</dcterms:bibliographicCitation>
+	<rdfs:seeAlso rdf:resource="http://www.w3.org/TR/NOTE-datetime"/>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/date"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/dateAccepted">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Date Accepted</rdfs:label>
+	<skos:definition xml:lang="en-us">Date of acceptance of the resource.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Examples of resources to which a Date Accepted may be relevant are a thesis (accepted by a university department) or an article (accepted by a journal).</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/date"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/dateCopyrighted">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Date Copyrighted</rdfs:label>
+	<skos:definition xml:lang="en-us">Date of copyright.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/date"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/dateSubmitted">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Date Submitted</rdfs:label>
+	<skos:definition xml:lang="en-us">Date of submission of the resource.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Examples of resources to which a Date Submitted may be relevant are a thesis (submitted to a university department) or an article (submitted to a journal).</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/date"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/description">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Description</rdfs:label>
+	<skos:definition xml:lang="en-us">An account of the resource.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Description may include but is not limited to: an abstract, a table of contents, a graphical representation, or a free-text account of the resource.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/description"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/educationLevel">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Audience Education Level</rdfs:label>
+	<skos:definition xml:lang="en-us">A class of entity, defined in terms of progression through an educational or training context, for which the described resource is intended.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/audience"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/AgentClass"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/extent">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Extent</rdfs:label>
+	<skos:definition xml:lang="en-us">The size or duration of the resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/format"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/SizeOrDuration"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/format">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Format</rdfs:label>
+	<skos:definition xml:lang="en-us">The file format, physical medium, or dimensions of the resource.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Examples of dimensions include size and duration. Recommended best practice is to use a controlled vocabulary such as the list of Internet Media Types [MIME].</rdfs:comment>
+	<dcterms:bibliographicCitation>[MIME] http://www.iana.org/assignments/media-types/</dcterms:bibliographicCitation>
+	<rdfs:seeAlso rdf:resource="http://www.iana.org/assignments/media-types/"/>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/format"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/MediaTypeOrExtent"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/hasFormat">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Has Format</rdfs:label>
+	<skos:definition xml:lang="en-us">A related resource that is substantially the same as the pre-existing described resource, but in another format.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/relation"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/hasPart">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Has Part</rdfs:label>
+	<skos:definition xml:lang="en-us">A related resource that is included either physically or logically in the described resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/relation"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/hasVersion">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Has Version</rdfs:label>
+	<skos:definition xml:lang="en-us">A related resource that is a version, edition, or adaptation of the described resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/relation"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/identifier">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Identifier</rdfs:label>
+	<skos:definition xml:lang="en-us">An unambiguous reference to the resource within a given context.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Recommended best practice is to identify the resource by means of a string conforming to a formal identification system.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/identifier"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/instructionalMethod">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Instructional Method</rdfs:label>
+	<skos:definition xml:lang="en-us">A process, used to engender knowledge, attitudes and skills, that the described resource is designed to support.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Instructional Method will typically include ways of presenting instructional materials or conducting instructional activities, patterns of learner-to-learner and learner-to-instructor interactions, and mechanisms by which group and individual levels of learning are measured. Instructional methods include all aspects of the instruction and learning processes from planning and implementation through evaluation and feedback.</rdfs:comment>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/MethodOfInstruction"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/isFormatOf">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Is Format Of</rdfs:label>
+	<skos:definition xml:lang="en-us">A related resource that is substantially the same as the described resource, but in another format.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/relation"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/isPartOf">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Is Part Of</rdfs:label>
+	<skos:definition xml:lang="en-us">A related resource in which the described resource is physically or logically included.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/relation"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/isReferencedBy">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Is Referenced By</rdfs:label>
+	<skos:definition xml:lang="en-us">A related resource that references, cites, or otherwise points to the described resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/relation"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/isReplacedBy">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Is Replaced By</rdfs:label>
+	<skos:definition xml:lang="en-us">A related resource that supplants, displaces, or supersedes the described resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/relation"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/isRequiredBy">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Is Required By</rdfs:label>
+	<skos:definition xml:lang="en-us">A related resource that requires the described resource to support its function, delivery, or coherence.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/relation"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/issued">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Date Issued</rdfs:label>
+	<skos:definition xml:lang="en-us">Date of formal issuance (e.g., publication) of the resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/date"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/isVersionOf">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Is Version Of</rdfs:label>
+	<skos:definition xml:lang="en-us">A related resource of which the described resource is a version, edition, or adaptation.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Changes in version imply substantive changes in content rather than differences in format.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/relation"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/language">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Language</rdfs:label>
+	<skos:definition xml:lang="en-us">A language of the resource.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Recommended best practice is to use a controlled vocabulary such as RFC 4646 [RFC4646].</rdfs:comment>
+	<dcterms:bibliographicCitation>[RFC4646] http://www.ietf.org/rfc/rfc4646.txt</dcterms:bibliographicCitation>
+	<rdfs:seeAlso rdf:resource="http://www.ietf.org/rfc/rfc4646.txt"/>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/language"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/LinguisticSystem"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/license">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">License</rdfs:label>
+	<skos:definition xml:lang="en-us">A legal document giving official permission to do something with the resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/rights"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/LicenseDocument"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/mediator">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Mediator</rdfs:label>
+	<skos:definition xml:lang="en-us">An entity that mediates access to the resource and for whom the resource is intended or useful.</skos:definition>
+	<rdfs:comment xml:lang="en-us">In an educational context, a mediator might be a parent, teacher, teaching assistant, or care-giver.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/audience"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/AgentClass"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/medium">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Medium</rdfs:label>
+	<skos:definition xml:lang="en-us">The material or physical carrier of the resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/format"/>
+	<rdfs:domain rdf:resource="http://purl.org/dc/terms/PhysicalResource"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/PhysicalMedium"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/modified">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Date Modified</rdfs:label>
+	<skos:definition xml:lang="en-us">Date on which the resource was changed.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/date"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/provenance">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Provenance</rdfs:label>
+	<skos:definition xml:lang="en-us">A statement of any changes in ownership and custody of the resource since its creation that are significant for its authenticity, integrity, and interpretation.</skos:definition>
+	<rdfs:comment xml:lang="en-us">The statement may include a description of any changes successive custodians made to the resource.</rdfs:comment>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/ProvenanceStatement"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/publisher">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Publisher</rdfs:label>
+	<skos:definition xml:lang="en-us">An entity responsible for making the resource available.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Examples of a Publisher include a person, an organization, or a service. Typically, the name of a Publisher should be used to indicate the entity.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/publisher"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/Agent"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/references">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">References</rdfs:label>
+	<skos:definition xml:lang="en-us">A related resource that is referenced, cited, or otherwise pointed to by the described resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/relation"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/relation">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Relation</rdfs:label>
+	<skos:definition xml:lang="en-us">A related resource.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Recommended best practice is to identify the related resource by means of a string conforming to a formal identification system.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/relation"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/replaces">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Replaces</rdfs:label>
+	<skos:definition xml:lang="en-us">A related resource that is supplanted, displaced, or superseded by the described resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/relation"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/requires">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Requires</rdfs:label>
+	<skos:definition xml:lang="en-us">A related resource that is required by the described resource to support its function, delivery, or coherence.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/relation"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/rights">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Rights</rdfs:label>
+	<skos:definition xml:lang="en-us">Information about rights held in and over the resource.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Typically, rights information includes a statement about various property rights associated with the resource, including intellectual property rights.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/rights"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/RightsStatement"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/rightsHolder">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Rights Holder</rdfs:label>
+	<skos:definition xml:lang="en-us">A person or organization owning or managing rights over the resource.</skos:definition>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/Agent"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/source">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Source</rdfs:label>
+	<skos:definition xml:lang="en-us">A related resource from which the described resource is derived.</skos:definition>
+	<rdfs:comment xml:lang="en-us">The described resource may be derived from the related resource in whole or in part. Recommended best practice is to identify the related resource by means of a string conforming to a formal identification system.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/source"/>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/relation"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/spatial">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Spatial Coverage</rdfs:label>
+	<skos:definition xml:lang="en-us">Spatial characteristics of the resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/coverage"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/Location"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/subject">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Subject</rdfs:label>
+	<skos:definition xml:lang="en-us">The topic of the resource.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Typically, the subject will be represented using keywords, key phrases, or classification codes. Recommended best practice is to use a controlled vocabulary. To describe the spatial or temporal topic of the resource, use the Coverage element.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/subject"/>
+	<skos:note xml:lang="en-us">This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/tableOfContents">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Table Of Contents</rdfs:label>
+	<skos:definition xml:lang="en-us">A list of subunits of the resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/description"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/temporal">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Temporal Coverage</rdfs:label>
+	<skos:definition xml:lang="en-us">Temporal characteristics of the resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/coverage"/>
+	<rdfs:range rdf:resource="http://purl.org/dc/terms/PeriodOfTime"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/title">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Title</rdfs:label>
+	<skos:definition xml:lang="en-us">A name given to the resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/title"/>
+	<skos:note xml:lang="en-us">In current practice, this term is used primarily with literal values; however, there are important uses with non-literal values as well. As of December 2007, the DCMI Usage Board is leaving this range unspecified pending an investigation of options.</skos:note>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/type">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Type</rdfs:label>
+	<skos:definition xml:lang="en-us">The nature or genre of the resource.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Recommended best practice is to use a controlled vocabulary such as the DCMI Type Vocabulary [DCMITYPE]. To describe the file format, physical medium, or dimensions of the resource, use the Format element.</rdfs:comment>
+	<dcterms:bibliographicCitation>[DCMITYPE] http://dublincore.org/documents/dcmi-type-vocabulary/</dcterms:bibliographicCitation>
+	<rdfs:seeAlso rdf:resource="http://dublincore.org/documents/dcmi-type-vocabulary/"/>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/elements/1.1/type"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/valid">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#AnnotationProperty"/>
+	<rdfs:label xml:lang="en-us">Date Valid</rdfs:label>
+	<skos:definition xml:lang="en-us">Date (often a range) of validity of a resource.</skos:definition>
+	<rdfs:subPropertyOf rdf:resource="http://purl.org/dc/terms/date"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/DCMIType">
+	<rdf:type rdf:resource="http://purl.org/dc/dcam/VocabularyEncodingScheme"/>
+	<rdfs:label xml:lang="en-us">DCMI Type Vocabulary</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of classes specified by the DCMI Type Vocabulary, used to categorize the nature or genre of the resource.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://dublincore.org/documents/dcmi-type-vocabulary/"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/DDC">
+	<rdf:type rdf:resource="http://purl.org/dc/dcam/VocabularyEncodingScheme"/>
+	<rdfs:label xml:lang="en-us">DDC</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of conceptual resources specified by the Dewey Decimal Classification.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://www.oclc.org/dewey/"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/IMT">
+	<rdf:type rdf:resource="http://purl.org/dc/dcam/VocabularyEncodingScheme"/>
+	<rdfs:label xml:lang="en-us">IMT</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of media types specified by the Internet Assigned Numbers Authority.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://www.iana.org/assignments/media-types/"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/LCC">
+	<rdf:type rdf:resource="http://purl.org/dc/dcam/VocabularyEncodingScheme"/>
+	<rdfs:label xml:lang="en-us">LCC</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of conceptual resources specified by the Library of Congress Classification.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://lcweb.loc.gov/catdir/cpso/lcco/lcco.html"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/LCSH">
+	<rdf:type rdf:resource="http://purl.org/dc/dcam/VocabularyEncodingScheme"/>
+	<rdfs:label xml:lang="en-us">LCSH</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of labeled concepts specified by the Library of Congress Subject Headings.</skos:definition>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/MESH">
+	<rdf:type rdf:resource="http://purl.org/dc/dcam/VocabularyEncodingScheme"/>
+	<rdfs:label xml:lang="en-us">MeSH</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of labeled concepts specified by the Medical Subject Headings.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://www.nlm.nih.gov/mesh/meshhome.html"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/NLM">
+	<rdf:type rdf:resource="http://purl.org/dc/dcam/VocabularyEncodingScheme"/>
+	<rdfs:label xml:lang="en-us">NLM</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of conceptual resources specified by the National Library of Medicine Classification.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://wwwcf.nlm.nih.gov/class/"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/TGN">
+	<rdf:type rdf:resource="http://purl.org/dc/dcam/VocabularyEncodingScheme"/>
+	<rdfs:label xml:lang="en-us">TGN</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of places specified by the Getty Thesaurus of Geographic Names.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://www.getty.edu/research/tools/vocabulary/tgn/index.html"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/UDC">
+	<rdf:type rdf:resource="http://purl.org/dc/dcam/VocabularyEncodingScheme"/>
+	<rdfs:label xml:lang="en-us">UDC</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of conceptual resources specified by the Universal Decimal Classification.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://www.udcc.org/"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/Box">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Datatype"/>
+	<rdfs:label xml:lang="en-us">DCMI Box</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of regions in space defined by their geographic coordinates according to the DCMI Box Encoding Scheme.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://dublincore.org/documents/dcmi-box/"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/ISO3166">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Datatype"/>
+	<rdfs:label xml:lang="en-us">ISO 3166</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of codes listed in ISO 3166-1 for the representation of names of countries.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://www.iso.org/iso/en/prods-services/iso3166ma/02iso-3166-code-lists/list-en1.html"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/ISO639-2">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Datatype"/>
+	<rdfs:label xml:lang="en-us">ISO 639-2</rdfs:label>
+	<skos:definition xml:lang="en-us">The three-letter alphabetic codes listed in ISO639-2 for the representation of names of languages.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://lcweb.loc.gov/standards/iso639-2/langhome.html"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/ISO639-3">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Datatype"/>
+	<rdfs:label xml:lang="en-us">ISO 639-3</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of three-letter codes listed in ISO 639-3 for the representation of names of languages.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://www.sil.org/iso639-3/"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/Period">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Datatype"/>
+	<rdfs:label xml:lang="en-us">DCMI Period</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of time intervals defined by their limits according to the DCMI Period Encoding Scheme.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://dublincore.org/documents/dcmi-period/"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/Point">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Datatype"/>
+	<rdfs:label xml:lang="en-us">DCMI Point</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of points in space defined by their geographic coordinates according to the DCMI Point Encoding Scheme.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://dublincore.org/documents/dcmi-point/"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/RFC1766">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Datatype"/>
+	<rdfs:label xml:lang="en-us">RFC 1766</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of tags, constructed according to RFC 1766, for the identification of languages.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://www.ietf.org/rfc/rfc1766.txt"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/RFC3066">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Datatype"/>
+	<rdfs:label xml:lang="en-us">RFC 3066</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of tags constructed according to RFC 3066 for the identification of languages.</skos:definition>
+	<rdfs:comment xml:lang="en-us">RFC 3066 has been obsoleted by RFC 4646.</rdfs:comment>
+	<rdfs:isDefinedBy rdf:resource="http://www.ietf.org/rfc/rfc3066.txt"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/RFC4646">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Datatype"/>
+	<rdfs:label xml:lang="en-us">RFC 4646</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of tags constructed according to RFC 4646 for the identification of languages.</skos:definition>
+	<rdfs:comment xml:lang="en-us">RFC 4646 obsoletes RFC 3066.</rdfs:comment>
+	<rdfs:isDefinedBy rdf:resource="http://www.ietf.org/rfc/rfc4646.txt"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/URI">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Datatype"/>
+	<rdfs:label xml:lang="en-us">URI</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of identifiers constructed according to the generic syntax for Uniform Resource Identifiers as specified by the Internet Engineering Task Force.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://www.ietf.org/rfc/rfc3986.txt"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/W3CDTF">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Datatype"/>
+	<rdfs:label xml:lang="en-us">W3C-DTF</rdfs:label>
+	<skos:definition xml:lang="en-us">The set of dates and times constructed according to the W3C Date and Time Formats Specification.</skos:definition>
+	<rdfs:isDefinedBy rdf:resource="http://www.w3.org/TR/NOTE-datetime"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/Agent">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdf:type rdf:resource="http://purl.org/dc/terms/AgentClass"/>
+	<rdfs:label xml:lang="en-us">Agent</rdfs:label>
+	<skos:definition xml:lang="en-us">A resource that acts or has the power to act.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Examples of Agent include person, organization, and software agent.</rdfs:comment>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/AgentClass">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Agent Class</rdfs:label>
+	<skos:definition xml:lang="en-us">A group of agents.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Examples of Agent Class include groups seen as classes, such as students, women, charities, lecturers.</rdfs:comment>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/BibliographicResource">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Bibliographic Resource</rdfs:label>
+	<skos:definition xml:lang="en-us">A book, article, or other documentary resource.</skos:definition>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/FileFormat">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">File Format</rdfs:label>
+	<skos:definition xml:lang="en-us">A digital resource format.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Examples include the formats defined by the list of Internet Media Types.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://purl.org/dc/terms/MediaType"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/Frequency">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Frequency</rdfs:label>
+	<skos:definition xml:lang="en-us">A rate at which something recurs.</skos:definition>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/Jurisdiction">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Jurisdiction</rdfs:label>
+	<skos:definition xml:lang="en-us">The extent or range of judicial, law enforcement, or other authority.</skos:definition>
+	<rdfs:subClassOf rdf:resource="http://purl.org/dc/terms/LocationPeriodOrJurisdiction"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/LicenseDocument">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">License Document</rdfs:label>
+	<skos:definition xml:lang="en-us">A legal document giving official permission to do something with a Resource.</skos:definition>
+	<rdfs:subClassOf rdf:resource="http://purl.org/dc/terms/RightsStatement"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/LinguisticSystem">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Linguistic System</rdfs:label>
+	<skos:definition xml:lang="en-us">A system of signs, symbols, sounds, gestures, or rules used in communication.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Examples include written, spoken, sign, and computer languages.</rdfs:comment>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/Location">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Location</rdfs:label>
+	<skos:definition xml:lang="en-us">A spatial region or named place.</skos:definition>
+	<rdfs:subClassOf rdf:resource="http://purl.org/dc/terms/LocationPeriodOrJurisdiction"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/LocationPeriodOrJurisdiction">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Location, Period, or Jurisdiction</rdfs:label>
+	<skos:definition xml:lang="en-us">A location, period of time, or jurisdiction.</skos:definition>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/MediaType">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Media Type</rdfs:label>
+	<skos:definition xml:lang="en-us">A file format or physical medium.</skos:definition>
+	<rdfs:subClassOf rdf:resource="http://purl.org/dc/terms/MediaTypeOrExtent"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/MediaTypeOrExtent">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Media Type or Extent</rdfs:label>
+	<skos:definition xml:lang="en-us">A media type or extent.</skos:definition>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/MethodOfAccrual">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Method of Accrual</rdfs:label>
+	<skos:definition xml:lang="en-us">A method by which resources are added to a collection.</skos:definition>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/MethodOfInstruction">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Method of Instruction</rdfs:label>
+	<skos:definition xml:lang="en-us">A process that is used to engender knowledge, attitudes, and skills.</skos:definition>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/PeriodOfTime">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Period of Time</rdfs:label>
+	<skos:definition xml:lang="en-us">An interval of time that is named or defined by its start and end dates.</skos:definition>
+	<rdfs:subClassOf rdf:resource="http://purl.org/dc/terms/LocationPeriodOrJurisdiction"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/PhysicalMedium">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Physical Medium</rdfs:label>
+	<skos:definition xml:lang="en-us">A physical material or carrier.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Examples include paper, canvas, or DVD.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://purl.org/dc/terms/MediaType"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/PhysicalResource">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Physical Resource</rdfs:label>
+	<skos:definition xml:lang="en-us">A material thing.</skos:definition>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/Policy">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Policy</rdfs:label>
+	<skos:definition xml:lang="en-us">A plan or course of action by an authority, intended to influence and determine decisions, actions, and other matters.</skos:definition>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/ProvenanceStatement">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Provenance Statement</rdfs:label>
+	<skos:definition xml:lang="en-us">A statement of any changes in ownership and custody of a resource since its creation that are significant for its authenticity, integrity, and interpretation.</skos:definition>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/RightsStatement">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Rights Statement</rdfs:label>
+	<skos:definition xml:lang="en-us">A statement about the intellectual property rights (IPR) held in or over a Resource, a legal document giving official permission to do something with a resource, or a statement about access rights.</skos:definition>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/SizeOrDuration">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Size or Duration</rdfs:label>
+	<skos:definition xml:lang="en-us">A dimension or extent, or a time taken to play or execute.</skos:definition>
+	<rdfs:comment xml:lang="en-us">Examples include a number of pages, a specification of length, width, and breadth, or a period in hours, minutes, and seconds.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://purl.org/dc/terms/MediaTypeOrExtent"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://purl.org/dc/terms/Standard">
+	<rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+	<rdfs:label xml:lang="en-us">Standard</rdfs:label>
+	<skos:definition xml:lang="en-us">A basis for comparison; a reference point against which other things can be evaluated.</skos:definition>
+</rdf:Description>
+
+</rdf:RDF>

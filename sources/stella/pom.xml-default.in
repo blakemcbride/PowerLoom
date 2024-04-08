@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<!-- This pom file is based on the template sources/stella/pom.xml-default.in -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>#$(SYSTEM-PARENT-GROUP-NAME)</groupId>
+    <artifactId>#$(SYSTEM-PARENT-NAME)</artifactId>
+    <version>[0,10000]</version>
+  </parent>
+  <groupId>#$(SYSTEM-GROUP-NAME)</groupId>
+  <artifactId>#$(SYSTEM-NAME)</artifactId>
+  <name>#$(SYSTEM-NAME) system</name>
+  <description>Maven project file for the Java version of the STELLA system #$(SYSTEM-NAME)</description>
+  <version>#$(SYSTEM-VERSION)</version>
+  <packaging>jar</packaging>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.1.1</version>
+        <executions>
+          <execution>
+            <id>copy-installed</id>
+            <phase>install</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>${project.groupId}</groupId>
+                  <artifactId>${project.artifactId}</artifactId>
+                  <version>${project.version}</version>
+                  <type>${project.packaging}</type>
+                </artifactItem>
+              </artifactItems>
+              <outputDirectory>../lib</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+  <dependencies>
+    #$(REQUIRED-SYSTEMS)
+  </dependencies>
+</project>

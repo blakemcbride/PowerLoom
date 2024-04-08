@@ -1,0 +1,39 @@
+Avoiding collapsing of whitespace and elimination of newlines is a somewhat
+tricky issue with Castor & SOAP.  The only solution for now seems to be to
+encode affected strings (e.g., the content of a PLFile object) via base64.
+To be fully general, we would have to do this for all slots that can
+contain whitespace (e.g., concept names).  Here is how that is done:
+
+- we need at least Castor-0.9.5.2
+- the slot needs to be encoded as an element (not as an attribute)
+- the slot either needs to be of type `byte[]' with direct="true" in the
+  <field...> specification, or it needs to have appropriate set/get methods
+  with `byte[]' type to do the conversion (in that case direct="false")
+
+For example, this works:
+
+    <class name="edu.isi.powerloom.gui.xmlobject.PLFile">
+        <map-to xml="PLFile"/> 
+        <field name="attrFileName" direct="true">
+            <bind-xml name="FileName" node="attribute"/>
+        </field>
+        <field name="textContent" type="bytes" direct="false">
+            <bind-xml name="textContent" node="element"/>
+        </field>
+    </class>
+
+with PLFile defined like this:
+
+public class PLFile extends XMLObject {
+    public String attrFileName;
+    public String textContent;
+    //public byte[] textContent;
+
+    public byte[] getTextContent() {
+        return textContent.getBytes();
+    }
+
+    public void setTextContent(byte[] content) {
+        textContent=new String(content);
+    }
+}

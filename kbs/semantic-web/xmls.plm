@@ -1,0 +1,73 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;; Dependencies: webcore.plm
+
+(IN-PACKAGE "STELLA")
+
+(IN-MODULE "/PL-KERNEL/WEB-CORE")
+
+(IN-DIALECT :KIF)
+
+
+(ASSERT (DOCUMENTATION /PL-KERNEL/WEB-CORE "Module for XMLS definitions.  This corresponds to the XML-Schema items. Version $Id$"))
+
+
+(DEFCONCEPT /XMLNS/XMLS/string (?x)
+  :<=> (STRING ?x))
+
+(DEFCONCEPT /XMLNS/XMLS/boolean (?x)
+  :<=> (BOOLEAN ?x))
+
+(DEFCONCEPT /XMLNS/XMLS/integer (?x)
+  :<=> (INTEGER ?x))			; (Not really.  Range problems)
+
+(DEFCONCEPT /XMLNS/XMLS/positiveInteger (?x INTEGER)
+  :<=> (AND (INTEGER ?x) (> ?x 0)))
+
+(DEFCONCEPT /XMLNS/XMLS/negativeInteger (?x INTEGER)
+  :<=> (AND (INTEGER ?x) (< ?x 0)))
+
+(DEFCONCEPT /XMLNS/XMLS/nonPositiveInteger (?x INTEGER)
+  :<=> (AND (INTEGER ?x) (=< ?x 0)))
+
+(DEFCONCEPT /XMLNS/XMLS/nonNegativeInteger (?x INTEGER)
+  :<=> (AND (INTEGER ?x) (>= ?x 0)))
+
+
+;; Size limited integers:
+
+(DEFCONCEPT /XMLNS/XMLS/byte (?x INTEGER)
+  ;; -(2^7) to 2^7 - 1  [-128, 128]
+  :=> (AND (INTEGER ?x) (>= ?x -128) (=< ?x 127)))
+
+(DEFCONCEPT /XMLNS/XMLS/short (?x INTEGER)
+  ;; -(2^15) to 2^15 - 1  [-32768, 32767]
+  :=> (AND (INTEGER ?x) (>= ?x -32768) (=< ?x 32767)))
+
+(DEFCONCEPT /XMLNS/XMLS/int (?x INTEGER)
+  ;; -(2^31) to 2^31 - 1, [-2147483648, 2147483647] but we can't represent that.
+  :=> (AND (INTEGER ?x)))
+
+(DEFCONCEPT /XMLNS/XMLS/long (?x INTEGER)
+  ;; -(2^63) to 2^63 - 1, [-9223372036854775808, 9223372036854775807] but we can't represent that.
+  :=> (AND (INTEGER ?x)))
+
+(DEFCONCEPT /XMLNS/XMLS/unsignedByte (?x INTEGER)
+  :=> (AND (INTEGER ?x) (>= ?x 0) (=< ?x 255)))
+
+(DEFCONCEPT /XMLNS/XMLS/unsignedShort (?x INTEGER)
+  :=> (AND (INTEGER ?x) (>= ?x 0) (=< ?x 65535)))
+
+(DEFCONCEPT /XMLNS/XMLS/unsignedInt (?x INTEGER)
+  ;; NOTE: Upper bound should be 2^32 - 1 (4294967295), but we can't represent that.
+  :=> (AND (INTEGER ?x) (>= ?x 0)))
+
+(DEFCONCEPT /XMLNS/XMLS/unsignedLong (?x INTEGER)
+  ;; NOTE: Upper bound should be 2^64 - 1 (18446744073709551615), but we can't represent that.
+  :=> (AND (INTEGER ?x) (>= ?x 0)))
+
+
+(DEFCONCEPT /XMLNS/XMLS/float (?x FLOAT))
+
+(DEFCONCEPT /XMLNS/XMLS/double (?x FLOAT)
+  :<=> (FLOAT ?x))

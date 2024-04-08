@@ -1,0 +1,69 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+(IN-PACKAGE "STELLA")
+
+
+  ;;
+;;;;;; Common modules for semantic web KBs (many of these are mirrored in "semantic-web-system.ste")
+  ;;
+
+;;; Top-level semantic web assertion modules
+
+(DEFMODULE "WEB-CORE"
+  :documentation "Core definitions of web namespaces.  Semantic web modules should
+be created as submodules of this module."
+  :INCLUDES ("PL-KERNEL")
+  :USES ("LOGIC" "STELLA")
+  :CASE-SENSITIVE? TRUE)
+
+(DEFMODULE "WEB-AXIOMS"
+  :documentation "Alternative module where axioms and assertions may reside
+if they are not simply asserted in WEB-CORE."
+  :INCLUDES ("WEB-CORE")
+  :CASE-SENSITIVE? TRUE)
+
+
+;;; Common semantic-web namespace modules
+
+(defmodule "/XMLNS"
+  :documentation "Root module for XML namespace modules."
+  :CASE-SENSITIVE? TRUE)
+
+(DEFMODULE "/XMLNS/XMLS"
+  :documentation "Namespace for XML Schema symbols."
+  :CASE-SENSITIVE? TRUE)
+
+(DEFMODULE "/XMLNS/RDF"
+  :documentation "Namespace for RDF symbols."
+  :CASE-SENSITIVE? TRUE)
+
+(DEFMODULE "/XMLNS/RDFS"
+  :documentation "Namespace for RDF-Schema symbols."
+  :CASE-SENSITIVE? TRUE)
+
+(DEFMODULE "/XMLNS/RDFS/OLD"
+  :documentation "Older namespace for RDF-Schema symbols."
+  :shadow (/XMLNS/RDFS/|domain|)
+  :CASE-SENSITIVE? TRUE)
+
+(DEFMODULE "/XMLNS/OWL"
+  :documentation "Namespace for OWL symbols."
+  :CASE-SENSITIVE? TRUE)
+
+(DEFMODULE "/XMLNS/DC"
+  :documentation "Namespace for symbols of the Dublin Core Elements ontology."
+  :CASE-SENSITIVE? TRUE)
+
+(DEFMODULE "/XMLNS/DCTERMS"
+  :documentation "Namespace for symbols of the Dublin Core Terms ontology."
+  :NICKNAME "DCT"
+  :CASE-SENSITIVE? TRUE)
+
+(DEFMODULE "/XMLNS/SKOS"
+  :documentation "Namespace for symbols of the Simple Knowledge Organization System (SKOS) data model."
+  :CASE-SENSITIVE? TRUE)
+
+
+(IN-MODULE "/PL-KERNEL/WEB-CORE")
+
+(IN-DIALECT :KIF)

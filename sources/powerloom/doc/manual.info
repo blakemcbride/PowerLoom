@@ -1,0 +1,156 @@
+This is manual.info, produced by makeinfo version 6.7 from manual.texi.
+
+Copyright (C) 2010 University of Southern California, Information
+Sciences Institute, 4676 Admiralty Way, Marina Del Rey, CA 90292, USA
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   PowerLoom is a registered trademark of the University of Southern
+California.
+
+   This file documents the knowledge representation and reasoning
+system.
+
+
+Indirect:
+manual.info-1: 533
+manual.info-2: 419023
+
+Tag Table:
+(Indirect)
+Node: Top533
+Node: Introduction1210
+Node: Powerloom Features2748
+Node: Powerloom History14307
+Node: Running PowerLoom14488
+Node: Command-Line Options16643
+Node: Conceptual Framework18250
+Node: Terms and Propositions20226
+Node: Relation Definitions22212
+Ref: Relation Definitions-Footnote-126231
+Node: Truth Values26310
+Node: Modules29481
+Ref: Modules-Footnote-132885
+Node: Annotated Example33042
+Node: Using Modules34338
+Ref: Using Modules-Footnote-135810
+Node: Concepts36249
+Node: Relations37498
+Node: Relation Hierarchies38952
+Node: Functions40918
+Node: Defined Concepts43097
+Node: Negation and Open and Closed World Semantics45018
+Ref: Negation and Open and Closed World Semantics-Footnote-149835
+Ref: Negation and Open and Closed World Semantics-Footnote-250041
+Node: Retraction50340
+Node: Clipping of Values52556
+Node: Rule-based Inference54515
+Ref: Rule-based Inference-Footnote-156905
+Node: Explanation57060
+Ref: Explanation-Footnote-161420
+Node: Contexts and Modules61499
+Node: Equality Reasoning64057
+Node: Classification65344
+Node: Truth Maintenance65532
+Node: Inference Control65699
+Node: Keyword Axioms65866
+Node: Cardinality/Type Reasoning with Frame Predicates66058
+Node: Loom-to-PowerLoom66318
+Node: Deviations from KIF66521
+Node: Differences from Loom66701
+Node: Defaults66876
+Node: Sets67010
+Node: Communicating with PowerLoom67154
+Node: Command Interpreter68724
+Ref: Command Interpreter-Footnote-170953
+Node: Persistent Knowledge Bases71159
+Node: Commands71889
+Ref: Commands-Footnote-1115538
+Node: PowerLoom API115657
+Node: API Functions116214
+Node: Language Specific Interface170186
+Node: Lisp API170646
+Node: Initialization171553
+Node: Type Declarations172009
+Node: NULL Values172975
+Node: Wrapped Literal Values173462
+Node: Special Variables173891
+Node: CLOS Objects versus Structs174198
+Node: C++ API174881
+Node: Java API175032
+Node: Initializing PowerLoom175717
+Node: PowerLoom Java Conventions176290
+Node: Using the PLI Class181796
+Node: Using Stella Objects182909
+Node: PowerLoom and Threads184762
+Node: Setting and Restoring Global Variable Values185605
+Node: Java Character Mapping188570
+Node: Stella Exceptions in Java190154
+Node: Iteration in Java190979
+Node: Utility Classes for Java193488
+Node: Built-In Relations194542
+Node: PowerLoom GUI234513
+Node: Invoking the GUI236057
+Node: Starting a PowerLoom Server239108
+Node: GUI Design Goals240344
+Ref: fig:context-menu243941
+Node: GUI Overview245600
+Ref: fig:gui245913
+Node: GUI Features250739
+Node: Connect to Server251294
+Node: Edit Preferences251910
+Node: KB Load/Save252542
+Node: Browsing253228
+Ref: fig:browser253652
+Node: Editing261457
+Ref: fig:instedit262649
+Ref: fig:propedit264993
+Node: Choosers265868
+Ref: fig:extedit266657
+Node: Extension Editor266752
+Node: Ask and Retrieve Queries267741
+Ref: fig:query267917
+Node: Search270567
+Ref: fig:search271790
+Node: Console272378
+Ref: fig:console272938
+Node: Cut/Copy/Paste/Delete273025
+Node: Future Work274619
+Node: Large KBs274938
+Node: Undo275642
+Node: Drag and Drop276019
+Node: Scrapbook276476
+Node: Instance Cloning276856
+Node: Security277473
+Node: Multiple Users278232
+Node: Ontosaurus278805
+Node: Installation280666
+Node: System Requirements280978
+Node: Unpacking the Sources284556
+Node: Lisp Installation285197
+Node: C++ Installation287552
+Node: Java Installation289447
+Node: Removing Unneeded Files291007
+Node: Installing PowerLoom Patches291915
+Node: Miscellaneous294869
+Node: Glossary419023
+Ref: Glossary-Footnote-1428427
+Node: PowerLoom Grammar428461
+Node: Alphabet428746
+Node: Grammar430059
+Node: Constants and Typed Variables430413
+Node: Terms431870
+Node: Sentences432759
+Node: Definitions434012
+Node: Function Index436413
+Node: Variable Index503143
+Node: Concept Index505047
+
+End Tag Table
+
+
+Local Variables:
+coding: utf-8
+End:

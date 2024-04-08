@@ -1,0 +1,924 @@
+; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                          ;
+;  COPYRIGHT (C) UNIVERSITY OF SOUTHERN CALIFORNIA, 2002                   ; 
+;  University of Southern California, Information Sciences Institute       ;
+;  4676 Admiralty Way                                                      ;
+;  Marina Del Rey, California 90292                                        ;
+;  All rights reserved.                                                    ;
+;                                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(in-package "STELLA")
+
+(defmodule "SEISMOLOGY"
+    :includes ("PL-KERNEL-KB" "UNIT-KB")
+    :lisp-package "STELLA"			; avoid funny names for functions
+    :case-sensitive? FALSE ; TRUE
+    :clearable? TRUE)
+
+(in-module "SEISMOLOGY")
+
+(in-dialect :KIF)
+
+(assert (documentation SEISMOLOGY 
+		       "*** UNDER DEVELOPMENT ****
+
+A support ontology for the SCEC-ITR work.
+
+KB version: $Id$")
+	)
+(assert (image-url SEISMOLOGY "images/scec/scec-banner.jpg"))
+
+
+;;;;
+;;;; **********************************************************************
+;;;;
+;;;; Background, mathematical constructs
+;;;;
+
+
+(defrelation measurement-uncertainty (?object (?relation RELATION) ?uncertainty)
+  :documentation "The uncertainty of the measurement of ?object with respect
+to the attributre ?relation")
+
+
+(deffunction derivative-fn (?x ?dy) :-> ?derivative
+   :documentation "Defines a relation between mathematical entities and their
+derivatives")
+
+(defconcept quantity)
+(deffunction quantity-of (?q) :-> ?x
+	     :documentation "What the quantity ?q is quantifying")
+(deffunction quantity-amount (?q) :-> ?x
+  :documentation "What the quantity ?q is quantifying")
+
+(defconcept depth-measure (?d distance-measure))
+(defconcept length-measure (?d distance-measure))
+(defconcept height-measure (?d distance-measure))
+(defconcept width-measure (?d distance-measure))
+
+(assert (= (derivative-fn distance-measure time-measure)
+           velocity-measure))
+(assert (= (derivative-fn velocity-measure time-measure)
+           acceleration-measure))
+
+
+
+(defconcept three-d-object)
+(defconcept two-d-object)
+(defconcept one-d-object)
+(defconcept zero-d-object)
+
+(assert (mutually-disjoint-collection
+	 (setof THREE-D-OBJECT TWO-D-OBJECT ONE-D-OBJECT ZERO-D-OBJECT)))
+
+(defconcept surface (?s two-d-object)
+  :documentation "A 2-dimensional object all of whose points are not necessarily
+in a single mathematical plane.")
+(defconcept plane   (?s two-d-object)
+  :documentation "A mathematical plane, with infinite extent.")
+
+(defconcept trace  (?s one-d-object)
+  :documentation "A 1-dimensional object all of whose points are not necessarily
+co-linear.")
+(defconcept line   (?s one-d-object)
+  :documentation "A mathematical line, with infinite extent.")
+(defconcept line-segment (?s one-d-object)
+  :documentation "A finite segment of a mathematical line.")
+
+
+(defrelation sub-region-of ((?sub two-d-object) (?super two-d-object))
+  :documentation "?sub is a smaller region completely contained in ?super")
+
+
+(defrelation pretty-name (?x (?s STRING))
+  :documentation "A pretty print name for the concept or parameter")
+
+;;;;
+;;;; **********************************************************************
+;;;;
+;;;; Parameters and values
+;;;;
+
+
+(defconcept measured-value)
+(deffunction measured-attribute ((?m measured-value)) :-> ?a
+   :documentation "Identifies what is being measured.")
+(deffunction measured-location ((?m measured-value)) :-> ?a
+   :documentation "Identifies where a measurement occurs.")
+
+
+(defconcept wave)
+(defconcept shear-wave (?w wave))
+(defconcept compression-wave (?w wave))
+(assert (disjoint shear-wave compression-wave))
+
+(defconcept parameter)
+(deffunction parameter-value (?p) :-> ?v)
+(deffunction parameter-describes (?p) :-> ?o)
+(deffunction parameter-object-type (?p) :-> ?d)
+(deffunction parameter-characteristic (?p) :-> ?d)
+(deffunction parameter-motion-component (?p) :-> ?d)
+(defrelation parameter-attribute (?p ?r))
+
+(defconcept motion-component)
+
+(defconcept maximum-value-parameter (?p parameter))
+(defconcept minimum-value-parameter (?p parameter))
+(defconcept mean-value-parameter (?p parameter))
+(defconcept median-value-parameter (?p parameter))
+;; Not quite sure how to distinguish between these:
+(defconcept categorical-value-parameter (?p parameter))
+(defconcept discrete-value-parameter (?p parameter))
+
+(deffunction preferred-unit ((?p parameter)) :-> (?u STRING)
+  :documentation "The preferred unit for measuring a parameter")
+
+
+(defconcept velocity-parameter ((?p parameter))
+  :<=> (and (parameter ?p)
+	    (parameter-characteristic ?p velocity)))
+
+(defconcept acceleration-parameter ((?p parameter))
+  :<=> (and (parameter ?p)
+	    (parameter-characteristic ?p acceleration)))
+
+(defrelation parameter-lower-bound ((?p parameter) ?V)
+  :documentation "A value that is a lower bound on the acceptable values of the parameter.
+It need not be the tightest bound.")
+
+(deffunction parameter-minimum-value ((?p parameter) ?v)
+  :documentation "The currently known greatest upper bound on the value of the parameter."
+  :<=> (and (parameter-lower-bound ?p ?v)
+	    (fail (exists (?v2)
+			  (and (parameter-lower-bound ?p ?v2)
+			       (> ?v2 ?v))))))
+
+(defrelation parameter-upper-bound ((?p parameter) ?V)
+  :documentation "a value that is a upper bound on the acceptable values of the parameter.
+It need not be the tightest bound.")
+
+(deffunction parameter-maximum-value ((?p parameter) ?v)
+  :documentation "The currently known greatest upper bound on the value of the parameter."
+  :<=> (and (parameter-upper-bound ?p ?v)
+	    (fail (exists (?v2)
+			  (and (parameter-upper-bound ?p ?v2)
+			       (> ?v2 ?v))))))
+
+
+(defconcept site-parameter ((?p parameter))
+  :documentation "A subtype of parameter that describes the characteristics
+of a site."
+  :=> (parameter-describes ?p site))
+
+(defconcept numeric-parameter ((?p parameter))
+  :documentation "A subtype of parameter that holds numeric values.")
+(defconcept integer-parameter ((?p numeric-parameter))
+  :documentation "A subtype of numeric parameter that holds only integer values.")
+
+(defconcept distance-parameter ((?p parameter))
+  :documentation "A subtype of parameter that describes the distance
+between a site and an earthquake source."
+;  :axioms (=> (distance-parameter ?p)
+;	      (forall (?x ?y ?d) 
+;		(=> (holds ?p ?x ?y ?d) 
+;		    (>= ?d (units 0 "m")))))
+  )
+
+(defconcept fault-parameter ((?p parameter))
+  :documentation "A subtype of parameter that describes some characteristic
+of a geologic fault that is a location for an earthquake source."
+  :=> (parameter-describes ?p fault))
+
+(defconcept magnitude-parameter ((?p parameter))
+  :documentation "A subtype of parameter that describes the magnitude of
+of an earthquake rupture"
+  :=> (parameter-describes ?p earthquake-source))
+
+(deffunction distance-jb ((?s site) (?f fault)) :-> ?d
+  :documentation "Joyner-Boore Distance (closest distance to surface projection of fault)"
+  :axioms ((distance-parameter distance-jb)
+	   (pretty-name distance-jb "Distance JB")
+	   (preferred-unit distance-jb "km")
+	   (=> (model ?x) (model-parameter-lower-bound ?x distance-jb (units 0 "m")))
+	   (=> (model ?x) (model-parameter-upper-bound ?x distance-jb (units 20000 "km")))
+	   ))
+
+(deffunction distance-rupture ((?s site) (?f fault)) :-> ?d
+  :documentation"Rupture Distance (closest distance to fault surface)"
+  :axioms ((distance-parameter distance-rupture)
+	   (pretty-name distance-rupture "Distance Rupture")
+	   (preferred-unit distance-rupture "km")
+	   (=> (model ?x) (model-parameter-lower-bound ?x distance-rupture (units 0 "m")))
+	   (=> (model ?x) (model-parameter-upper-bound ?x distance-rupture (units 20000 "km")))
+	   ))
+
+(deffunction distance-seismogenic ((?s site) (?f fault)) :-> ?d
+  :documentation "Seismogenic Distance (closest distance to seismogenic part of fault surface)"
+  :axioms ((distance-parameter distance-seismogenic)
+	   (pretty-name distance-seismogenic "Distance Seismogenic")
+	   (preferred-unit distance-seismogenic "km")
+	   (=> (model ?x) (model-parameter-lower-bound ?x distance-seismogenic (units 0 "m")))
+	   (=> (model ?x) (model-parameter-upper-bound ?x distance-seismogenic (units 20000 "km")))
+	   ))
+
+;;
+;; Still to be fleshed out:
+;;
+
+#|
+(defconcept vs (?v parameter)
+  :<=> (and (parameter ?v)
+	    (parameter-object-type ?v shear-wave)
+	    (parameter-characteristic ?v velocity)))
+|#
+
+(deffunction measurement-depth ((?v parameter)) :-> ?d)
+(deffunction surface-of (?v) :-> ?s
+  :documentation "Function to map to the surface of a 3-D object")
+
+
+(defconcept vs (?v parameter)
+  :documentation "S-Wave velocity."
+  :<=> (and (parameter ?v)
+	    (exists ?w
+	      (and (parameter-describes ?v ?w)
+		   (shear-wave ?w))))
+  :axioms (and (velocity-measure vs)
+	       (preferred-unit vs "m/s")))
+
+(defconcept vs30 (?v vs)
+  :documentation "Mean value of S-wave velocity in the top 30 meters of
+the ground."
+  :<=> (and (vs ?v)
+	    (mean-value-parameter ?v)
+	    (exists ?w
+	      (and (parameter-describes ?v ?w)
+		   (measurement-depth ?v (units 30 "m"))))) ;; Not quite right!
+  :axioms (and (velocity-measure vs30)
+	       (mean-value-parameter vs30)
+	       (preferred-unit vs30 "m/s")))
+
+;;;;
+;;;;  Computed Output Values
+;;;;
+
+(defconcept pga (?a parameter)
+  :documentation "Peak Ground Acceleration.  TO DO:  determine what additional
+attributes are needed, for example direction?"
+  :<=> (and (parameter ?a)
+	    (acceleration-parameter ?a)
+	    (maximum-value-parameter ?a)
+	    (exists ?s
+	      (and (parameter-describes ?a ?s)
+		   (surface ?s)
+		   (surface-of ?s earth))))
+  :=> (parameter-attribute ?a parameter-motion-component)
+  :=> (=> (model ?m)
+	  (model-parameter-lower-bound ?m ?a (units 0 "G")))
+  :axioms (and (acceleration-measure pga)
+	       (maximum-value-parameter pga)
+	       (acceleration-parameter pga)
+	       (preferred-unit pga "G")
+	       (=> (model ?m) (model-parameter-lower-bound ?m pga (units 0 "G")))
+	       (pretty-name pga "PGA")
+	       (parameter-attribute pga parameter-motion-component)))
+
+(defconcept pgv (?a parameter)
+  :documentation "Peak Ground Velocity  TO DO:  determine what additional
+attributes are needed, for example direction?"
+  :<=> (and (parameter ?a)
+	    (velocity-parameter ?a)
+	    (maximum-value-parameter ?a)
+	    (exists ?s
+	      (and (parameter-describes ?a ?s)
+		   (surface ?s)
+		   (surface-of ?s earth))))
+  :=> (parameter-attribute ?a parameter-motion-component)
+  :=> (=> (model ?m)
+	  (model-parameter-lower-bound ?m ?a (units 0 "m/s")))
+  :axioms (and (velocity-measure pgv)
+	       (maximum-value-parameter pgv)
+	       (velocity-parameter pgv)
+	       (=> (model ?m) (model-parameter-lower-bound ?m pgv (units 0 "m/s")))
+	       (pretty-name pgv "PGV")
+	       (preferred-unit pgv "m/s")
+	       (parameter-attribute pgv parameter-motion-component)))
+
+(defconcept sa (?a parameter)
+  :documentation "Spectral acceleration.  TO DO:  determine what
+additional characteristics, like period, damping, etc. are needed."
+  :=> (and (maximum-value-parameter ?a)
+	   (acceleration-parameter ?a)
+	   (parameter-attribute ?a sa-period)
+	   (parameter-attribute ?a sa-damping)
+	   (parameter-attribute ?a parameter-motion-component))
+  ;; These two should be :~>, but defaults cause problems
+  :=> (preferred-unit ?a "G")
+  :=> (pretty-name ?a "SA")
+  :=> (=> (model ?m)
+	  (model-parameter-lower-bound ?m ?a (units 0 "G")))
+  :axioms (and (acceleration-measure sa)
+	       (maximum-value-parameter sa)
+	       (acceleration-parameter sa)
+	       (preferred-unit sa "G")
+	       (pretty-name sa "SA")
+	       (=> (model ?m) (model-parameter-lower-bound ?m sa (units 0 "G")))
+	       (parameter-attribute sa sa-period)
+	       (parameter-attribute sa sa-damping)
+	       (parameter-attribute sa parameter-motion-component)))
+
+(deffunction sa-period ((?a sa)) :-> ?p
+  :documentation "The period at which the spectral acceleration is measured."
+  :axioms (and (time-measure sa-period)
+	       (pretty-name sa-period "SA Period")
+	       (preferred-unit sa-period "s")))
+
+(deffunction sa-damping ((?a sa)) :-> ?p
+  :documentation "The damping ratio assumed by the spectral acceleration."
+  :axioms (pretty-name sa-damping "SA Damping"))
+
+
+(defconcept probability-of-exceedence (?a parameter)
+  :documentation "Probability of Exceedence parameter.  This is implicitly in
+regard to a threshold value of an independent parameter."
+  :=> (and (parameter-attribute ?a gaussian-truncation-type)
+	   (parameter-attribute ?a gaussian-truncation-level))
+  ;; This should be :~>, but defaults cause problems
+  :=> (preferred-unit ?a "%")
+  :axioms (and (parameter probability-of-exceedence)
+	       (preferred-unit probability-of-exceedence "%")
+	       (pretty-name probability-of-exceedence "Exceedence Probability")
+	       (parameter-attribute probability-of-exceedence gaussian-truncation-type)
+	       (parameter-attribute probability-of-exceedence gaussian-truncation-level)
+	       (=> (model ?m) (model-parameter-lower-bound ?m probability-of-exceedence (units 0 "%")))
+	       (=> (model ?m) (model-parameter-upper-bound ?m probability-of-exceedence (units 100 "%")))
+	       ))
+
+(deffunction gaussian-truncation-type ((?a sa)) :-> (?p gaussian-truncation)
+   :documentation "Various types of truncation available for the Gaussian
+ probability distribution."
+   :axioms (and (pretty-name gaussian-truncation-type "Gaussian Distribution Truncation")
+		(discrete-value-parameter gaussian-truncation-type)
+		(range-type gaussian-truncation-type ?x gaussian-truncation)
+		))
+
+(deffunction gaussian-truncation-level ((?a sa)) :-> ?p
+  :documentation "The level (in units of Standard Deviations) at which gaussian
+truncation is supposed to occur.  This level is defined in terms of some
+number of standard deviations above (and perhaps below) the mean."
+  :axioms (and (pretty-name gaussian-truncation-level "Gaussian Truncation Level")
+	       (parameter gaussian-truncation-level)
+	       (=> (model ?m) (model-parameter-lower-bound ?m gaussian-truncation-level 0))
+	       ))
+
+(defconcept gaussian-truncation (?t parameter)
+  :documentation "Various types of truncation available for the Gaussian
+probability distribution"
+  :<=> (member-of ?t (setof no-truncation
+ 		       ; left-side-truncation ;; Temporary.  No left side truncation.
+		       right-side-truncation
+		       both-sides-truncation)))
+
+(assert 
+  (and (gaussian-truncation no-truncation)
+       (pretty-name no-truncation "None" ;  "No Truncation"
+		    )
+       (documentation no-truncation "No truncation of the Gaussian Distribution")))
+#|
+(assert 
+  (and (gaussian-truncation left-side-truncation)
+       ; (pretty-name left-side-truncation "***")  ; None yet.  1 Sided is right side
+       (documentation left-side-truncation
+		      "Truncation on the left (lower) side of the Gaussian Distribution")))
+|#
+(assert 
+  (and (gaussian-truncation right-side-truncation)
+       (pretty-name right-side-truncation "1 Sided" ; "Right Side Truncation"
+		    )
+       (documentation right-side-truncation
+		      "Truncation on the right (upper) side of the Gaussian Distribution")))
+(assert 
+  (and (gaussian-truncation both-sides-truncation)
+       (pretty-name both-sides-truncation "2 Sided" ; "2 Sided Truncation"
+		    )
+       (documentation both-sides-truncation
+		      "Truncation on the both sides of the Gaussian Distribution")))
+
+(deffunction standard-deviation-type ((?m model)) :-> ?s
+  :documentation "Standard Deviation Type to use in computing standard deviation output."
+  ;; This should be :~>, but in this case, an infinity loop results
+  ; :~> (standard-deviation-type ?m "Total")
+  :axioms (and (discrete-value-parameter standard-deviation-type)
+	       (pretty-name standard-deviation-type "Std Dev Type")))
+
+
+;;;;
+;;;; **********************************************************************
+;;;;
+;;;; Locations and assorted information
+;;;;
+
+(defconcept location (?l zero-d-object))
+(defconcept geopolitical-entity (?d two-d-object))
+(defconcept country (?c geopolitical-entity))
+(defconcept county (?c geopolitical-entity))
+(defconcept us-state (?s geopolitical-entity))
+(defconcept city (?c geopolitical-entity))
+
+(deffunction latitude-of ((?l location)) :-> ?d
+  :documentation "North latitude is positive, South latitude is negative")
+(deffunction longitude-of ((?l location)) :-> ?d
+ :documentation "East longitude is positive, West longitude is negative")
+(deffunction depth-of ((?l location)) :-> ?d
+   :documentation "Measured relative to earth's surface.  Down is positive.")
+(deffunction altitude-of ((?l location)) :-> ?d
+   :documentation "Measured relative to mean sea level.  Up is positive")
+
+(defconcept site (?l location))
+
+(deffunction city-of ((?l location)) :-> (?c CITY)
+  :documentation "The city in which a location is found")
+
+(deffunction county-of ((?l location)) :-> (?s STRING)
+	     :documentation "The county in which a location is found")
+
+(deffunction province-of ((?l location)) :-> (?s STRING)
+	     :documentation "The county in which a location is found")
+
+(deffunction us-state-of ((?l location)) :-> (?s US-STATE)
+   :documentation "The US state in which a location is found")
+
+(deffunction country-of ((?l location)) :-> (?c COUNTRY)
+ :documentation "The county in which a location is found")
+
+(deffunction postal-code-of ((?l location)) :-> (?s STRING)
+  :documentation "The postal code of a location")
+
+(deffunction us-zip-code-of ((?l location)) :-> (?s STRING)
+  :documentation "The US postal zip code of a location"
+  :=> (postal-code-of ?l ?s))
+
+
+;;;;
+;;;; **********************************************************************
+;;;;
+;;;; Rock types and attributes
+;;;;
+
+
+
+(defconcept nehrp-class
+    :documentation "Metaclass for NEHRP (National Earthquake Hazard
+Reduction Program) ground response classifications")
+(deffunction nehrp-class-letter ((?x nehrp-class)) :-> (?n string)
+   :documentation "Mapping from class to the letter designating that class.")
+
+(deffunction vs30-of-soil ((?x site)) :-> ?n
+	     :documentation "Mapping from a soil class to the Vs of the soil making
+up that class"
+	     :axioms (and (site-parameter vs30-of-soil)
+			  (velocity-measure vs30-of-soil)
+			  (pretty-name vs30-of-soil "Vs30")))
+
+(deffunction basin-depth-2.5 ((?x site)) :-> ?n
+	     :documentation "Depth to the 2.5km/s Vs boundary in a basin."
+	     :axioms (and (site-parameter basin-depth-2.5)
+			  (depth-measure basin-depth-2.5)
+			  (pretty-name basin-depth-2.5 "Basin Depth")
+                          #|
+                          (<=> (> (vs30-of-soil ?s) (units 2.5 "km/s"))
+			       (= (basin-depth-2.5 ?s) (units 0 "m")))
+                          |#
+			  (=> (and (site ?s)
+                                   (> (vs30-of-soil ?s) (units 2.5 "km/s"))
+                                   (units 0 "m" ?z))
+                              (= (basin-depth-2.5 ?s) ?z))
+                          (<= (> ?v ?x)
+                              (and (site ?s)
+                                   (= (basin-depth-2.5 ?s) (units 0 "m"))
+                                   (vs30-of-soil ?s ?v)
+                                   (units 2.5 "km/s" ?x)))))
+
+(defconcept nehrp-class-a (?c)
+  :documentation "NEHRP class A"
+  :axioms (and (nehrp-class nehrp-class-a)
+	    (nehrp-class-letter nehrp-class-a "A"))
+  :<=> (and (site ?c)
+	    (> (vs30-of-soil ?c) (units 1500 "m/s"))))
+
+(defconcept nehrp-class-b (?c)
+  :documentation "NEHRP class B"
+  :axioms (and (nehrp-class nehrp-class-b)
+	    (nehrp-class-letter nehrp-class-b "B"))
+  :<=> (and (site ?c)
+	    (=< (vs30-of-soil ?c) (units 1500 "m/s"))
+	    (>  (vs30-of-soil ?c) (units 750 "m/s"))))
+
+(defconcept nehrp-class-c (?c)
+  :documentation "NEHRP class C"
+  :axioms (and (nehrp-class nehrp-class-c)
+	    (nehrp-class-letter nehrp-class-c "C"))
+  :<=> (and (site ?c)
+	    (=< (vs30-of-soil ?c) (units 750 "m/s"))
+	    (>  (vs30-of-soil ?c) (units 350 "m/s"))))
+
+(defconcept nehrp-class-d (?c)
+  :documentation "NEHRP class D"
+  :axioms (and (nehrp-class nehrp-class-d)
+	    (nehrp-class-letter nehrp-class-d "D"))
+  :<=> (and (site ?c)
+	    (=< (vs30-of-soil ?c) (units 350 "m/s"))
+	    (>  (vs30-of-soil ?c) (units 200 "m/s"))))
+
+(defconcept nehrp-class-e (?c)
+  :documentation "NEHRP class E"
+  :axioms (and (nehrp-class nehrp-class-e)
+	    (nehrp-class-letter nehrp-class-e "E"))
+  :<=> (and (site ?c)
+	    (=< (vs30-of-soil ?c) (units 200 "m/s"))
+	    (>  (vs30-of-soil ?c) (units 0 "m/s"))))
+
+(defconcept era
+    :documentation "Geologic eras.  TO DO:  Need to define them in terms
+of other information, for example time spans, Vs values, NEHRP classes?")
+
+(defconcept mesozoic
+    :axioms (era mesozoic))
+(defconcept quarternay
+    :axioms (era quarternary))
+(defconcept tertiary
+    :axioms (era tertiary))
+
+(defconcept soil)
+
+(defconcept rock (?r soil))
+(defconcept hard-rock (?r rock)
+  )
+(defconcept soft-rock (?r rock)
+  )
+
+(defconcept sedimentary-rock (?r rock))
+(defconcept igneous-rock (?r rock))
+(defconcept metamorphic-rock (?r rock))
+
+(assert (disjoint-covering 
+	 rock 
+	 (setof sedimentary-rock igneous-rock metamorphic-rock)))
+
+
+;;
+;; **********************************************************************
+;;
+;; Fault types and attributes
+;;
+
+
+(defconcept hanging-wall (?w)
+    :documentation "Needs to be fleshed out")
+(defconcept foot-wall (?w)
+  :documentation "Needs to be fleshed out")
+
+
+(defconcept fault (?s surface)
+  :documentation "A fault is a surface where two rock masses meet.")
+(defconcept fault-system (?s collection)
+  :documentation "A collection of faults.")
+
+
+(defconcept fault-trace (?s trace)
+  :documentation "A fault-trace is the intersection of a fault with the
+ Earth's surface.")
+
+(deffunction the-fault-trace ((?f fault)) :-> (?t trace)
+  :documentation "The trace of the fault")
+(defrelation the-fault-endpoint ((?f fault) (?l location))
+  :documentation "The endpoints of the fault.  There will generally (always?) be two.
+TO DO: It seems this should interact in an interesting way with THE-FAULT-TRACE.")
+(defrelation the-fault-length ((?f fault) ?l)
+  :documentation "The length of the fault.  TO DO: This needs to be axiomatically hooked
+up to the endpoints of the fault.")
+(defrelation the-fault-down-dip-width ((?f fault) ?l)
+  :documentation "The width of the fault, measured along the dip vector.")
+  
+
+(deffunction the-fault-slip ((?f fault)) :-> ?a
+	     :documentation "The maximum amount of fault displacement during a rupture
+event?  Or should this be a vector?"
+	     :axioms (image-url the-fault-slip "images/scec/Fault-Vector-72.gif"))
+(deffunction the-fault-slip-rate ((?f fault)) :-> ?a
+	     :documentation "The mean slip rate of the fault."
+	     :axioms (image-url the-fault-slip-rate "images/scec/Fault-Vector-72.gif"))
+(deffunction the-fault-strike ((?f fault)) :-> ?a
+	     :documentation "The strike of the fault, angle between fault trace and North"
+	     :axioms (image-url the-fault-strike "images/scec/Fault-Vector-72.gif"))
+(deffunction the-fault-dip ((?f fault)) :-> ?a
+	     :documentation "The dip of the fault, angle between fault surface and Earth's surface"
+	     :axioms (image-url the-fault-dip "images/scec/Fault-Vector-72.gif"))
+(deffunction the-fault-rake ((?f fault)) :-> ?a
+	     :documentation "The angle of the hanging wall slip vector, measured in the fault plane,
+with the strike vector being 0 degrees.  Range is -180 to 180 degrees."
+	     :axioms (image-url the-fault-rake "images/scec/Fault-Vector-72.gif"))
+(deffunction the-fault-hanging-wall ((?f fault)) :-> (?t hanging-wall)
+	     :documentation "The hanging wall of a particular fault")
+(deffunction the-fault-foot-wall ((?f fault)) :-> (?t foot-wall)
+	     :documentation "The foot wall of a particular fault")
+
+
+(deffunction the-fault-maximum-magnitude ((?f fault)) :-> (?a number)
+	     :documentation "The maximum magnitude earthquake the fault can generate.")
+(deffunction the-fault-characteristic-rate ((?f fault)) :-> ?a
+	     :documentation "The characteristic rate of (major? maximum?) earthquakes on the fault.")
+(deffunction the-fault-recurrence-interval ((?f fault)) :-> ?a
+	     :documentation "The expected time between characteristic earthquakes on the fault."
+	     :axioms (=> (fault ?f)
+			 (u-within-factor
+			  (the-fault-recurrence-interval ?f)
+			  (u-div (units 1 "") (the-fault-characteristic-rate ?f))
+			  (units 5 "%"))))
+
+(defconcept blind-fault (?f fault)
+  :<=> (and (fault ?f)
+	    (range-max-cardinality the-fault-trace ?f 0))
+  :<=> (and (fault ?f)
+	    (not (exists ?t (the-fault-trace ?f ?t))))
+  :documentation "A blind fault is one without a fault trace")
+
+(defconcept strike-slip-fault (?f fault)
+  :=> (and (fault ?f)
+	   (or (< (U-abs (U- (the-fault-rake ?f) (units 180 "deg")))
+		      (units 15 "deg"))
+	       (< (U-abs (the-fault-rake ?f))
+		      (units 15 "deg"))))
+  :<= (and (fault ?f)
+	   (or (< (U-abs (U- (the-fault-rake ?f) (units 180 "deg")))
+		      (units 10 "deg"))
+	       (< (U-abs (the-fault-rake ?f))
+		      (units 10 "deg"))))
+  :documentation "Strike slip faults have their slip vector close to the strike.
+In other words, a rake within 10-15 degrees of 0 or 180 degrees.")
+
+(defconcept normal-fault (?f fault)
+  :documentation "Normal faults have values of rake angles less than 0 degrees"
+  :<=> (and (fault ?f)
+	    (< (the-fault-rake ?f) (units 0 "deg"))
+	    (> (the-fault-rake ?f) (units -180 "deg"))))
+
+(defconcept reverse-fault (?f fault)
+  :documentation "Reverse faults have values of rake angles greater than 0 degrees"
+  :<=> (and (fault ?f)
+	    (> (the-fault-rake ?f) (units 0 "deg"))
+	    (< (the-fault-rake ?f) (units 180 "deg"))))
+
+(defconcept vertical-fault (?f fault)
+  :documentation "Is this really a seismological term?"
+  :<=> (and (fault ?f)
+	    (= (the-fault-dip ?f) (units 90 "deg"))))
+
+(defconcept thrust-fault (?f reverse-fault)
+  :documentation "Thrust faults have dips of less than 30 to 45 degrees.  This definition
+sets up asymmetric inference rules to allow dips up to 45 degrees while
+only automatically concluding them for 30 degrees."
+  :=> (and (reverse-fault ?f)
+	   (=< (the-fault-dip ?f) (units 45 "deg")))
+  :<= (and (reverse-fault ?f)
+	   (=< (the-fault-dip ?f) (units 30 "deg"))))
+
+
+(defconcept earthquake-source (?s))
+
+(deffunction source-rupture-start-time ((?s earthquake-source)) :-> ?t
+	     :documentation "The time the rupture started.")
+(deffunction source-rupture-duration ((?s earthquake-source)) :-> ?t
+	     :documentation "The time the rupture lasted.")
+(deffunction source-hypocenter ((?s earthquake-source)) :-> (?h location)
+	     :documentation "The hypocenter (where the ruptured started)")
+(deffunction source-epicenter  ((?s earthquake-source)) :-> (?e location)
+	     :documentation "The point on the earth's surface directly above the hypocenter"
+	     #|  ;; Rewritten, so that its expansion will be more readable.
+	         ;; This should be fixed in a future version of PowerLoom.
+	     :axioms (=> (earthquake-source ?s)
+			 (and (= (latitude-of (source-hypocenter ?s))
+				 (latitude-of (source-epicenter ?s)))
+			      (= (longitude-of (source-hypocenter ?s))
+				 (longitude-of (source-epicenter ?s)))
+			      (= (depth-of (source-epicenter ?s)) (units 0 "m"))))
+			      |#
+	     
+	     :axioms (=> (earthquake-source ?s)
+                         (exists (?epi ?hypo)
+			   (and (= (source-hypocenter ?s) ?hypo)
+				(= (source-epicenter  ?s) ?epi)
+				(= (latitude-of ?hypo) (latitude-of ?epi))
+				(= (longitude-of ?hypo) (longitude-of ?epi))
+				(= (depth-of ?epi) (units 0 "m")))))
+	     )
+(deffunction source-maximum-slip ((?s earthquake-source)) :-> ?d
+	     :documentation "The maximum slip of the fault during the rupture")
+(deffunction source-mean-slip ((?s earthquake-source)) :-> ?d
+	     :documentation "The mean slip of the fault during the rupture"
+	     :axioms (=> (earthquake-source ?e)
+			 (=< (source-mean-slip ?e) (source-maximum-slip ?e))))
+(defrelation source-fault ((?s earthquake-source) (?f fault))
+  :documentation "The fault that ruptured.")
+
+
+(deffunction source-moment ((?s earthquake-source)) :-> ?m
+  :documentation "The moment of the rupture.  Units are work.")
+(deffunction source-moment-magnitude ((?s earthquake-source)) :-> ?m
+  :documentation "MODELING QUESTION: Should this just be a number, with either 
+subfunctions to specify the precise type of magnitude, or meta-assertions
+about the values?  Or should it point to a structured value which identifies
+the numeric value as well as the particular type of magnitude measure?  That
+could be done somewhat like the parameter modeling above."
+  :axioms ((magnitude-parameter source-moment-magnitude)
+	   (model-parameter-lower-bound ?x source-moment-magnitude -1000.0)
+	   (model-parameter-upper-bound ?x source-moment-magnitude 12.0)
+	   ))
+
+(deffunction standard-magnitude-symbol ((?c concept)) :-> (?s string))
+(defconcept magnitude-measure-type)
+(defconcept magnitude-measure)
+(defconcept richter-magnitude-measure (?m magnitude-measure)
+  :axioms (magnitude-measure-type richter-magnitude-measure))
+(defconcept moment-magnitude-measure (?m magnitude-measure)
+  :axioms (and (standard-magnitude-symbol moment-magnitude-measure "Mb")
+	       (magnitude-measure-type moment-magnitude-measure)))
+
+
+;;
+;;  ASSERTIONS:
+;; 
+
+;;;;
+;;;;  MODEL RELATED TERMS
+;;;;
+
+(defconcept model)
+
+(defrelation model-parameter ((?m MODEL) ?p))
+
+(defrelation model-site-parameter ((?m MODEL) ?p)
+  :=> (model-parameter ?m ?p)
+  :axioms (parameter-describes model-site-parameter site))
+(defrelation model-fault-parameter ((?m MODEL) ?p)
+  :=> (model-parameter ?m ?p)
+  :axioms (parameter-describes model-fault-parameter fault))
+(defrelation model-distance-parameter ((?m MODEL) ?p)
+  :=> (model-parameter ?m ?p))
+(defrelation model-magnitude-parameter ((?m MODEL) ?p)
+  :=> (model-parameter ?m ?p)
+  :axioms (parameter-describes model-magnitude-parameter earthquake-source))
+
+(defrelation model-computation-dependency ((?m MODEL) 
+					   (?output PARAMETER)
+					   (?variable PARAMETER)
+					   (?independent SET))
+  :documentation "Describes a model computation dependency.  It means that for
+a model ?m, computing ?output by varying ?variable also requires that
+the set of ?independent parameters also be specified.  There may be other
+parameter attributes associated with any of these parameters that also would
+need to be specified.")
+
+(deffunction parameter-type-partition (?p (?set SET))
+  :documentation "Describes a particular partition of parameter types.")
+(assert (parameter-type-partition type-partition 
+				  (setof model-site-parameter
+				    model-fault-parameter
+				    model-distance-parameter
+				    model-magnitude-parameter)))
+
+(defrelation model-site-type ((?m MODEL) (?s CONCEPT)))
+(defrelation model-fault-type ((?m MODEL) (?s CONCEPT)))
+
+(defrelation default-categorical-site-type ((?m MODEL) ?s))
+(defrelation default-categorical-fault-type ((?m MODEL) ?s))
+
+
+(defrelation model-discrete-value-parameter ((?m MODEL) (?p DISCRETE-VALUE-PARAMETER))
+  :documentation "Identifies discrete value model parameters, that is those that
+take on one of a small set of enumerated values."
+  :=> (model-parameter ?m ?p))
+(defrelation model-discrete-value-parameter-allowed-value ((?m MODEL) (?p DISCRETE-VALUE-PARAMETER) ?v)
+  :documentation "Identifies allowed discrete values for discrete value model parameters, 
+that is those that take on one of a small set of enumerated values.")
+
+(defrelation model-categorical-parameter ((?m MODEL) (?p CATEGORICAL-VALUE-PARAMETER))
+  :documentation "Identifies categorical model parameters, that is those that
+take on one of a small set of categorical values which can be defined in terms of
+something else."
+  :=> (model-parameter ?m ?p))
+(defrelation model-categorical-parameter-values-relation
+    ((?m MODEL) (?p CATEGORICAL-VALUE-PARAMETER) (?r RELATION))
+  :documentation "Identifies the relation ?r that links a model to  concepts describing
+defined values of categorical value parameter ?p"
+  :axioms (=> (and (model-categorical-parameter ?m ?p)
+		   (model-site-parameter ?m ?p))
+	      (model-categorical-parameter-values-relation ?m ?p model-site-type)))
+
+(defrelation model-with-categorical-site-parameter ((?m MODEL))
+  :documentation "A unary relation that describes those models that have
+a categorical site parameter.")
+(defrelation model-with-categorical-fault-parameter ((?m MODEL))
+  :documentation "A unary relation that describes those models that have
+a categorical site parameter."
+  :axioms (=> (and (model-categorical-parameter ?m ?p)
+		   (model-fault-parameter ?m ?p))
+	      (model-categorical-parameter-values-relation ?m ?p model-fault-type)))
+
+
+(defrelation model-parameter-lower-bound ((?m MODEL) (?p parameter) ?V)
+  :documentation "A value that is a lower bound on the acceptable values of the parameter
+for a given model.
+It need not be the tightest bound.")
+
+(deffunction model-parameter-minimum-value ((?m MODEL) (?p parameter) ?v)
+  :documentation "The currently known greatest upper bound on the value of the parameter
+for a given model."
+  :<=> (and (model-parameter-lower-bound ?m ?p ?v)
+	    (fail (exists (?v2)
+			  (and (model-parameter-lower-bound ?m ?p ?v2)
+			       (> ?v2 ?v))))
+	    (fail (exists (?v2)
+			  (and (model-parameter-lower-bound ?m ?p ?v2)
+			       (> ?v2 ?v))))))
+
+(defrelation model-parameter-upper-bound ((?m MODEL) (?p parameter) ?V)
+  :documentation "a value that is a upper bound on the acceptable values of the parameter
+for a given model.
+It need not be the tightest bound.")
+
+(deffunction model-parameter-maximum-value ((?m MODEL) (?p parameter) ?v)
+  :documentation "The currently known greatest upper bound on the value of the parameter
+for a given model."
+  :<=> (and (model-parameter-upper-bound ?m ?p ?v)
+	    (fail (exists (?v2)
+			  (and (model-parameter-upper-bound ?m ?p ?v2)
+			       (< ?v2 ?v))))
+	    (fail (exists (?v2)
+			  (and (model-parameter-upper-bound ?m ?p ?v2)
+			       (< ?v2 ?v))))))
+
+(defrelation model-parameter-preferred-lower-bound ((?m MODEL) (?p parameter) ?V)
+  :documentation "A value that is a lower bound on the acceptable values of the parameter
+for a given model.
+It need not be the tightest bound.")
+
+(deffunction model-parameter-preferred-minimum-value ((?m MODEL) (?p parameter) ?v)
+  :documentation "The currently known greatest upper bound on the value of the parameter
+for a given model."
+  :<=> (and (model-parameter-preferred-lower-bound ?m ?p ?v)
+	    (fail (exists (?v2)
+			  (and (model-parameter-preferred-lower-bound ?m ?p ?v2)
+			       (> ?v2 ?v))))
+	    (fail (exists (?v2)
+		    (and (model-parameter-lower-bound ?m ?p ?v2)
+			 (> ?v2 ?v))))
+	    (fail (exists (?v2)
+			  (and (model-parameter-preferred-lower-bound ?m ?p ?v2)
+			       (> ?v2 ?v))))
+	    (fail (exists (?v2)
+		    (and (model-parameter-lower-bound ?m ?p ?v2)
+			 (> ?v2 ?v)))))
+  #|
+  :axioms (and (=> (and (model ?m) (parameter ?p))
+		   (>= (model-parameter-preferred-minimum-value ?m ?p)
+		       (model-parameter-minimum-value ?m ?p)))
+	       (=> (and (model ?m) (parameter ?p))
+		   (>= (model-parameter-preferred-minimum-value ?m ?p)
+		   (model-parameter-minimum-value ?m ?p))))
+		   |#
+  )
+
+(defrelation model-parameter-preferred-upper-bound ((?m MODEL) (?p parameter) ?V)
+  :documentation "a value that is a upper bound on the acceptable values of the parameter
+for a given model.
+It need not be the tightest bound.")
+
+(deffunction model-parameter-preferred-maximum-value ((?m MODEL) (?p parameter) ?v)
+  :documentation "The currently known greatest upper bound on the value of the parameter
+for a given model."
+  :<=> (and (model-parameter-preferred-upper-bound ?m ?p ?v)
+	    (fail (exists (?v2)
+			  (and (model-parameter-preferred-upper-bound ?m ?p ?v2)
+			       (< ?v2 ?v))))
+	    (fail (exists (?v2)
+			  (and (model-parameter-upper-bound ?m ?p ?v2)
+			       (< ?v2 ?v))))
+	    (fail (exists (?v2)
+		    (and (model-parameter-preferred-upper-bound ?m ?p ?v2)
+			 (< ?v2 ?v))))
+	    (fail (exists (?v2)
+		    (and (model-parameter-upper-bound ?m ?p ?v2)
+			 (< ?v2 ?v)))))
+  #|
+  :axioms (and (=> (and (model ?m) (parameter ?p))
+		   (=< (model-parameter-preferred-maximum-value ?m ?p)
+		       (model-parameter-maximum-value ?m ?p)))
+	       (=> (and (model ?m) (parameter ?p))
+		   (=< (model-parameter-preferred-maximum-value ?m ?p)
+		   (model-parameter-maximum-value ?m ?p))))
+		   |#
+  )

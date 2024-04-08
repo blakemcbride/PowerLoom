@@ -1,0 +1,128 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;; webtools-system-structs.slisp
+
+#|
++---------------------------- BEGIN LICENSE BLOCK ---------------------------+
+|                                                                            |
+| Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          |
+|                                                                            |
+| The contents of this file are subject to the Mozilla Public License        |
+| Version 1.1 (the "License"); you may not use this file except in           |
+| compliance with the License. You may obtain a copy of the License at       |
+| http://www.mozilla.org/MPL/                                                |
+|                                                                            |
+| Software distributed under the License is distributed on an "AS IS" basis, |
+| WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   |
+| for the specific language governing rights and limitations under the       |
+| License.                                                                   |
+|                                                                            |
+| The Original Code is the STELLA Programming Language.                      |
+|                                                                            |
+| The Initial Developer of the Original Code is                              |
+| UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          |
+| 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               |
+|                                                                            |
+| Portions created by the Initial Developer are Copyright (C) 2003-2023      |
+| the Initial Developer. All Rights Reserved.                                |
+|                                                                            |
+| Contributor(s):                                                            |
+|                                                                            |
+| Alternatively, the contents of this file may be used under the terms of    |
+| either the GNU General Public License Version 2 or later (the "GPL"), or   |
+| the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   |
+| in which case the provisions of the GPL or the LGPL are applicable instead |
+| of those above. If you wish to allow use of your version of this file only |
+| under the terms of either the GPL or the LGPL, and not to allow others to  |
+| use your version of this file under the terms of the MPL, indicate your    |
+| decision by deleting the provisions above and replace them with the notice |
+| and other provisions required by the GPL or the LGPL. If you do not delete |
+| the provisions above, a recipient may use your version of this file under  |
+| the terms of any one of the MPL, the GPL or the LGPL.                      |
+|                                                                            |
++---------------------------- END LICENSE BLOCK -----------------------------+
+|#
+
+(CL:IN-PACKAGE "STELLA")
+
+
+(CL:DEFSTRUCT (|XMLObject| (:CONC-NAME |%XMLObject.|) (:INCLUDE STANDARD-OBJECT) (:CONSTRUCTOR |%MAKE-XMLObject| ()) (:COPIER ()) (:PREDICATE ())) "The Root of all XMLObjects"
+  (|textContent| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|cdataContent| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT
+ (F (:CONC-NAME %F.) (:INCLUDE |XMLObject|) (:CONSTRUCTOR %MAKE-F ())
+  (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT (E (:CONC-NAME %E.) (:INCLUDE |XMLObject|) (:CONSTRUCTOR %MAKE-E ()) (:COPIER ()) (:PREDICATE ())) (|f| NULL))
+
+(CL:DEFSTRUCT (D (:CONC-NAME %D.) (:INCLUDE |XMLObject|) (:CONSTRUCTOR %MAKE-D ()) (:COPIER ()) (:PREDICATE ())) (|f| NULL))
+
+(CL:DEFSTRUCT (C (:CONC-NAME %C.) (:INCLUDE |XMLObject|) (:CONSTRUCTOR %MAKE-C ()) (:COPIER ()) (:PREDICATE ())) (|d| NULL)
+  (|e| NULL))
+
+(CL:DEFSTRUCT (B (:CONC-NAME %B.) (:INCLUDE |XMLObject|) (:CONSTRUCTOR %MAKE-B ()) (:COPIER ()) (:PREDICATE ())) (|d| NULL))
+
+(CL:DEFSTRUCT (A (:CONC-NAME %A.) (:INCLUDE |XMLObject|) (:CONSTRUCTOR %MAKE-A ()) (:COPIER ()) (:PREDICATE ())) (|b| NULL)
+  (|c| NULL))
+
+(CL:EVAL-WHEN (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)
+  (CL:UNLESS (CL:FIND-PACKAGE "STELLA")
+     (CL:DEFPACKAGE "STELLA" (:USE))))
+
+(CL:IN-PACKAGE "STELLA")
+
+(CL:DEFSTRUCT (|Detail| (:CONC-NAME |%Detail.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-Detail| ()) (:COPIER ()) (:PREDICATE ())) (|contents| NULL))
+
+(CL:DEFSTRUCT
+ (|FaultActor| (:CONC-NAME |%FaultActor.|) (:INCLUDE |XMLObject|)
+  (:CONSTRUCTOR |%MAKE-FaultActor| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|FaultString| (:CONC-NAME |%FaultString.|) (:INCLUDE |XMLObject|)
+  (:CONSTRUCTOR |%MAKE-FaultString| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|FaultCode| (:CONC-NAME |%FaultCode.|) (:INCLUDE |XMLObject|)
+  (:CONSTRUCTOR |%MAKE-FaultCode| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT (|Fault| (:CONC-NAME |%Fault.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-Fault| ()) (:COPIER ()) (:PREDICATE ())) (|faultcode| NULL)
+  (|faultstring| NULL)
+  (|faultactor| NULL)
+  (|detail| NULL))
+
+(CL:DEFSTRUCT (|Body| (:CONC-NAME |%Body.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-Body| ()) (:COPIER ()) (:PREDICATE ())) (|contents| NULL))
+
+(CL:DEFSTRUCT (|Envelope| (:CONC-NAME |%Envelope.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-Envelope| ()) (:COPIER ()) (:PREDICATE ())) (|encodingStyle| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|body| NULL))
+
+(CL:IN-PACKAGE "STELLA")
+
+(CL:DEFINE-CONDITION HTTP-EXCEPTION (READ-EXCEPTION)
+  ((ERROR-CODE :TYPE CL:FIXNUM :INITFORM NULL-INTEGER :ALLOCATION
+    :INSTANCE :ACCESSOR %ERROR-CODE)))
+
+(CL:DEFSTRUCT (HTTP-SERVER (:CONC-NAME %HTTP-SERVER.) (:INCLUDE STANDARD-OBJECT) (:CONSTRUCTOR %MAKE-HTTP-SERVER ()) (:COPIER ()) (:PREDICATE ())) "Abstract class that will be implemented by specific server implementations
+and instantiated with a single instance used to dispatch all API methods.")
+
+(CL:DEFSTRUCT (HTTP-EXCHANGE (:CONC-NAME %HTTP-EXCHANGE.) (:INCLUDE STANDARD-OBJECT) (:CONSTRUCTOR %MAKE-HTTP-EXCHANGE ()) (:COPIER ()) (:PREDICATE ())) "Abstract class that represents exchange objects that encapsulate all necessary
+state needed by a http handler function to understand the request and generate the
+appropriate response.  This is mirrored somewhat after Sun's basic HTTP server
+implementation in com.sun.net.httpserver.")
+
+(CL:DEFSTRUCT (SESSION (:CONC-NAME %SESSION.) (:INCLUDE DICTIONARY) (:CONSTRUCTOR %MAKE-SESSION ()) (:COPIER ()) (:PREDICATE ())) "Object storing the state associated with a single session.
+All session-related information is stored in a table indexed on string keys."
+  (NAME STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (TIMEOUT NULL)
+  (TIMESTAMP NULL)
+  (OBJECTS NULL))
+
+(CL:IN-PACKAGE "STELLA")
+
+(CL:DEFSTRUCT (ID-PARENT-STRUCT (:CONC-NAME %ID-PARENT-STRUCT.) (:INCLUDE OBJECT) (:CONSTRUCTOR %MAKE-ID-PARENT-STRUCT ()) (:COPIER ()) (:PREDICATE ())) (|id| NULL-INTEGER :TYPE CL:FIXNUM)
+  (|parents| NULL))
+
+(CL:IN-PACKAGE "STELLA")
+
+(CL:DEFINE-CONDITION SOAP-FAULT-EXCEPTION (STELLA-EXCEPTION)
+  ((FAULT :ALLOCATION :INSTANCE :ACCESSOR %FAULT)))

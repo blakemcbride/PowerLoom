@@ -1,0 +1,754 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;; BEGIN LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                            ;
+; Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          ;
+;                                                                            ;
+; The contents of this file are subject to the Mozilla Public License        ;
+; Version 1.1 (the "License"); you may not use this file except in           ;
+; compliance with the License. You may obtain a copy of the License at       ;
+; http://www.mozilla.org/MPL/                                                ;
+;                                                                            ;
+; Software distributed under the License is distributed on an "AS IS" basis, ;
+; WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   ;
+; for the specific language governing rights and limitations under the       ;
+; License.                                                                   ;
+;                                                                            ;
+; The Original Code is the PowerLoom KR&R System.                            ;
+;                                                                            ;
+; The Initial Developer of the Original Code is                              ;
+; UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          ;
+; 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               ;
+;                                                                            ;
+; Portions created by the Initial Developer are Copyright (C) 2004-2019      ;
+; the Initial Developer. All Rights Reserved.                                ;
+;                                                                            ;
+; Contributor(s):                                                            ;
+;                                                                            ;
+; Alternatively, the contents of this file may be used under the terms of    ;
+; either the GNU General Public License Version 2 or later (the "GPL"), or   ;
+; the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   ;
+; in which case the provisions of the GPL or the LGPL are applicable instead ;
+; of those above. If you wish to allow use of your version of this file only ;
+; under the terms of either the GPL or the LGPL, and not to allow others to  ;
+; use your version of this file under the terms of the MPL, indicate your    ;
+; decision by deleting the provisions above and replace them with the notice ;
+; and other provisions required by the GPL or the LGPL. If you do not delete ;
+; the provisions above, a recipient may use your version of this file under  ;
+; the terms of any one of the MPL, the GPL or the LGPL.                      ;
+;                                                                            ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; END LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; Version: $Id$
+
+;;; OWL translation support.
+
+(in-package "STELLA")
+
+(in-module "SEMANTIC-WEB")
+
+
+  ;;
+;;;;;; A new, fairly simple OWL translator based on the new RDF machinery
+  ;;
+
+;;; NOTES, TO DO:
+
+;;; - support OWL-2 relations
+;;; - http://www.w3.org/TR/owl-ref/
+;;; - http://www.w3.org/TR/2004/REC-owl-guide-20040210/
+;;; - translation of ontology tag
+;;; - handling of import declarations
+;;; - translation of owl:AllDifferent
+;;; + inferring metaclasses (subclasses of owl:Class and so on)
+;;; - maybe use typed nodes in RDF-MODEL to store element types
+;;; - handle cases where a term already defined in one of the support modules
+;;;   gets redefined (they often do this so they don't have to depend on other
+;;;   ontologies, e.g., for OWL/Thing or RDFS/title).
+;;; - handle assertions that aren't part of any definitions (this might also
+;;;   handle the previous problem in most cases)
+;;; - map domain/range onto nth-domain to avoid having to do inference
+;;;   - improve embedded axiom handling to allow non-binary relations as
+;;;     well as relations that need to be qualified with a module, e.g.:
+;;;     (defconcept b (a) :doc "foo" plk/nth-domain (0 thing))
+;;; - handling of OWL's non-unique names (e.g., introduce an `nun' function
+;;;   or support named skolems in PowerLoom
+;;; - should we translate :subset-of expressions into rules?  this doesn't really
+;;;   buy us anything unless we use =>> and <<= inference control expressions
+;;; - generalize top-level functions and interfaces
+;;; - more general module definition handling as done in Tom's old translator
+;;;   (e.g., define all the namespaces defined in the RDF tag if the
+;;;   user requests that in an option)
+;;; - test/improve rule translation and inference support so we get actually
+;;;   the same classification results on the pizza ontology
+;;; - add a Dublin core namespace and ontology file, since it is often referenced
+;;; - Fix equivalentProperty in owl.plm
+
+
+(defglobal *owl-to-powerloom-map* (KEY-VALUE-MAP OF SYMBOL SYMBOL)
+  (dictionary @KEY-VALUE-MAP
+
+              (quote /XMLNS/RDF/|Property|)             (quote /PL-KERNEL-KB/BINARY-RELATION)
+              (quote /XMLNS/RDF/|type|)                 (quote /PL-KERNEL-KB/INSTANCE-OF)
+
+              (quote /XMLNS/RDFS/|Class|)               (quote /PL-KERNEL-KB/CONCEPT)
+              (quote /XMLNS/RDFS/|Literal|)             (quote /PL-KERNEL-KB/LITERAL)
+              (quote /XMLNS/RDFS/|comment|)             (quote /PL-KERNEL-KB/DOCUMENTATION)
+              (quote /XMLNS/RDFS/|subClassOf|)          (quote /PL-KERNEL-KB/SUBSET-OF)
+              (quote /XMLNS/RDFS/|subPropertyOf|)       (quote /PL-KERNEL-KB/SUBSET-OF)
+              (quote /XMLNS/RDFS/|domain|)              (quote /PL-KERNEL-KB/DOMAIN)
+              (quote /XMLNS/RDFS/|range|)               (quote /PL-KERNEL-KB/RANGE)
+              (quote /XMLNS/RDFS/|Resource|)            (quote /PL-KERNEL-KB/THING)
+
+              (quote /XMLNS/DAML/|Thing|)               (quote /PL-KERNEL-KB/THING)
+              (quote /XMLNS/DAML/|Class|)               (quote /PL-KERNEL-KB/CONCEPT)
+              (quote /XMLNS/DAML/|Property|)            (quote /PL-KERNEL-KB/BINARY-RELATION)
+              (quote /XMLNS/DAML/|TransitiveProperty|)  (quote /PL-KERNEL-KB/TRANSITIVE)
+              (quote /XMLNS/DAML/|disjointWith|)        (quote /PL-KERNEL-KB/DISJOINT)
+
+              (quote /XMLNS/OWL/|Thing|)               (quote /PL-KERNEL-KB/THING)
+              (quote /XMLNS/OWL/|Class|)               (quote /PL-KERNEL-KB/CONCEPT)
+              (quote /XMLNS/OWL/|Property|)            (quote /PL-KERNEL-KB/BINARY-RELATION)
+              (quote /XMLNS/OWL/|TransitiveProperty|)  (quote /PL-KERNEL-KB/TRANSITIVE)
+              (quote /XMLNS/OWL/|SymmetricProperty|)   (quote /PL-KERNEL-KB/SYMMETRIC)
+              (quote /XMLNS/OWL/|disjointWith|)        (quote /PL-KERNEL-KB/DISJOINT)
+              (quote /XMLNS/OWL/|inverseOf|)           (quote /PL-KERNEL-KB/INVERSE)
+              (quote /XMLNS/OWL/|equivalentClass|)     (quote /PL-KERNEL-KB/EQUIVALENT-RELATION)
+
+              )
+  :documentation "A mapping table between symbols and their PowerLoom counterparts.
+These are not necessarily true equivalents, for example RDFS/subClassOf
+and RDFS/subPropertyOf both map to PL-KERNEL/SUBSET-OF.")
+
+(defspecial *translate-to-native-powerloom?* BOOLEAN TRUE
+  :documentation "When `true' translate those constructs that have native PowerLoom
+counterparts directly into PowerLoom.  Otherwise use the indirection
+of translating to the RDFS, DAML, OWL, etc. relation and rely on the
+inference rules associated with those constructs."
+  :public? TRUE)
+
+(defun (owl-to-powerloom-name SYMBOL) ((name SYMBOL))
+  :documentation "Substitute the corresponding PowerLoom symbol for the OWL relation `name'."
+  :public? TRUE
+  (unless *translate-to-native-powerloom?*
+    (return name))
+  (let ((translated-name (lookup *owl-to-powerloom-map* name)))
+    (if (defined? translated-name)
+      (return translated-name)
+      (return name))))
+
+
+(defmethod (owl-test-type? BOOLEAN) ((model RDF-MODEL) (term RDF-MODEL-NODE) (type KEYWORD))
+  ;; Return true if `type' has been inferred about `term'.  `type' can be one of :CLASS,
+  ;; :RELATION, :FUNCTION or :RESTRICTION.  Note that this looks for an explicit annotation,
+  ;; it does not infer :RELATION from being a :FUNCTION or :CLASS, for example.
+  (case type
+    (:CLASS (return (eql? (get-element-attribute term :class? NULL) TRUE-WRAPPER)))
+    (:RELATION (return (eql? (get-element-attribute term :relation? NULL) TRUE-WRAPPER)))
+    (:FUNCTION (return (eql? (get-element-attribute term :function? NULL) TRUE-WRAPPER)))
+    (:RESTRICTION (return (eql? (get-element-attribute term :restriction? NULL) TRUE-WRAPPER)))
+    (:META-CLASS (return (eql? (get-element-attribute term :meta-class? NULL) TRUE-WRAPPER)))
+    (otherwise (return FALSE))))
+
+(defmethod (owl-set-type? BOOLEAN) ((model RDF-MODEL) (object RDF-MODEL-NODE) (type KEYWORD))
+  ;; Record that `object' is of `type'.  Return TRUE if `type' was a new type for `object'.
+  (let ((attribute KEYWORD NULL))
+    (case type
+      (:CLASS (setq attribute :class?))
+      (:RELATION (setq attribute :relation?))
+      (:FUNCTION (setq attribute :function?))
+      (:RESTRICTION (setq attribute :restriction?))
+      (:META-CLASS (setq attribute :meta-class?)))
+    (cond ((eql? (get-element-attribute object attribute NULL) TRUE-WRAPPER)
+           (return FALSE))
+          (otherwise
+           ;; for debugging:
+           ;(when (eql? attribute :meta-class?)
+           ;  (print "*** Inferring new :META-CLASS: " object EOL))
+           (set-element-attribute object attribute TRUE-WRAPPER)
+           (return TRUE)))))
+
+(defmethod (owl-infer-argument-types? BOOLEAN) ((model RDF-MODEL) (statement RDF-MODEL-EDGE))
+  ;; Infers types for the arguments of `statement' based on the statement predicate.
+  ;; Return TRUE if some new object types where discovered and set.
+  (let ((new? FALSE)
+        (subject (subject statement))
+        (predicateID (label statement))
+        (predicate (get-node model predicateID))
+        (object (object statement))
+        (objectID (id object)))
+    (when (defined? predicate)
+      (setq new? (owl-set-type? model predicate :relation)))
+    (case predicateID
+      (/XMLNS/RDF/|type|
+       (setq new? (owl-set-type? model object :class))
+       (case objectID
+         ((/XMLNS/RDFS/|Class|
+           /XMLNS/OWL/|Class|
+           /XMLNS/OWL/|Datatype|)
+          (setq new? (owl-set-type? model subject :class))
+          (setq new? (owl-set-type? model object :meta-class)))
+         (/XMLNS/OWL/|Restriction|
+          (setq new? (owl-set-type? model subject :restriction)))
+         ((/XMLNS/RDF/|Property|
+           /XMLNS/OWL/|TransitiveProperty|
+           /XMLNS/OWL/|SymmetricProperty|
+           /XMLNS/OWL/|InverseFunctionalProperty|
+           /XMLNS/OWL/|UnambiguousProperty|
+           /XMLNS/OWL/|ObjectProperty|
+           /XMLNS/OWL/|DatatypeProperty|
+           /XMLNS/OWL/|AnnotationProperty|)
+          (setq new? (owl-set-type? model subject :relation)))
+         (/XMLNS/OWL/|FunctionalProperty|
+          (setq new? (owl-set-type? model subject :function)))
+         (otherwise NULL))
+       ;; NOTE: this is generally not true, since a class can be an instance
+       ;; of something that includes classes and non-classes (e.g., Thing, or
+       ;; PersonClass union Integers, or ReadingTargetThing which includes
+       ;; classes and relations), hence, we disable it for now even though
+       ;; we used to need it for some cases:
+       ;(when (and (owl-test-type? model subject :class)
+       ;           (not (eql? objectID (quote /XMLNS/OWL/|Thing|))))
+       ;  (setq new? (owl-set-type? model object :meta-class)))
+       (when (owl-test-type? model object :meta-class)
+         (setq new? (owl-set-type? model subject :class))))
+
+      (/XMLNS/RDFS/|subClassOf|
+       (setq new? (owl-set-type? model subject :class))
+       (setq new? (owl-set-type? model object :class))
+       (when (owl-test-type? model object :meta-class)
+         (setq new? (owl-set-type? model subject :meta-class))))
+
+      (/XMLNS/OWL/|equivalentClass|
+       (setq new? (owl-set-type? model subject :class))
+       (setq new? (owl-set-type? model object :class))
+       (cond ((owl-test-type? model subject :meta-class)
+              (setq new? (owl-set-type? model object :meta-class)))
+             ((owl-test-type? model object :meta-class)
+              (setq new? (owl-set-type? model subject :meta-class)))))
+      
+      ((/XMLNS/OWL/|disjointWith|
+        /XMLNS/OWL/|unionOf|
+        /XMLNS/OWL/|disjointUnionOf|  ;; obsolete
+        /XMLNS/OWL/|intersectionOf|
+        /XMLNS/OWL/|complementOf|)
+       (setq new? (owl-set-type? model subject :class))
+       (setq new? (owl-set-type? model object :class)))
+      
+      (/XMLNS/OWL/|oneOf|
+       (setq new? (owl-set-type? model subject :class)))
+      
+      ((/XMLNS/RDFS/|domain|
+        /XMLNS/RDFS/|range|)
+       (setq new? (owl-set-type? model subject :relation))
+       (setq new? (owl-set-type? model object :class)))
+
+      ((/XMLNS/OWL/|hasClass|
+        /XMLNS/OWL/|toClass|)
+       (setq new? (owl-set-type? model object :class)))
+      
+      ((/XMLNS/RDFS/|subPropertyOf|
+        /XMLNS/OWL/|samePropertyAs|
+        /XMLNS/OWL/|equivalentProperty| ;; new canonical name, FIX THIS IN owl.plm
+        /XMLNS/OWL/|inverseOf|)
+       (setq new? (owl-set-type? model subject :relation))
+       (setq new? (owl-set-type? model object :relation)))
+      
+      ((/XMLNS/OWL/|onProperty|
+        /XMLNS/OWL/|ObjectProperty|
+        /XMLNS/OWL/|DatatypeProperty|
+        /XMLNS/OWL/|AnnotationProperty|)
+       (setq new? (owl-set-type? model object :relation)))
+      
+      (otherwise NULL))
+    (return new?)))
+
+(defmethod owl-infer-object-types ((model RDF-MODEL))
+  ;; Infers types for all objects in `model' based on the
+  ;; statements the objects participate in.
+  (let ((new? FALSE))
+    (loop
+      (foreach statement in (all-statements model)
+          do (when (owl-infer-argument-types? model statement)
+               (setq new? TRUE)))
+      (if new?
+          (setq new? FALSE)
+        (break)))))
+
+#|
+(defmethod (owl-class-expression? BOOLEAN) ((model RDF-MODEL) (term RDF-MODEL-NODE))
+  ;; Return TRUE if `term' is a class expression such as a restriction of combination tag.
+  (let ((termID (id term)))
+    (return (or (owl-test-type? model term :RESTRICTION)
+               (and (symbol? termID)
+                    (blank-rdf-node-id? (symbol-name (cast termID SYMBOL))))))))
+|#
+
+(defmethod (owl-class-expression? BOOLEAN) ((model RDF-MODEL) (term RDF-MODEL-NODE))
+  ;; Return TRUE if `term' is a class expression such as a restriction of combination tag.
+  (return (or (owl-test-type? model term :RESTRICTION)
+              (is-anonymous? term))))
+
+(defmethod (owl-translate-term OBJECT) ((model RDF-MODEL) (term OBJECT))
+  ;; Translate `term' into the corresponding PowerLoom representation.
+  (typecase term
+    (RDF-MODEL-NODE
+     (return (owl-translate-term model (id term))))
+    (SYMBOL
+     (when (eql? (home-context term) *xmls-module*)
+       (let ((type (xmls-type-name-to-stella-type (symbol-name term))))
+         (unless (eql? type @OBJECT)
+           (setq term (symbolize type)))))
+     (when (and (blank-rdf-node-id? (symbol-name term))
+                (owl-class-expression? model (get-node model term)))
+       (return (owl-translate-class-expression model (get-node model term))))
+     (return (owl-to-powerloom-name term)))
+    (otherwise
+     (return term))))
+
+(defmethod (owl-translate-class-expression OBJECT) ((model RDF-MODEL) (term RDF-MODEL-NODE))
+  ;; Translate an anonymous class expression or a restriction.
+  ;; This primarily collects arguments and does some normalization and checking before it
+  ;; calls the more specialized translators for class expressions and restrictions.
+  (cond ((owl-test-type? model term :RESTRICTION)
+         (let ((property RDF-MODEL-EDGE NULL)
+               (restriction RDF-MODEL-EDGE NULL))
+           (foreach statement in (get-subject-statements model term NULL)
+               do (case (owl-translate-term model (label statement))
+                    (/XMLNS/OWL/|onProperty|
+                                (setq property statement))
+                    ((/XMLNS/OWL/|cardinality|
+                      /XMLNS/OWL/|minCardinality|
+                      /XMLNS/OWL/|maxCardinality|
+                      /XMLNS/OWL/|allValuesFrom|
+                      /XMLNS/OWL/|someValuesFrom|
+                      /XMLNS/OWL/|hasValue|)
+                     (setq restriction statement))
+                    ;; the only other thing we should get is a type statement:
+                    (/PL-KERNEL/INSTANCE-OF NULL)
+                    (otherwise
+                     (warn "Unexpected restriction element: " (label statement)))))
+           (if (and (defined? property)
+                    (defined? restriction))
+               (return (owl-translate-restriction model property restriction))
+             (warn "Incomplete restriction: " (id term)))))
+        
+        ;; the order of tests is important here, since most restrictions are also typed as :class:
+        ((owl-test-type? model term :CLASS)
+         (let ((property RDF-MODEL-EDGE NULL))
+           (foreach statement in (get-subject-statements model term NULL)
+               do (cond ((defined? property)
+                         (warn "Unexpected class expression element: " (label statement)))
+                        (otherwise
+                         (case (owl-translate-term model (label statement))
+                           ((/XMLNS/OWL/|oneOf|
+                             /XMLNS/OWL/|unionOf|
+                             /XMLNS/OWL/|intersectionOf|
+                             /XMLNS/OWL/|complementOf|)
+                            (setq property statement))
+                           ;; the only other thing we should get is a type statement:
+                           (/PL-KERNEL/INSTANCE-OF NULL)
+                           (otherwise
+                            (warn "Unexpected class expression element: " (label statement)))))))
+           (if (defined? property)
+               (return (owl-translate-unnamed-class model property))
+             (warn "Incomplete class expression: " (id term))))))
+  ;; we failed, simply translate the blank node:
+  (return (id term)))
+
+(defmethod (owl-create-local-variable SYMBOL) ((model RDF-MODEL) (variableName STRING))
+  (unless (starts-with? variableName "?" 0)
+    (setq variableName (concatenate "?" variableName)))
+  (return (intern-symbol-in-module variableName *module* FALSE)))
+
+(defmethod (owl-get-collection-args CONS) ((model RDF-MODEL) (node RDF-MODEL-NODE))
+  ;; Node is a collection-valued node (e.g., the args to a unionOf).
+  ;; Return the arguments as a CONS list.
+  (let ((args (id node)))
+    (typecase args
+      (CONS (return args))
+      (KV-CONS (return (value args)))
+      (otherwise
+       (warn "Unexpected class expression argument list: " args)
+       (return NIL)))))
+
+(defmethod (owl-translated-class-expression-to-sentence OBJECT) ((model RDF-MODEL)
+                                                                 (expression OBJECT))
+  ;; Convert a translated class `expression' into the KIF sentence defining it.
+  ;; This is useful to be able to combine multiple expressions joined by union or
+  ;; intersection operators into a single compound sentence.
+  (typecase expression
+    (SYMBOL
+     (return (bquote (& expression & (owl-create-local-variable model "?X")))))
+    (CONS
+     ;; we must have a setofall expression:
+     (return (third expression)))))
+
+(defmethod (owl-class-expression-operator-to-kif SYMBOL) ((model RDF-MODEL) (operator SYMBOL))
+  (case operator
+    (/XMLNS/OWL/|unionOf| (return (quote /PL-KERNEL/OR)))
+    (/XMLNS/OWL/|intersectionOf| (return (quote /PL-KERNEL/AND)))
+    (/XMLNS/OWL/|complementOf| (return (quote /PL-KERNEL/NOT)))))
+        
+(defmethod (owl-translate-unnamed-class OBJECT) ((model RDF-MODEL) (property RDF-MODEL-EDGE))
+  ;; Translate an unnamed class expression represented by `property' into a corresponding
+  ;; PowerLoom SETOFALL term.
+  (let ((operator (owl-translate-term model (label property)))
+        (xVar (owl-create-local-variable model "?X"))
+        (translation NIL))
+    (case operator
+      (/XMLNS/OWL/|oneOf|
+       (foreach arg in (owl-get-collection-args model (object property))
+           collect (owl-translate-term model arg) into translation)
+       (setq translation (bquote (/PL-KERNEL/MEMBER-OF & xVar (PL-KERNEL/SETOF && translation)))))
+      ((/XMLNS/OWL/|unionOf| /XMLNS/OWL/|intersectionOf|)
+       (foreach arg in (owl-get-collection-args model (object property))
+           collect (owl-translated-class-expression-to-sentence
+                    model
+                    (owl-translate-term model arg))
+           into translation)
+       (setq translation
+         (bquote (& (owl-class-expression-operator-to-kif model operator)
+                    && translation))))
+      (/XMLNS/OWL/|complementOf|
+        (setq translation
+          (bquote (& (owl-class-expression-operator-to-kif model operator)
+                     & (owl-translated-class-expression-to-sentence
+                        model
+                        (owl-translate-term model (object property))))))))
+    (return
+      (bquote (PL-KERNEL/setofall & xVar & translation)))))
+                                                      
+(defmethod (owl-translate-restriction OBJECT) ((model RDF-MODEL)
+                                               (onProperty RDF-MODEL-EDGE)
+                                               (restriction RDF-MODEL-EDGE))
+  ;; Translate a `restriction' on `onProperty' into a corresponding SETOFALL term.
+  ;; `onProperty' and `restriction' have the same blank node as their subject.
+  (let ((property (owl-translate-term model (object onProperty)))
+        (restrictionProperty (owl-translate-term model (label restriction)))
+        (restrictionValue (owl-translate-term model (object restriction)))
+        (xVar (owl-create-local-variable model "?X"))
+        (yVar (owl-create-local-variable model "?Y"))
+        (translation OBJECT NULL))
+    (case restrictionProperty
+      (/XMLNS/OWL/|cardinality|
+       (setq translation (bquote (PL-KERNEL/range-cardinality & property & xVar & restrictionValue))))
+      (/XMLNS/OWL/|minCardinality|
+       (setq translation (bquote (PL-KERNEL/range-min-cardinality & property & xVar & restrictionValue))))
+      (/XMLNS/OWL/|maxCardinality|
+       (setq translation (bquote (PL-KERNEL/range-max-cardinality & property & xVar & restrictionValue))))
+      (/XMLNS/OWL/|allValuesFrom|
+       (setq translation (bquote (PL-KERNEL/range-type & property & xVar & restrictionValue))))
+      (/XMLNS/OWL/|someValuesFrom|
+       (setq translation
+         (bquote (PL-KERNEL/EXISTS & yVar
+                   (PL-KERNEL/AND (& property & xVar & yVar)
+                                  (& restrictionValue & yVar))))))
+      (/XMLNS/OWL/|hasValue|
+       (setq translation (bquote (& property & xVar & restrictionValue))))
+      (otherwise
+       (warn "Unhandled restriction type: " restrictionProperty)
+       (return (owl-translate-term model (id (subject restriction))))))
+    (return (bquote (PL-KERNEL/setofall & xVar & translation)))))
+
+(defmethod (owl-translate-statement CONS) ((model RDF-MODEL) (statement RDF-MODEL-EDGE))
+  ;; Translate `statement' into an equivalent PowerLoom representation.
+  (let ((subject (owl-translate-term model (subject statement)))
+        (predicate (owl-translate-term model (label statement)))
+        (object (owl-translate-term model (object statement))))
+    (cond ((eql? predicate (quote /PL-KERNEL/INSTANCE-OF))
+           (return (cons object (cons subject NIL))))
+          (otherwise
+           (return (cons predicate (cons subject (cons object NIL))))))))
+
+(startup-time-progn
+  ;; Define this here for now which is a bit kludgey.  We currently explicitly link a
+  ;; Statement ID to the statement it reifies.  We could introduce the direct modal
+  ;; assertions like this:
+  #|
+    (assert-from-query
+             (retrieve all (?r ?p ?y)
+                       (and (/XMLNS/RDF/|statementIdOf| ?id ?p)
+                            (holds ?r ?id ?y)
+                            (different ?r /XMLNS/RDF/|statementIdOf|)))
+             :pattern (kappa (?r ?p ?y)
+                        (holds ?r ?p ?y)))
+  |#
+  ;; however, this requires the retrieved ?r's to have their first argument typed as
+  ;; proposition or `*auto-coerce-propositional-arguments?*' needs to be true.
+  
+  (within-module (get-stella-module "/PL-KERNEL/WEB-CORE" TRUE)
+    (PL-KERNEL/DEFFUNCTION /XMLNS/RDF/|statementIdOf| (?id (?prop PL-KERNEL/PROPOSITION)))))
+
+(defmethod (owl-collect-statements CONS) ((model RDF-MODEL) (subject OBJECT))
+  ;; Collect and translate all statements that have `subject' as their first argument.
+  (let ((translatedStatement NIL)
+        (reifiedStatement RDF-MODEL-EDGE NULL)
+        (statements NIL))
+    (setq subject (get-node model subject))
+    (foreach statement in (get-subject-statements model subject NULL)
+        do (setq translatedStatement (owl-translate-statement model statement))
+           (pushq statements translatedStatement))
+    (setq reifiedStatement
+      (lookup (reified-statement-index model) (owl-translate-term model subject)))
+    (when (defined? reifiedStatement)
+      ;; `subject' is the ID of a reified statement; this isn't really legal in OWL, but
+      ;; we allow it here and link it to the reified statement via a `statementIdOf'
+      ;; assertion to support loading some of the Machine Reading document annotations:
+      (setq translatedStatement
+        (cons (quote /XMLNS/RDF/|statementIdOf|)
+              (cons (owl-translate-term model subject)
+                    (cons (owl-translate-statement model reifiedStatement) NIL))))
+      (pushq statements translatedStatement))
+    (return (reverse statements))))
+
+(defmethod (owl-remove-redundant-axioms (CONS OF CONS)) ((model RDF-MODEL) (axioms (CONS OF CONS)))
+  (let ((redundantAxioms NIL))
+    (foreach axiom in axioms
+        where (eql? (first axiom) (quote /PL-KERNEL/THING))
+        collect axiom into redundantAxioms)
+    (return (subtract axioms redundantAxioms))))
+
+(defmethod (owl-translate-definition CONS) ((model RDF-MODEL)
+                                            (subject RDF-MODEL-NODE)
+                                            (axioms (CONS OF CONS)))
+  ;; Create a PowerLoom definition for `subject' according to its type and `axioms'.
+  ;; If `subject' is a node representing an anonymous class expression such as
+  ;;    a restriction, return NULL.
+  (let ((definition NIL)
+        (operator SYMBOL NULL)
+        (docstring STRING-WRAPPER NULL)
+        (keywordAxioms NIL)
+        (otherAxioms NIL)
+        (xVar (owl-create-local-variable model "?X"))
+        (yVar (owl-create-local-variable model "?Y")))
+    (cond ((owl-class-expression? model subject)
+           (return NULL))
+          ((owl-test-type? model subject :CLASS)
+           (setq definition (bquote (PL-KERNEL/DEFCONCEPT & (id subject) (& xVar)))))
+          ((owl-test-type? model subject :FUNCTION)
+           (setq definition (bquote (PL-KERNEL/DEFFUNCTION & (id subject) (& xVar & yVar)))))
+          ((owl-test-type? model subject :RELATION)
+           (setq definition (bquote (PL-KERNEL/DEFRELATION & (id subject) (& xVar & yVar)))))
+          (otherwise
+           (setq definition (bquote (PL-KERNEL/DEFINSTANCE & (id subject))))))
+    ;; Canonicalize axioms, eliminate redundant stuff and do some minor reordering:
+    (foreach axiom in (owl-remove-redundant-axioms model axioms)
+        do (setq operator (first axiom))
+           (cond ((eql? operator (quote /PL-KERNEL/DOCUMENTATION))
+                  (setq docstring (third axiom)))
+                 ((or (eql? operator (quote /PL-KERNEL/THING))
+                      (and (eql? operator (quote /PL-KERNEL/CONCEPT))
+                           (eql? (first definition) (quote PL-KERNEL/DEFCONCEPT))))
+                  ;; eliminate obviously redundant axioms:
+                  (continue))
+                 ((eql? (home-module operator) *pl-kernel-module*)
+                  (pushq keywordAxioms (keywordify operator))
+                  (if (defined? (third axiom))
+                      (pushq keywordAxioms (third axiom))
+                    (pushq keywordAxioms /PL-KERNEL/TRUE)))
+                 (otherwise
+                  (pushq otherAxioms :axioms)
+                  (pushq otherAxioms axiom))))
+    ;; Finally, assemble the definition:
+    (return (bquote (&& definition
+                        && (choose (defined? docstring)
+                                   (bquote (:documentation & docstring))
+                                   NIL)
+                        && (reverse keywordAxioms)
+                        && (reverse otherAxioms))))))
+
+(defmethod (owl-translate-axioms CONS) ((model RDF-MODEL) (axioms (CONS OF CONS)))
+  ;; Translate `axioms' into a set of assertions.
+  (let ((translatedAxioms (owl-remove-redundant-axioms model axioms)))
+    (cond ((empty? translatedAxioms)
+           (return NULL))
+          ((empty? (rest translatedAxioms))
+           (return (cons (quote PL-KERNEL/ASSERT) translatedAxioms)))
+          (otherwise
+           (return (bquote (PL-KERNEL/ASSERT (PL-KERNEL/AND && translatedAxioms))))))))
+
+(defmethod (owl-define-entity? BOOLEAN) ((model RDF-MODEL) (entity RDF-MODEL-NODE))
+  ;; Return TRUE if we should create a definition for `entity'.
+  ;; TO DO: improve this based on looking at an object's module and `model's base module.
+  (return (and (not (owl-class-expression? model entity))
+               (or (owl-test-type? model entity :CLASS)
+                   (owl-test-type? model entity :FUNCTION)
+                   (owl-test-type? model entity :RELATION)))))
+
+(defun owl-to-powerloom ((inFile STRING)
+                         (outFile STRING)
+                         (map NAMESPACE-MAP)
+                         (baseURI STRING)
+                         (baseModule MODULE))
+  :documentation "Translate the OWL file `inFile' into a corresponding PowerLoom `outFile'
+relative to `map', `baseURI' and/or `baseModule' (all of which can be NULL)."
+  :public? TRUE :command? TRUE
+  ;; TO DO: - generalize this and pull out the model generation given an OWL input stream
+  ;;        - make this a command with various optional keyword arguments.
+  ;;        - add support to automatically generate reasonable namespace maps from the preamble
+  ;; FIXME: - address some weird base URI issue that surfaced with the original SUMO.owl (see
+  ;;          preamble of SUMO.plm); without a baseURI declaration in the OWL file, we could not
+  ;;          get rid of hashmarks on instance names, it still escapes me why not; actually, I
+  ;;          might know now: rdf.ste's read-preamble-expression reads the base URI and overwrites
+  ;;          the one set here from `baseModule', and the `baseModule' prefix has to include
+  ;;          the # to properly strip it off later; thus, if it is not set in the preamble, we'll
+  ;;          always get an extra hash.
+  (let ((model (new RDF-MODEL))
+        (rdfStatements RDF-STATEMENT-ITERATOR NULL)
+        (currentSubject OBJECT NULL)
+        (orderedSubjects NIL))
+    (when (null? map)
+      (setq map (create-default-namespace-map)))
+    (with-input-file (in inFile)
+      (when (and (null? baseURI)
+                 (defined? baseModule))
+        (setq baseURI (namespace-uri-prefix (lookup-module-mapping map baseModule))))
+      (setq rdfStatements (rdf-statements in baseURI))
+      (foreach statement in rdfStatements
+          do (setq currentSubject (rdf-to-stella (subject statement) map))
+             (add-statement model (rdf-to-stella statement map))
+          collect currentSubject into orderedSubjects)
+      ;; records the order in which things were defined in the source file:
+      (setq orderedSubjects (remove-duplicates orderedSubjects))
+      (when (null? baseModule)
+        ;; try to determine the module from the base URI:
+        (setq baseURI (base-uri (reader rdfStatements)))
+        (setq baseModule (assertion-module (lookup-prefix-mapping map baseURI)))
+        (when (eql? (lookup-prefix-mapping map baseURI) (default-mapping map))
+          (setq baseModule
+            (assertion-module (lookup-prefix-mapping map (concatenate baseURI "#")))))))
+    (owl-infer-object-types model)
+    (with-output-file (out outFile)
+      (within-module baseModule
+        (cl-output-file-header out inFile FALSE)
+        (print-stream out "(IN-MODULE \"" (module-name baseModule) "\")" EOL EOL)
+        (foreach subject in orderedSubjects
+              do (setq subject (get-node model subject))
+                 (when (owl-class-expression? model subject)
+                   (continue))
+                 (cond ((owl-define-entity? model subject)
+                        ;; we have an object definition:
+                        (let ((definition
+                                (owl-translate-definition
+                                 model subject (owl-collect-statements model subject))))
+                          (when (defined? definition)
+                            (pretty-print-relation-definition-tree definition out)
+                            (print-stream out EOL))))
+                       ((owl-class-expression? model subject)
+                        ;; ignore those:
+                        NULL)
+                       (otherwise
+                        ;; we have some plain old assertions:
+                        (let ((axioms
+                               (owl-translate-axioms model (owl-collect-statements model subject))))
+                          (when (defined? axioms)
+                            (special ((*printReadably?* TRUE)
+                                      (*printPretty?* TRUE))
+                              (print-stream out axioms EOL EOL)))))))))))
+
+#|
+;;; Example translation
+
+;;; First, load the relevant ontologies to create modules:
+
+(load "~/Projects/powerloom/sources/lbr/kbs/football-load-path.plm")
+(load "football-load-ontologies")
+
+(setq map (create-default-namespace-map))
+(/semantic-web/map-namespace (clv map)
+               :namespace "mrq"
+               :namespace-uri "https://sw.globalinfotek.com/2009/11/mrp/query/"
+               :namespace-module "DSRS-QUERY"
+               :mapping-style :BARE-NAME)
+(/semantic-web/map-namespace (clv map)
+               :namespace "mrq"
+               :namespace-uri "https://sw.globalinfotek.com/2009/11/mrp/query#"
+               :namespace-module "DSRS-QUERY"
+               :mapping-style :BARE-NAME)
+(/semantic-web/map-namespace (clv map)
+               :namespace "mrq"
+               :namespace-uri "https://sw.globalinfotek.com/2010/05/mrp/query#"
+               :namespace-module "DSRS-QUERY"
+               :mapping-style :BARE-NAME)
+(/semantic-web/map-namespace (clv map)
+               :namespace "nfl"
+               :namespace-uri "https://sw.globalinfotek.com/2009/11/mrp/nfl/scoring#"
+               :namespace-module "NFL-SCORING"
+               :mapping-style :BARE-NAME)
+(/semantic-web/map-namespace (clv map)
+               :namespace "nfl"
+               :namespace-uri "https://sw.globalinfotek.com/2010/05/mrp/nfl/scoring#"
+               :namespace-module "NFL-SCORING"
+               :mapping-style :BARE-NAME)
+(/semantic-web/map-namespace (clv map)
+               :namespace "IC"
+               :namespace-uri "https://sw.globalinfotek.com/2010/01/mrp/IC#"
+               :namespace-module "IC"
+               :mapping-style :BARE-NAME)
+(/semantic-web/map-namespace (clv map)
+               :namespace-uri "https://sw.mrporg.wedunno/2009/11/mrp/readingTeam#"
+               :namespace-module "PL-USER"
+               :mapping-style :FULL-URI)
+(/semantic-web/map-namespace (clv map)
+               :namespace-uri "http://www.co-ode.org/ontologies/pizza/pizza.owl#"
+               :namespace-module "PL-USER"
+               :mapping-style :FULL-URI)
+
+STELLA(22): (owl-to-powerloom
+             "~/Projects/powerloom/sources/lbr/kbs/query.rdf"
+             "/tmp/query.plm"
+             map null-string)
+()
+
+STELLA(23): (owl-to-powerloom
+             "~/Projects/powerloom/sources/lbr/kbs/NFL-scoring.rdf"
+             "/tmp/NFL-scoring.plm"
+             map null-string)
+()
+
+STELLA(24): (owl-to-powerloom
+             "/home/hans/Documents/powerloom/sources/translators/semantic-web/tests/pizza.owl"
+             "/tmp/pizza.plm"
+             map null-string)
+()
+STELLA(25): (owl-to-powerloom
+             "~/Documents/learning-by-reading/code/MRAPI/MRAPI-3.2/MRAPI.32.0423/vocab/IC.rdf"
+             "/tmp/IC.plm"
+             map null-string)
+()
+STELLA(26): 
+|#
+
+;;; Parsing and translating restrictions
+
+#|
+    <owl:Class rdf:about="#NFLGame">
+        <rdfs:subClassOf rdf:resource="#Event"/>
+        <rdf:type rdf:resource="&mrq;NFL-PrimaryReadingTargetClass"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="#teamInGame"/>
+                <owl:maxCardinality rdf:datatype="&xsd;nonNegativeInteger">2</owl:maxCardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        ....
+    </owl:Class>
+
+;;; direct translation:
+
+(defconcept NFLGame
+  :subset-of Event
+  :NFL-PrimaryReadingTargetClass true
+  :subset-of (setofall ?x
+               (range-max-cardinality teamInGame ?x 2)))
+
+;;; better translation:
+
+(defconcept NFLGame (?x)
+  :subset-of Event
+  :NFL-PrimaryReadingTargetClass true
+  :=> (range-max-cardinality teamInGame ?x 2))
+
+|#

@@ -1,0 +1,3309 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;; BEGIN LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                            ;
+; Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          ;
+;                                                                            ;
+; The contents of this file are subject to the Mozilla Public License        ;
+; Version 1.1 (the "License"); you may not use this file except in           ;
+; compliance with the License. You may obtain a copy of the License at       ;
+; http://www.mozilla.org/MPL/                                                ;
+;                                                                            ;
+; Software distributed under the License is distributed on an "AS IS" basis, ;
+; WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   ;
+; for the specific language governing rights and limitations under the       ;
+; License.                                                                   ;
+;                                                                            ;
+; The Original Code is the PowerLoom KR&R System.                            ;
+;                                                                            ;
+; The Initial Developer of the Original Code is                              ;
+; UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          ;
+; 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               ;
+;                                                                            ;
+; Portions created by the Initial Developer are Copyright (C) 1997-2020      ;
+; the Initial Developer. All Rights Reserved.                                ;
+;                                                                            ;
+; Contributor(s):                                                            ;
+;                                                                            ;
+; Alternatively, the contents of this file may be used under the terms of    ;
+; either the GNU General Public License Version 2 or later (the "GPL"), or   ;
+; the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   ;
+; in which case the provisions of the GPL or the LGPL are applicable instead ;
+; of those above. If you wish to allow use of your version of this file only ;
+; under the terms of either the GPL or the LGPL, and not to allow others to  ;
+; use your version of this file under the terms of the MPL, indicate your    ;
+; decision by deleting the provisions above and replace them with the notice ;
+; and other provisions required by the GPL or the LGPL. If you do not delete ;
+; the provisions above, a recipient may use your version of this file under  ;
+; the terms of any one of the MPL, the GPL or the LGPL.                      ;
+;                                                                            ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; END LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; Re-implementation and extension of David Moriarty's Chameleon reasoner
+
+(in-package "STELLA")
+
+(in-module "LOGIC")
+
+
+;;; GOALS
+;;; This is a reimplementation of David Moriarty's Chameleon neural network partial matcher
+;;; whose main goals are as follows:
+;;; (1) Use new scheme partial match methods throughout (as opposed to still relying on some
+;;;     deprecated 'old-XXX' functions)
+;;; (2) Use TensorFlow for neural net construction, training and forward/backward propagation.
+;;;     This will use the PowerLoom Python API for now, but might use the TensorFlow C++ API
+;;;     at some point.  The main reason to do this is to allow us to easily experiment with more
+;;;     complex network topologies that take more input information into account (e.g., embeddings)
+;;; (3) Generalize rule networks to take embeddings associated with variable bindings into account.
+;;;     The nature of these embeddings is unspecified, they could come from text, could be knowledge
+;;;     graph embeddings, etc.
+;;; (4) Streamline and generalize the current training example generation code which uses various
+;;;     kludges and hacks to deal with recursive invocations, etc.  Instead, the main structure to
+;;;     control everything with should be justification trees
+;;; (5) Build rule-combination from multiple antecedent supports directly into the network instead
+;;;     of handling it through special-purpose combination rules; this should allow us to learn
+;;;     appropriate combination rules even if there are conflicting rules as we have in case of
+;;;     defaults with exceptions, for example.  This means we have to collect both positive and
+;;;     negated consequents
+;;; (6) See if we can use this scheme to also support collective inference a la PSL or MLN
+;;; (7) Generalize to seemlessly work with a number of specialized PowerLoom inference services such
+;;;     as subsumption specialists, negation, etc.
+;;; (8) Support default network combination functions that behave more or less like standard logic
+;;;     operators for cases where we don't have specific training examples
+;;; (9) Support explanation, particularly for use cases such as theory revision or collective inference
+;;;     where we want to get some a posteriori description of modified rules and weighted evidence
+;;; (10) Support efficient incremental training, for example, we might want to add a few new rules
+;;;     to the current theory and retrain a specific region as opposed to everything
+;;; (11) The very high level goal is to make knowledge base construction less brittle, so that "throwing
+;;;     in a few new rules" has at most no effect and at best a positive one, while in the current scheme
+;;;     it has always a high likelihood to break everything
+
+
+;;; NOTES, TO DO:
+;;; + we have more or less achieved goals (1-4) above
+;;; - clean up the unnecessary NN creation for ignored (e.g., vector-generating) rules during cached proof generation
+;;; - we might (eventually) need some way to specify a specific network architecture for each rule, which of course
+;;;   we could also somehow encode in the STELLA type of the network object
+;;; - figure out whether we get proper weight propagation for computed subsumption inference
+;;; - maybe introduce a new proposition annotation keyword such as :score, since :weight captures something else,
+;;;   and deal with context sensitivity of that slot, or maybe attach it to truth values
+;;; - possibly promote `try-goal-complement-proof' into a full-fledged `continue-...' so it gets its proper justification
+;;;   and maybe becomes more controllable than what we have now (see `continue-partial-strategies-proofs' below).
+;;; - add support for categorical variable encoding to provide another way to take instance context into account
+;;;   see: https://stats.idre.ucla.edu/r/library/r-library-contrast-coding-systems-for-categorical-variables/
+;;;        https://www.researchgate.net/publication/320465713
+;;; - properly handle chameleon-primitive-value-relation? during inference, since right now this is only handled
+;;;   during cached proof generation, maybe we have to switch to strict inference for those relations?
+
+;;; - proposition-weight, top-level assertion weights archeology
+;;;   - proposition-weight was introduced by Dave in 1998 to deal with variable-type propos
+;;;   - he upgraded it in March 2000 to provide "weighted assertion support" which added the check for
+;;;     the truth value and use of its positive-score (which at that time only existed for TRUE-TRUTH-VALUE)
+;;;   - there was a parallel update in `propositions.ste' that used `assign-proposition-weight' to handle
+;;;     :weight decorations, even though that function wasn't ready for consumption yet; in fact it was
+;;;     bi-directional wrt weight-to-tv and could modify the score of a truth value
+;;;   - somebody eliminated that piece again soon after
+;;;   - in June 2001 the initialization of FALSE-TV and friends' positive-score was changed to "make them work with the new
+;;;     version of the partial matcher", it was from then on that FALSE had a score of -1.0; up to that it had no score
+;;;     or was assigned 0.0 by `assign-proposition-weight'
+;;;   - at the same time, the scaling of positive-score with a proposition's weights was introduced in
+;;;     strategies.ste try-scan-propositions-proof; before that it was copied from the asserted proposition to
+;;;     the query description proposition which surely was the wrong thing to do
+;;;   - also at the same time with commit 0a9a91252624eace44d14b6b52d30c40c72bb333, the handling of NOT scores
+;;;     for incremental partial match was changed from using 0.0 for false to -1.0 which necessitates the change
+;;;     on the definition of FALSE-tv; in particular, INCREMENTAL-PARTIAL-MATCH.compute-NOT-score now flips on 0.0
+;;;     instead of 1.0 as in the prior release
+;;;   - there is handling of :weight in defproposition, which should really be handled by the annotation machinery?
+;;;   - there is a weight slot copied in optimize/normalize somewhere, so if we add score we need to do the same
+
+
+;;; Moriarty NN matcher observations
+;;; - it allows multiple supports (proofs) for subgoal propositions  (really at any level)
+;;; - ORs and alternative rules are evaluated eagerly, which is different from what the incremental
+;;;   matcher does; there are some wrinkles with respect to cutoffs, but basically we are always
+;;;   looking at all rules and all disjuncts
+;;; - ANDs and ORs are basically treated identically, we always evaluate all arguments (modulo cutoffs)
+;;;   and the NNs don't distinguish between them; the only difference is that ORs as arguments to ANDs
+;;;   get their own network since the structure doesn't get flattened out, so the structure of the
+;;;   resulting network tree is slightlhy different
+;;; - the NN matcher relies on the static optimizer, the reordering of clauses from dynamic optimization
+;;;   screws up the association of match scores with their respective argument propositions
+;;; - NN.record-partial-match-score is basically a version of push-AND/OR-partial-match-score, so we
+;;;   should map that onto its more modern variant
+;;; - *AND-MISSED-A-BINDING* is not used (anymore)
+;;; - record-partial-match-score records the rule of a chaining which is then made the axiom of a
+;;;   partial support by attach-support.  however, that axiom is not used anywhere later
+;;; - it seems the NNs are primarily attached to AND and OR propositions, not to rules
+;;; - scores are computed with compute-partial-match-score? which uses NNs for AND and OR and
+;;;   a rule combination for atomic goals (which is what we also do during learning)
+;;; - there is nothing special done for negations or rules with atomic antecedents
+;;; - create-cached-network basically creates an AND/OR tree for each training example, and the NN
+;;;   learner than tries to adjust the weights so that the error over all AND/OR trees is minimized
+;;; - :NOISY-OR rule combination is akin to our redundant evidence combination a la anti-error compounding
+;;; - :MAX rule combination can lead to unstable learning behavior where we settle in non-optimal places
+;;;   since the behavior is not smooth
+
+(defglobal *chameleon-module* MODULE NULL
+  :documentation "Namespace module for Chameleon relations")
+
+(defun ensure-chameleon-ontology ()
+  :documentation "Ensure the chameleon.plm ontology file has been loaded (assumes it exists in the current load path)."
+  :public? TRUE :command? TRUE
+  (when (null? *chameleon-module*)
+    ;; check if somebody already loaded it independently - we assume the cham module has been created at startup time:
+    (unless (defined? (surrogate-value cham/@truth-value-relation))
+      (load "chameleon.plm"))
+    (setq *chameleon-module* (get-stella-module "/CHAMELEON" TRUE))))
+
+(defun (get-chameleon-module MODULE) ()
+  :documentation "Return the namespace module for Chameleon relations"
+  :public? TRUE
+  (when (null? *chameleon-module*)
+    (ensure-chameleon-ontology))
+  (return *chameleon-module*))
+
+(defun (chameleon-vector-relation? BOOLEAN) ((x OBJECT))
+  :documentation "Return TRUE if `x' is an explicitly marked vector relation."
+  :public? TRUE :globally-inline? TRUE
+  (return (test-property? x cham/@vector-relation)))
+
+(defun (chameleon-ignored-value-relation? BOOLEAN) ((x OBJECT))
+  :documentation "Return TRUE if `x' is an explicitly marked as ignored or a vector relation
+that is not also marked as a truth value relation."
+  :public? TRUE :globally-inline? TRUE
+  (return (or (test-property? x cham/@ignored-value-relation)
+              (and (test-property? x cham/@vector-relation)
+                   (not (test-property? x cham/@truth-value-relation))))))
+
+(defun (chameleon-truth-value-relation? BOOLEAN) ((x OBJECT))
+  :documentation "Return TRUE if `x' is an explicitly marked truth value relation or
+otherwise not known to be ignored."
+  :public? TRUE :globally-inline? TRUE
+  (return (or (test-property? x cham/@truth-value-relation)
+              (not (chameleon-ignored-value-relation? x)))))
+
+(defun (chameleon-primitive-value-relation? BOOLEAN) ((x OBJECT))
+  :documentation "Return TRUE if `x' is an explicitly marked primitive value relation."
+  :public? TRUE :globally-inline? TRUE
+  (return (test-property? x cham/@primitive-value-relation)))
+
+
+(defclass CHAMELEON-PARTIAL-MATCH (INCREMENTAL-PARTIAL-MATCH)
+  :documentation "Variant of :BASIC partial match strategy to support CHAMELEON queries."
+  :slots ((argument-justifications :type (CONS OF JUSTIFICATION) :initially NIL
+            :documentation "Holds justifications for OR arguments and alternative rules.")
+          (argument-propositions :type (CONS OF PROPOSITION) :initially NIL
+            :documentation "Holds argument propositions in the order they are associated with scores")))
+
+;;; TO DO: use this for `*chameleon-default-input-value*'?
+(defglobal *chameleon-default-default-score* FLOAT 0.01
+  :documentation "Default weight to use for unknown propositions that don't have a relation-specific value specified."
+  :demon-property "powerloom.chameleon.defaultDefaultScore"
+  :public? TRUE)
+
+(defun (chameleon-partial-match-mode? BOOLEAN) ()
+  :documentation "Return TRUE if a query is computing Chameleon partial matches."
+  :globally-inline? TRUE
+  (return (and (partial-match-mode?)
+               (isa? (partial-match-strategy *queryIterator*) @CHAMELEON-PARTIAL-MATCH))))
+
+(defmethod (create-partial-match-frame CHAMELEON-PARTIAL-MATCH) ((self CHAMELEON-PARTIAL-MATCH) 
+                                                                 (frame CONTROL-FRAME)
+                                                                 (kind KEYWORD))
+  ;; Adapted version of `initialize-nn-partial-match' (for now).
+  (let ((pmf (new CHAMELEON-PARTIAL-MATCH :control-frame frame :kind kind))
+        (prop (proposition frame)))
+    ;; if `frame' contains an :AND proposition, compute the total possible weight for the proposition:
+    (case kind
+      ((:AND :OR)
+       (when (null? (get-proposition-neural-network prop FALSE))
+         (create-and-link-neural-network prop)))
+      (otherwise NULL))
+    (link-to-parent-partial-match-frame pmf)
+    (return pmf)))
+
+(defmethod (compute-dynamic-cutoff PARTIAL-MATCH-SCORE) ((self CHAMELEON-PARTIAL-MATCH))
+  ;; For the CHAMELEON partial matcher, we use a greedy cutoff strategy,
+  ;; where we only return activations of more input units.  That is,
+  ;; if a network is going to be activated with less input units than
+  ;; previously activated, we prune it.  This is not foolproof, but
+  ;; should be a good heuristic pruning strategy.
+  ;; Adapted version of NN-PARTIAL-MATCH.compute-dynamic-cutoff (fow now).
+  ;; TO DO: figure out how this relates to `prune-nn-search?'
+  (when (defined? (parent self))
+    (case (kind self)
+      (:ATOMIC-GOAL
+       (return (dynamic-cutoff (parent self))))
+      ((:AND :OR)
+       ;; Suppose we have an AND with 5 clauses and are evaluating clause 3.
+       ;; Then the following inequality must hold:
+       ;;    parentCutoff <= actfn(s1, s2, X, s4, s5)
+       ;; Now the question is what's the smallest X that with the best possible
+       ;; outcome for s4 and s5 would still let us clear the parentCutoff hurdle?
+       ;; Since `actfn' is non-linear and projects multiple inputs onto a single
+       ;; output, we'd have to do some input simulations to get an acceptable
+       ;; range estimate for X and then take the lower bound of that.
+       ;; The NN.compute-dynamic-cutoff method sums the input activations of the
+       ;; net associated with the AND.  This means the cutoff can be > 1.0 which
+       ;; is then taken into account by `prune-nn-search?' which - if we do this -
+       ;; needs to be folded into cutoff-partial-match? below.
+       ;; We are punting on this for now.  The bigger question is whether anything
+       ;; can be done once we have more complex inputs such as embeddings.
+       NULL)
+      (otherwise NULL)))
+  (return 0.0))
+
+(defmethod (cutoff-partial-match? BOOLEAN) ((self CHAMELEON-PARTIAL-MATCH)
+                                            (trace? BOOLEAN))
+  ;; Assume the goal represented by `self' just completed.
+  ;; Return TRUE if the goal's computed score fails to clear the minimally
+  ;;    required cutoff score for `self'.
+  ;; Trace the search cutoff to standard output if `trace?' is true.
+  ;; TO DO: figure out how this relates to `prune-nn-search?'
+  (return (call-super-method self trace?)))
+
+(defmethod (truth-value-score PARTIAL-MATCH-SCORE) ((self CHAMELEON-PARTIAL-MATCH) (truthValue TRUTH-VALUE))
+  ;; Compute a match score based on the `truthValue' of a proposition relative to `self'.
+  ;; Chameleon uses a 0-1 score range, so the :basic method needs to be scaled appropriately.
+  (let ((score (match-score truthValue)))
+    (when (< score 0.0)
+      (setq score (+ score 1.0)))
+    (return score)))
+
+(defun (invert-chameleon-match-score PARTIAL-MATCH-SCORE) ((score PARTIAL-MATCH-SCORE))
+  ;; Compute the "negated" `score', that is, if P has `score' what is the score of (not P)?
+  ;; Chameleon assumes that scores behave similar to probabilities between 0 and 1.
+  (return (- 1.0 score)))
+
+(defmethod (invert-match-score PARTIAL-MATCH-SCORE) ((self CHAMELEON-PARTIAL-MATCH) (score PARTIAL-MATCH-SCORE))
+  ;; Compute the "negated" `score', that is, if P has `score' what is the score of (not P)?
+  ;; Chameleon assumes that scores behave similar to probabilities between 0 and 1.
+  (return (invert-chameleon-match-score score)))
+
+(defmethod (proposition-weight FLOAT) ((self CHAMELEON-PARTIAL-MATCH) (proposition PROPOSITION))
+  ;; Compute the weight of `proposition' relative to its controlling partial match frame `self'.
+  ;; We revert to use the :BASIC method for now which does not consider truth values and also
+  ;; does not destructively set the weight of a proposition from its truth value.
+  (return (call-super-method self proposition)))
+
+(defmethod push-AND-partial-match-score ((self CHAMELEON-PARTIAL-MATCH) (score PARTIAL-MATCH-SCORE) (weight FLOAT))
+  (let ((argProp (proposition (result (control-frame self)))))
+    (call-super-method self score weight)
+    (pushf (argument-propositions self) argProp)))
+
+(defmethod pop-AND-partial-match-score ((self CHAMELEON-PARTIAL-MATCH))
+  (call-super-method self)
+  (setf (argument-propositions self) (rest (argument-propositions self))))
+
+(defmethod push-OR-partial-match-score ((self CHAMELEON-PARTIAL-MATCH) (score PARTIAL-MATCH-SCORE) (weight FLOAT))
+  ;; just a place holder, since the super method calls `push-AND-partial-match-score'.
+  (call-super-method self score weight))
+
+(defmethod pop-OR-partial-match-score ((self CHAMELEON-PARTIAL-MATCH))
+  ;; just a place holder, since the super method calls `pop-AND-partial-match-score'.
+  (call-super-method self))
+
+(defmethod (allow-unbound-variables? BOOLEAN) ((self CHAMELEON-PARTIAL-MATCH))
+  ;; Return TRUE if compound clauses such as AND/OR are allowed to succeed
+  ;;    even if some of their variables remain unbound.  We are making this
+  ;;    explicit here even though this is the same as the inherited value.
+  (return FALSE))
+
+(defmethod (compute-AND-score PARTIAL-MATCH-SCORE) ((self CHAMELEON-PARTIAL-MATCH))
+  ;; Adapted version of NN-PARTIAL-MATCH.compute-AND-score.
+  ;; Streamlined to not pass match-scores through proposition arguments.
+  (let ((net (get-proposition-neural-network (proposition (control-frame self)) TRUE))
+        (inputs (new VECTOR :array-size (number-of-inputs net)))
+        (vectorArgs
+         (only-if (has-vector-arguments? net)
+           (new VECTOR :array-size (number-of-vector-arguments net NULL))))
+        (index -1))
+    (foreach arg in (argument-propositions self)
+        as score in (argument-scores self)
+        do (setq index (truth-value-argument-index net arg))
+           (when (>= index 0)
+             (setf (nth inputs index) score))
+           (when (defined? vectorArgs)
+             (setq index (vector-argument-index net arg))
+             (when (>= index 0)
+               (setf (nth vectorArgs index) (get-vector-argument-spec net arg)))))
+    ;; this provides default values for missing args in case we have an OR:
+    (set-input-values net inputs)
+    (when (defined? vectorArgs)
+      (set-vector-input-values net vectorArgs))
+    (return (forward-propagate-inputs net))))
+
+(defmethod (continue-partial-AND-proof KEYWORD) ((self CHAMELEON-PARTIAL-MATCH)
+                                                 (frame CONTROL-FRAME)
+                                                 (lastMove KEYWORD))
+  ;; Control partial :AND proofs - simply call :BASIC parent method for now.
+  (case lastMove
+    ((:UP-TRUE :UP-FAIL)
+     ;; disable this cutoff used by :basic mode, just treat it like a regular failure:
+     (when (and (false-truth-value? (truth-value (result frame)))
+                (strict-truth-value? (truth-value (result frame))))
+       (setf (truth-value (result frame)) UNKNOWN-TRUTH-VALUE)))
+    (otherwise NULL))
+  (return (call-super-method self frame lastMove)))
+
+(defmethod (compute-OR-score PARTIAL-MATCH-SCORE) ((self CHAMELEON-PARTIAL-MATCH))
+  ;; Adapted version of NN-PARTIAL-MATCH.compute-OR-score (fow now).
+  ;; Identical to CHAMELEON-PARTIAL-MATCH.compute-AND-score.
+  (return (compute-AND-score self)))
+
+(defmethod (continue-partial-OR-proof KEYWORD) ((self CHAMELEON-PARTIAL-MATCH)
+                                                (lastMove KEYWORD))
+  ;; Control partial :OR proofs - simply call :BASIC parent method for now.
+  ;; This is a conceptual merge of `old-interpret-OR-scores' and `BASIC.continue-partial-OR-proof'.
+  ;; The main thing we are trying to do here is to evaluate all disjuncts at once as opposed to just one.
+  ;; This is conceptually very similar to `continue-partial-antecedents-proof', which see for a
+  ;; more detailed discussion of these two scenarios:
+  ;; (1) Simple case: all variables bound
+  ;; (2) Complex case: one or more variables are unbound
+  ;; TO DO / Issues:
+  ;; - what kind of cutoff should we allow if at all?
+  ;; - what is the proper cleanup we need to perform if we are failing due to an unbound variable or cutoff?
+  ;; - properly handle case (2), the current down frame cleanup is too aggressive and will prevent us from
+  ;;   generating any new sets of bindings (doesn't look like NN was handling that properly either)
+  ;; - NN matcher also doesn't properly cleanup the down frame when moving to next disjunct
+  (let ((frame (control-frame self))
+        (orProposition (proposition frame))
+        (argCursor (argument-cursor frame))
+        (result KEYWORD NULL))
+    (case lastMove
+      (:DOWN
+       ;; pop partial match scores until they agree with the cursor position (in case we backtracked):
+       (foreach i in (interval argCursor (1- (length (argument-scores self))))
+           do (ignore i)
+	      (pop-OR-partial-match-score self)
+              (when (record-justifications?)
+                (setf (argument-justifications self) (rest (argument-justifications self)))))
+       (set-dynamic-cutoff self))
+      ((:UP-TRUE :UP-FAIL)
+       (let ((sucess? (eql? lastMove :UP-TRUE))
+             (result (result frame))
+             (disjuncts (VECTOR OF PROPOSITION) (arguments orProposition))
+             (disjunct (nth disjuncts argCursor))
+             (score (match-score (partial-match-frame result))))
+         (push-OR-partial-match-score self score (proposition-weight self disjunct))
+         (setq score (compute-OR-score self))
+         (set-frame-partial-truth self NULL score FALSE)
+         (when (record-justifications?)
+           (pushf (argument-justifications self) (justification result)))
+         (cond ((or (not (all-arguments-bound? disjunct))
+                    (cutoff-partial-match? self (trace-keyword? :GOAL-TREE)))
+                (pop-OR-partial-match-score self)
+                (when (record-justifications?)
+                  (setf (argument-justifications self) (rest (argument-justifications self))))
+                (set-frame-partial-truth self UNKNOWN-TRUTH-VALUE 0.0 TRUE)
+                (setq lastMove :UP-FAIL))
+               ((and sucess?
+                     (= argCursor (1- (length disjuncts)))
+                     (all-arguments-bound? disjunct))
+                (setq lastMove :UP-TRUE))
+               (otherwise
+                (setq lastMove :UP-FAIL))))))
+    ;; make sure to clean up the down frame, otherwise we might try to get the next
+    ;; solution for the previous disjunct instead of moving on to the next one:
+    (setf (down frame) NULL)
+    (setq result (continue-OR-proof frame lastMove))
+    ;; TO DO: figure out if that's really what we want to do in case the OR completely failed,
+    ;; but if we record justifications we need something here, it can't just be NULL:
+    (when (and ;(eql? lastMove :UP-TRUE)
+               (>= (length (argument-justifications self)) 2))
+      (record-goal-justification
+       frame
+       (new JUSTIFICATION
+            :inference-rule :or-introduction
+            :antecedents (reverse (argument-justifications self)))))
+    (return result)))
+
+(defmethod (compute-NOT-score PARTIAL-MATCH-SCORE) ((self CHAMELEON-PARTIAL-MATCH))
+  ;; This never gets called.
+  ;; Adapted version of NN-PARTIAL-MATCH.compute-NOT-score (fow now).
+  (return 0.0))
+
+(defmethod (continue-partial-NOT-proof KEYWORD) ((self CHAMELEON-PARTIAL-MATCH)
+                                                 (lastMove KEYWORD))
+  ;; Control partial :NOT proofs - simply call :BASIC parent method for now.
+  (return (call-super-method self lastMove)))
+
+(defmethod (continue-partial-FAIL-proof KEYWORD) ((self CHAMELEON-PARTIAL-MATCH)
+                                                  (lastMove KEYWORD))
+  ;; Control partial :FAIL proofs - simply call :BASIC parent method for now.
+  (return (call-super-method self lastMove)))
+
+(defmethod (compute-GOAL-score PARTIAL-MATCH-SCORE) ((self CHAMELEON-PARTIAL-MATCH))
+  ;; Adapted version of NN-PARTIAL-MATCH.compute-GOAL-score (fow now).
+  ;; Simply call identical :BASIC parent method for now.
+  (return (call-super-method self)))
+
+(defmethod (continue-partial-strategies-proofs KEYWORD) ((self CHAMELEON-PARTIAL-MATCH)
+                                                         (lastMove KEYWORD))
+  ;; Called instead of `continue-strategies-proofs' if we are in partial match
+  ;;    mode to compute partial match scores and success or failure.
+  (let ((frame (control-frame self))
+        ;; call :basic method here and then do some post-processing:
+        (result (call-super-method self lastMove)))
+    ;; kludgey way to test whether we failed due to a :shallow-disproof or similar:
+    (when (and (eql? result :FAILURE)
+               (not (unknown-truth-value? (truth-value frame)))
+               (not (eql? (reverse-polarity? frame) (false-truth-value? (truth-value frame)))))
+      ;; PROBLEM: there is an extremely hairy interaction going on between shallow disproofs, reverse polarity
+      ;; and inverted rules derived from subsumption relationships.  What we want is to have a full or partial
+      ;; disproof be translated into an inverted score for the goal we want to prove and then succeed (unless
+      ;; maybe it was a strict disproof).  However, deciding under which conditions to invert the score has
+      ;; eluded us.  When we prove a regular NOT, things seem straight forward, however, when we have an inverted
+      ;; antecedent rule, we also get inversion from `set-frame-partial-truth' which seems to screw us up in
+      ;; certain cases. Anyway, this needs to be fixed more systematically, right now I just don't know how.
+      ;; Conceivably, we could disable shallow disproofs all together...
+      ;; FIXED?: the new fix to `has-shallow-disproof?' seems to address this issue at least for the test cases
+      ;; we tried; we might still need to test the :goal-complement case by explicitly adding inverted rules
+      ;; TO DO: check if we need to do anything special for justification recording in the disproof case
+      (case :other
+        (:variant1
+         ;; this makes us fail with the proper inversion in some of the inverse rule cases, but for the top-level
+         ;; inverted assertion cases, it does the right thing:
+         (set-frame-truth-value frame UNKNOWN-TRUTH-VALUE)
+         (unless (or (eql? (match-score self) 0.0)
+                     (eql? (match-score self) 1.0))
+           (setq result :FINAL-SUCCESS))
+         (when (and (record-justifications?)
+                    (eql? result :FINAL-SUCCESS)
+                    (null? (justification frame)))
+           (record-primitive-justification frame :UP-TRUE)))
+        (:variant2
+         ;; this makes us fail where we want evidence from top-level inverse assertions:
+         (set-frame-truth-value frame UNKNOWN-TRUTH-VALUE)
+         (set-frame-partial-truth self UNKNOWN-TRUTH-VALUE NULL TRUE))
+        ;; doing nothing is very similar to variant1 except for the antecedent cases:
+        (otherwise NULL)))
+    (return result)))
+
+(defmethod (continue-partial-antecedents-proof KEYWORD) ((self CHAMELEON-PARTIAL-MATCH)
+                                                         (lastMove KEYWORD))
+  ;; Control partial :ANTECEDENTS strategy proofs.
+  ;; This is a conceptual merge of `old-interpret-GOAL-scores' and BASIC.continue-partial-antecedents-proof.
+  ;; The main thing we are trying to do here is to apply multiple rules at once as opposed to just one.
+  ;; (1) Simple case: we come in here with all variables bound: in this case we simply run each rule
+  ;;     separately with the provided bindings, get the "best" proof for the particular rule, and record
+  ;;     the individual derivations via a :multiple-proofs justification.  The scores of indivual proofs
+  ;;     are combinded via `compute-GOAL-score' which uses `*rule-combination*' to do the right thing
+  ;; (2) Complex case: one or more variables are unbound and we are generating bindings: in this case we
+  ;;     should generate all possible bindings from all rules and for each binding then run case (1).
+  ;;     One way to do this would be to run everything to exhaustion here by continuing to fail, recording
+  ;;     all solutions and then gluing them together for matching variable bindings; another way would
+  ;;     be for each variable binding to run the simple case (1) as a new subgoal and then report that
+  ;;     result for the binding; this would allow us to generate solutions on demand instead of eagerly
+  ;; TO DO / Issues:
+  ;; - what kind of cutoff should we allow if at all?
+  ;; - what is the proper cleanup we need to perform if we are failing due to an unbound variable or cutoff?
+  ;; - properly handle case (2), the current down frame cleanup is too aggressive and will prevent us from
+  ;;   generating any new sets of bindings (doesn't look like NN was handling that properly either)
+  (let ((frame (control-frame self))
+        (goal (extract-subgoal-of-frame frame))
+        (score PARTIAL-MATCH-SCORE NULL)
+        (result KEYWORD NULL))
+    (case lastMove
+      (:DOWN
+       (set-dynamic-cutoff self))
+      ((:UP-TRUE :UP-FAIL)
+       (let ((goalFrame (result frame)))
+         (setq score (match-score (partial-match-frame goalFrame)))
+         ;; Since this is a subgoaling strategy, treat it conceptually like an OR:
+         (push-OR-partial-match-score self score (proposition-weight self (antecedents-rule frame)))
+         (setq score (compute-GOAL-score self))
+         (set-frame-partial-truth self NULL score FALSE)
+         (when (and (record-justifications?)
+                    ;; in case the antecedent totally failed recording anything will break:
+                    (defined? (justification goalFrame)))
+           ;; since we are messing with `lastMove' and (potentially) pretending to fail,
+           ;; we have to record this justification here, otherwise we'd lose it:
+           (record-MODUS-PONENS-justification frame :UP-TRUE)
+           (pushf (argument-justifications self) (justification frame)))
+         (cond ((or (not (all-arguments-bound? goal))
+                    (cutoff-partial-match? self (trace-keyword? :GOAL-TREE)))
+                ;; TO DO: is this the proper cleanup for the most recent cut-off solution:
+                (pop-OR-partial-match-score self)
+                (when (record-justifications?)
+                  (setf (argument-justifications self) (rest (argument-justifications self))))
+                (set-frame-partial-truth self UNKNOWN-TRUTH-VALUE 0.0 TRUE)
+                (setq lastMove :UP-FAIL))
+               ((and (not (has-more-antecedents? frame))
+                     (all-arguments-bound? goal)
+                     ;; we need this switch only if we are recording justifications and we have at least one:
+                     (> (length (argument-justifications self)) 0))
+                (setq lastMove :UP-TRUE))
+               (otherwise
+                (setq lastMove :UP-FAIL))))))
+    ;; make sure to clean up the down frame, otherwise we might try to get the next
+    ;; solution for the previous rule instead of moving on to the next one:
+    (setf (down frame) NULL)
+    (setq result (continue-antecedents-proof frame lastMove))
+    (when (eql? lastMove :UP-TRUE)
+      (when (null? (truth-value frame))
+        ;; indicate that we did already compute a truth value:
+        (setf (truth-value frame) UNKNOWN-TRUTH-VALUE))
+      (case (length (argument-justifications self))
+        (0 NULL)
+        (1 (setf (justification frame) (first (argument-justifications self))))
+        (otherwise
+         (record-goal-justification
+          frame
+          (new JUSTIFICATION
+               :inference-rule :multiple-proofs
+               :antecedents (reverse (argument-justifications self)))))))
+    (return result)))
+
+(startup-time-progn
+  (define-explanation-phrase :multiple-proofs :technical "from multiple proofs")
+  (define-explanation-phrase :multiple-proofs :lay "from multiple proofs"))
+
+(defmethod (compute-partial-truth FLOAT) ((self CHAMELEON-PARTIAL-MATCH)
+                                          (query QUERY-ITERATOR))
+  ;; Compute the partial truth of `query' using the :CHAMELEON partial match mode.
+  ;; This mostly mirrors :INCREMENTAL mode with some small adaptations.
+  ;; TO DO: consider collecting multiple proofs as we do for :WHYNOT.
+  (let ((baseFrame (base-control-frame query))
+	(partialMatchFrame (partial-match-strategy query))
+        (minimumScore FLOAT-WRAPPER (lookup (options query) :MINIMUM-SCORE))
+        (maximizeScore?
+         (not (eql? (lookup (options query) :MAXIMIZE-SCORE?) FALSE-WRAPPER)))
+        (recordJustifications?
+         (lookup-deferred-query-option query :record-justifications? @BOOLEAN))
+        (epsilon 0.001)
+        (initialInferenceLevel (current-inference-level))
+        (latestScore 0.0)
+        (bestScore 0.0)
+        (bestProof JUSTIFICATION NULL))
+    (when (null? partialMatchFrame)
+      (setq partialMatchFrame self)
+      (setf (partial-match-strategy query) self))
+    (setf (dynamic-cutoff partialMatchFrame)
+      (choose (defined? minimumScore) minimumScore epsilon))
+    (special ((*queryIterator* query)
+              (*generate-all-proofs?* TRUE)
+              (*record-justifications?* *record-justifications?*)
+              (*inferenceLevel* initialInferenceLevel)
+              (*reversePolarity?* FALSE))
+      (when (eql? recordJustifications? TRUE-WRAPPER)
+        ;; the option can selectively turn it on, but not off it is on:
+        (setq *record-justifications?* TRUE))
+      ;; TO DO: cleanup this parameterization, but :MAX can lead to unstable behavior:
+      (setq *rule-combination* :NOISY-OR)
+      (loop
+	;(emit-thinking-dot :PARTIAL-MATCH)
+	(unless (next? query)
+          (when (= (length (solutions query)) 0)
+            ;; we completely failed, set score to final match score:
+            (setq bestScore (match-score partialMatchFrame)))
+          (break))
+        ;; if we couldn't get the minimally required score, terminate:
+        (when (cutoff-partial-match? partialMatchFrame FALSE)
+          (break))
+        (setq latestScore (match-score partialMatchFrame))
+        ;; given our cutoff scheme we should be monotonically increasing,
+        ;; but we are conservative and don't assume that here for now:
+        (when (> latestScore bestScore)
+          (setq bestScore latestScore)
+          (setq bestProof (justification baseFrame))
+          (setf (dynamic-cutoff partialMatchFrame) (+ bestScore epsilon)))
+        (when (not maximizeScore?)
+          (break))
+        ;; copied from whynot:
+        (setq *inferenceLevel* initialInferenceLevel)) ;; reset for next round
+      ;; Attach justification of the best proof found (might be NULL):
+      (setf (justification baseFrame) bestProof)
+      (setf (match-score partialMatchFrame) bestScore)
+      (return bestScore))))
+
+
+  ;;
+;;;;;; Streamlined neural network support:
+  ;;
+
+(defglobal *all-neural-networks* (KEY-VALUE-MAP OF INTEGER-WRAPPER (CONS OF NEURAL-NETWORK))
+           (new KEY-VALUE-MAP))
+
+(defun register-neural-network ((self NEURAL-NETWORK))
+  :documentation "Register the network `self' on the global networks list (assumes `self' has been linked)."
+  :public? TRUE
+  (let ((hashCode (wrap-integer (proposition-hash-index (get-neural-network-proposition self) NULL TRUE)))
+        (bucket (lookup *all-neural-networks* hashCode)))
+    (cond ((null? bucket)
+           (insert-at *all-neural-networks* hashCode (cons self NIL)))
+          (otherwise
+           ;; insert the newest bucket member at the front of the list:
+           (setf (rest bucket) (cons (first bucket) (rest bucket)))
+           (setf (first bucket) self)))))
+
+(defun unregister-neural-network ((self NEURAL-NETWORK))
+  :documentation "Unregister the network `self' on the global networks list."
+  :public? TRUE
+  (let ((hashCode (wrap-integer (proposition-hash-index (get-neural-network-proposition self) NULL TRUE)))
+        (bucket (lookup *all-neural-networks* hashCode)))
+    (cond ((null? bucket) NULL)
+          ((nil? (rest bucket))
+           (remove-at *all-neural-networks* hashCode))
+          (otherwise
+           (remove bucket self)))))
+
+(defun (lookup-proposition-neural-network NEURAL-NETWORK) ((prop PROPOSITION))
+  :documentation "Lookup the neural network for `prop' in the global networks list."
+  :public? TRUE
+  (let ((hashCode (wrap-integer (proposition-hash-index prop NULL TRUE)))
+        (bucket (lookup *all-neural-networks* hashCode)))
+    (when (defined? bucket)
+      (foreach net in bucket
+          where (and (equivalent-propositions? prop (get-neural-network-proposition net) NULL)
+                     (visible-from? (home-context (get-neural-network-proposition net)) *module*))
+          do (return net)))
+    (return NULL)))
+          
+(defun delete-neural-networks ()
+  :documentation "Eliminate all neural networks and remove any connections
+to propositions and training examples."
+  :command? TRUE  :public? TRUE
+  ;; TO DO: upgrade `delete-all-neural-networks' to do the same
+  (foreach bucket in *all-neural-networks*
+      do (foreach net in bucket
+             do (delete-neural-network net)))
+  ;; invalidate training example caches:
+  (increment-now-timestamp)
+  (clear *all-neural-networks*)
+  ;; delete old-style networks as well for robustness during comparison testing:
+  (foreach net in *master-neural-network-list*
+      do (delete-neural-network net))
+  (delete-all-neural-networks))
+
+(defun randomize-neural-networks ()
+  :documentation "Undo all training and randomize weights in all neural networks."
+  :command? TRUE  :public? TRUE
+  (foreach bucket in *all-neural-networks*
+      do (foreach net in bucket
+             do (randomize-network-weights net))))
+
+(defglobal *chameleon-neural-network-implementation* KEYWORD :original
+  :demon-property "powerloom.chameleon.neuralNetworkImplementation"
+  :public? TRUE)
+
+(defun create-and-link-neural-network ((prop PROPOSITION))
+  ;; Top-level builder that lets us switch between different implementations.
+  (let ((net NEURAL-NETWORK NULL))
+    (case *chameleon-neural-network-implementation*
+      (:original
+       ;; Dave's original code:
+       (setf (neural-network prop) (create-neural-network prop))
+       (return))
+      (:proposition
+       ;; new interface to Dave's proposition networks:
+       (setq net (new PROPOSITION-NEURAL-NETWORK)))
+      (:chameleon
+       (ensure-chameleon-ontology)
+       (setq net (new CHAMELEON-NEURAL-NETWORK)))
+      (:chameleon-batch
+       (ensure-chameleon-ontology)
+       (setq net (new CHAMELEON-BATCH-NEURAL-NETWORK)))
+      (:tensorflow
+       (ensure-chameleon-ontology)
+       (unless (tensorflow-backend-available?)
+         (error "create-and-link-neural-network: TensorFlow backend is not available"))
+       (setq net (new TENSORFLOW-NEURAL-NETWORK)))
+      (:tensorflow-batch
+       (ensure-chameleon-ontology)
+       (unless (tensorflow-backend-available?)
+         (error "create-and-link-neural-network: TensorFlow backend is not available"))
+       (setq net (new TENSORFLOW-BATCH-NEURAL-NETWORK))))
+    (build-proposition-network net prop)
+    (register-neural-network net)))
+
+
+;;; Proposition to neural network mapping
+
+(defun (get-proposition-neural-network NEURAL-NETWORK) ((prop PROPOSITION) (error? BOOLEAN))
+  :documentation "Return the neural network associated with `prop'.  If `error?', raise an
+exception if it cannot be found, otherwise, simply return NULL."
+  :public? TRUE
+  (let ((net (neural-net prop)))
+    (when (null? net)
+      (setq net (lookup-proposition-neural-network prop))
+      (cond ((defined? net)
+             ;; cache it on the proposition for faster lookup next time around:
+             (setf (neural-net prop) net))
+            (error?
+             (error "Missing neural network for proposition: " prop))))
+    (return net)))
+
+(defmethod (get-neural-network-proposition PROPOSITION) ((self NEURAL-NETWORK))
+  :documentation "Return the proposition linked to `self'."
+  :public? TRUE)
+
+(defun (get-justification-neural-network NEURAL-NETWORK) ((just JUSTIFICATION))
+  :documentation "Return the neural network associated with an :AND or :OR justification.
+Raise an error if the associated proposition is not linked to a neural network."
+  (return (get-proposition-neural-network (proposition just) TRUE)))
+
+(defmethod (truth-value-argument? BOOLEAN) ((self NEURAL-NETWORK) (arg PROPOSITION))
+  :documentation "Return TRUE if the partial truth value of `arg' will be considered for `self's inputs.
+This top-level method only looks at `arg' and ignores `self'."
+  :public? TRUE)
+
+(defmethod (number-of-truth-value-arguments INTEGER) ((self NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Return the number of arguments of `prop' whose partial truth value will be considered
+for `self's inputs.  This top-level method only looks at `prop' and ignores `self'."
+  :public? TRUE)
+
+(defmethod (truth-value-argument-index INTEGER) ((self NEURAL-NETWORK) (arg PROPOSITION))
+  :documentation "Return the 0-based input position of truth value argument `arg'.  Ignores bias unit which
+is a network-implementation-specific detail.  Generates indices in the order expected by `set-input-values'.
+If `arg' is not a truth value argument, returns -1."
+  :public? TRUE)
+
+(defmethod (ignored-value-argument? BOOLEAN) ((self NEURAL-NETWORK) (arg PROPOSITION))
+  :documentation "Return TRUE if the partial truth value of `arg' will be ignored for `self's inputs.
+This top-level method only looks at `arg' and ignores `self'."
+  :public? TRUE)
+
+(defmethod (number-of-ignored-value-arguments INTEGER) ((self NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Return the number of arguments of `prop' whose partial truth value will be ignored
+for `self's inputs.  This top-level method only looks at `prop' and ignores `self'."
+  :public? TRUE)
+
+(defmethod (vector-argument? BOOLEAN) ((self NEURAL-NETWORK) (arg PROPOSITION))
+  :documentation "Return TRUE if `arg' yields one or more vectors for `self's inputs."
+  :public? TRUE)
+
+(defmethod (has-vector-arguments? BOOLEAN) ((self NEURAL-NETWORK))
+  :documentation "Return TRUE if `self' has at least one vector input argument."
+  :public? TRUE)
+
+(defmethod (number-of-vector-arguments INTEGER) ((self NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Return the number of arguments of `prop' that yield one or more vectors
+for `self's inputs.  `prop' can be NULL in which case the linked proposition will be used."
+  :public? TRUE)
+
+(defmethod (vector-argument-index INTEGER) ((self NEURAL-NETWORK) (arg PROPOSITION))
+  :documentation "Return the 0-based input position of vector argument `arg'.  Ignores bias unit which
+is a network-implementation-specific detail.  If `arg' is not a vector argument, returns -1."
+  :public? TRUE)
+
+
+;;; Abstract neural network API
+
+(defmethod link-neural-network ((self NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Link the network `self' to its associated proposition `prop'."
+  :public? TRUE
+  (error "link-neural-network: Not defined on " self))
+
+(defmethod unlink-neural-network ((self NEURAL-NETWORK))
+  :documentation "Unlink the network `self' from its associated proposition."
+  :public? TRUE
+  (error "unlink-neural-network: Not defined on " self))
+
+(defmethod (get-neural-network-proposition PROPOSITION) ((self NEURAL-NETWORK))
+  :documentation "Return the proposition linked to `self'."
+  :public? TRUE
+  (error "get-proposition: Not defined on " self))
+
+(defmethod delete-neural-network ((self NEURAL-NETWORK))
+  :documentation "Unlink the network `self' from its associated proposition and mark it as deleted."
+  :public? TRUE
+  (error "delete-neural-network: Not defined on " self))
+
+(defmethod (deleted? BOOLEAN) ((self NEURAL-NETWORK))
+  :documentation "Return trun if `self' has been deleted."
+  :public? TRUE
+  (return FALSE))
+
+
+(defmethod allocate-network-arrays ((self NEURAL-NETWORK) (num-in INTEGER) (num-hidden INTEGER) (num-out INTEGER))
+  :documentation "Allocates array space for a neural network with given number of input, hidden and output units."
+  :public? TRUE
+  (ignore num-in num-hidden num-out)
+  (error "allocate-arrays: Not defined on " self))
+
+(defmethod randomize-network-weights ((self NEURAL-NETWORK))
+  :documentation "Randomize the weights of the neural network `self'."
+  :public? TRUE
+  (error "randomize-network-weights: Not defined on " self))
+
+(defmethod build-proposition-network ((self NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Build a neural network for the proposition `prop' and link them.  This builds
+a two-layer perceptron network whose input nodes are activated by the truth of `prop's arguments
+and whose output node computes the truth of `prop'."
+  :public? TRUE
+  (ignore prop)
+  (error "build-proposition-network: Not defined on " self))
+
+(defmethod (number-of-inputs INTEGER) ((self NEURAL-NETWORK))
+  :documentation "Return the number of input values expected by `self' (ignores bias unit)."
+  :public? TRUE
+  (error "number-of-inputs: Not defined on " self))
+
+(defun (help-compute-argument-index INTEGER) ((self NEURAL-NETWORK) (arg PROPOSITION) (kind KEYWORD))
+  :documentation "Memoizable helper function for `truth-value-argument-index' and friends."
+  :public? TRUE
+  (let ((proposition (get-neural-network-proposition self))
+        (pos -1)
+        (match? FALSE)
+        (mapping ENTITY-MAPPING NULL))
+    ;; normalize to base proposition to handle reverse polarity situations -
+    ;; we also handle `fail' in case we had a `not' on a closed relation:
+    (when (or (eql? (kind arg) :NOT)
+              (eql? (kind arg) :FAIL))
+      (setq arg (first (arguments arg))))
+    (foreach propArg in (arguments proposition)
+        do (typecase propArg
+             (PROPOSITION
+              (when (or (eql? (kind propArg) :NOT)
+                        (eql? (kind propArg) :FAIL))
+                ;; normalize to base proposition to handle reverse polarity situations:
+                (setq propArg (first (arguments propArg))))
+              (cond ((or (and (eql? kind :truth-value) (truth-value-argument? self propArg))
+                         (and (eql? kind :ignored-value) (ignored-value-argument? self propArg))
+                         (and (eql? kind :vector) (vector-argument? self propArg)))
+                     (++ pos)
+                     (setq match? TRUE))
+                    (otherwise
+                     (setq match? FALSE)))
+              (cond ((eql? propArg arg)
+                     (return (choose match? pos -1)))
+                    ((eql? (operator propArg) (operator arg))
+                     (special ((*unify-propositions?* TRUE)
+                               (*queryIterator* NULL)) ;; don't consider variable bindings
+                       (if (null? mapping)
+                           (setq mapping (new ENTITY-MAPPING))
+                         (clear mapping))
+                       (when (equivalent-propositions? propArg arg mapping)
+                         (return (choose match? pos -1)))))))
+             (otherwise NULL)))
+    (error "INTERNAL ERROR: failed to map neural net input argument: " arg proposition)))
+
+(defmethod (truth-value-argument? BOOLEAN) ((self NEURAL-NETWORK) (arg PROPOSITION))
+  :documentation "Return TRUE if the partial truth value of `arg' will be considered for `self's inputs.
+This top-level method only looks at `arg' and ignores `self'."
+  :public? TRUE
+  (let ((argRel (surrogate-value (relationRef arg))))
+    (return (and (defined? argRel)
+                 (chameleon-truth-value-relation? argRel)))))
+
+(defmethod (number-of-truth-value-arguments INTEGER) ((self NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Return the number of arguments of `prop' whose partial truth value will be considered
+for `self's inputs.  This top-level method only looks at `prop' and ignores `self'."
+  :public? TRUE
+  (let ((nTruth 0))
+    (foreach arg in (arguments prop)
+        where (truth-value-argument? self arg)
+        do (++ nTruth))
+    (return nTruth)))
+
+(defmethod (truth-value-argument-index INTEGER) ((self NEURAL-NETWORK) (arg PROPOSITION))
+  :documentation "Return the 0-based input position of truth value argument `arg'.  Ignores bias unit which
+is a network-implementation-specific detail.  Generates indices in the order expected by `set-input-values'.
+If `arg' is not a truth value argument, returns -1."
+  :public? TRUE
+  (return (memoize (self arg)
+                   :timestamps :KB-UPDATE :max-values 1000
+                   (help-compute-argument-index self arg :truth-value))))
+
+(defmethod (ignored-value-argument? BOOLEAN) ((self NEURAL-NETWORK) (arg PROPOSITION))
+  :documentation "Return TRUE if the partial truth value of `arg' will be ignored for `self's inputs.
+This top-level method only looks at `arg' and ignores `self'."
+  :public? TRUE
+  (let ((argRel (surrogate-value (relationRef arg))))
+    (return (and (defined? argRel)
+                 (chameleon-ignored-value-relation? argRel)))))
+
+(defmethod (number-of-ignored-value-arguments INTEGER) ((self NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Return the number of arguments of `prop' whose partial truth value will be ignored
+for `self's inputs.  This top-level method only looks at `prop' and ignores `self'."
+  :public? TRUE
+  (let ((nIgnored 0))
+    (foreach arg in (arguments prop)
+        where (ignored-value-argument? self arg)
+        do (++ nIgnored))
+    (return nIgnored)))
+
+(defmethod (vector-argument? BOOLEAN) ((self NEURAL-NETWORK) (arg PROPOSITION))
+  :documentation "Return TRUE if `arg' yields one or more vectors for `self's inputs."
+  :public? TRUE
+  (ignore arg)
+  (return FALSE))
+
+(defmethod (has-vector-arguments? BOOLEAN) ((self NEURAL-NETWORK))
+  :documentation "Return TRUE if `self' has at least one vector input argument."
+  :public? TRUE
+  (return FALSE))
+
+(defmethod (number-of-vector-arguments INTEGER) ((self NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Return the number of arguments of `prop' that yield one or more vectors
+for `self's inputs.  `prop' can be NULL in which case the linked proposition will be used."
+  :public? TRUE
+  (ignore prop)
+  (return 0))
+
+(defmethod (vector-argument-index INTEGER) ((self NEURAL-NETWORK) (arg PROPOSITION))
+  :documentation "Return the 0-based input position of vector argument `arg'.  Ignores bias unit which
+is a network-implementation-specific detail.  If `arg' is not a vector argument, returns -1."
+  :public? TRUE
+  (ignore arg)
+  (return -1))
+
+(defmethod (nth-input FLOAT) ((self NEURAL-NETWORK) (n INTEGER))
+  :documentation "Return the 0-based `n'-th proposition input of `self' (ignores bias unit)."
+  :public? TRUE
+  (ignore n)
+  (error "nth-input: Not defined on " self))
+
+(defmethod (nth-input-error FLOAT) ((self NEURAL-NETWORK) (n INTEGER))
+  :documentation "Return the 0-based `n'-th proposition input error of `self' (ignores bias unit)."
+  :public? TRUE
+  (ignore n)
+  (error "nth-input-error: Not defined on " self))
+
+(defglobal *chameleon-default-input-value* FLOAT 0.0)
+(defglobal *wrapped-chameleon-default-input-value* FLOAT-WRAPPER (wrap-float *chameleon-default-input-value*))
+
+(defmethod set-input-values ((self NEURAL-NETWORK) (values OBJECT))
+  :documentation "Set the current truth-value inputs of the network `self' to float `values' in sequence.
+Missing inputs will be set to 0.0, extra values will be ignored."
+  :public? TRUE
+  (ignore values)
+  (error "set-input-values: Not defined on " self))
+
+(defmethod set-vector-input-values ((self NEURAL-NETWORK) (vectorSpecs OBJECT))
+  :documentation "Set the current vector inputs of the network `self' to the vectors described by `vectorSpecs'.
+Each vector spec describes a vector-generating proposition that produces one or more vectors.  How those specs
+are translated into actual numeric vectors such as embeddings is specific to the particular neural network type."
+  :public? TRUE
+  (ignore vectorSpecs)
+  NULL)
+
+(defmethod (get-vector-argument-spec OBJECT) ((self NEURAL-NETWORK) (arg OBJECT))
+  :documentation "Generate a single argument spec for `arg' that can be used for `set-vector-input-values'.
+`arg' can either be a proposition or justification."
+  :public? TRUE
+  (ignore arg)
+  (return NULL))
+
+(defmethod (forward-propagate-inputs FLOAT) ((self NEURAL-NETWORK))
+  :documentation "Activates the current inputs of the network `self' to compute its output.
+Sets `self's `output' slot and returns the computed value.  Reads input activations and
+weights and updates hidden and output activations."
+  :public? TRUE
+  (error "forward-propagate-inputs: Not defined on " self))
+
+(defmethod backward-propagate-error ((self NEURAL-NETWORK) (error FLOAT))
+  :documentation "Given a properly forward activated network `self' for the current set of inputs,
+and a training `error' between the current output and the goal value, backpropagate the error and
+update `self's vector of input errors.  Reads output, hidden activations and weights and updates
+hidden errors and input errors."
+  :public? TRUE
+  (ignore error)
+  (error "backward-propagate-error: Not defined on " self))
+
+(defmethod update-network-weights ((self NEURAL-NETWORK) (error FLOAT))
+  :documentation "Given a properly forward activated and backpropagated network `self' for the current
+inputs and training `error', update the network's weights according to current gradients, learning rate
+and momentum terms to reduce the error for the given inputs.  Reads output, hidden and input activations,
+hidden error, weights and weight deltas, and updates weights and weight deltas."
+  :public? TRUE
+  (ignore error)
+  (error "update-network-weights: Not defined on " self))
+
+
+;;; Neural network API implemented for Dave's propostion neural nets
+
+(defmethod link-neural-network ((self PROPOSITION-NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Link the network `self' to its associated proposition `prop'."
+  :public? TRUE
+  (setf (proposition self) prop)
+  (setf (neural-net prop) self))
+
+(defmethod unlink-neural-network ((self PROPOSITION-NEURAL-NETWORK))
+  :documentation "Unlink the network `self' from its associated proposition."
+  :public? TRUE
+  (let ((prop (proposition self)))
+    (setf (proposition self) NULL)
+    (when (defined? prop)
+      (setf (neural-net prop) NULL))))
+
+(defmethod (get-neural-network-proposition PROPOSITION) ((self PROPOSITION-NEURAL-NETWORK))
+  :documentation "Return the proposition linked to `self'."
+  :public? TRUE
+  (return (proposition self)))
+
+(defmethod delete-neural-network ((self PROPOSITION-NEURAL-NETWORK))
+  :documentation "Unlink the network `self' from its associated proposition and mark it as deleted."
+  :public? TRUE
+  (unlink-neural-network self)
+  ;; use this as the deleted mark:
+  (setf (output self) MOST-NEGATIVE-FLOAT))
+
+(defmethod (deleted? BOOLEAN) ((self PROPOSITION-NEURAL-NETWORK))
+  :documentation "Return trun if `self' has been deleted."
+  :public? TRUE
+  (return (= (output self) MOST-NEGATIVE-FLOAT)))
+
+
+(defmethod allocate-network-arrays ((self PROPOSITION-NEURAL-NETWORK) (num-in INTEGER) (num-hidden INTEGER) (num-out INTEGER))
+  :documentation "Allocates array space for a neural network with given number of input, hidden and output units."
+  :public? TRUE
+  ;; derived from `allocate-neural-network':
+  (ignore num-out)
+  (setf (input self) (new WEIGHT-VECTOR :array-size num-in))
+  (setf (hidden self) (new WEIGHT-VECTOR :array-size num-hidden))
+  (setf (ih self) (new 2_d_WEIGHT-ARRAY :nof-rows num-in :nof-columns num-hidden))
+  (setf (ih-delta self) (new 2_d_WEIGHT-ARRAY :nof-rows num-in :nof-columns num-hidden))
+  (setf (input-error self) (new WEIGHT-VECTOR :array-size num-in))
+  (setf (hidden-error self) (new WEIGHT-VECTOR :array-size num-hidden))    
+  (setf (ho self) (new WEIGHT-VECTOR :array-size num-hidden))
+  (setf (ho-delta self) (new WEIGHT-VECTOR :array-size num-hidden))
+  ;; If using quickprop, allocate slope memory:
+  (when (eql? *Neural-Network-Training-Method* :QUICKPROP)
+    (setf (ih-slope self) (new 2_d_WEIGHT-ARRAY :nof-rows num-in :nof-columns num-hidden))
+    (setf (ih-prev-slope self) (new 2_d_WEIGHT-ARRAY :nof-rows num-in :nof-columns num-hidden))
+    (setf (ho-slope self) (new WEIGHT-VECTOR :array-size num-hidden))
+    (setf (ho-prev-slope self) (new WEIGHT-VECTOR :array-size num-hidden))))
+
+(defmethod randomize-network-weights ((self PROPOSITION-NEURAL-NETWORK))
+  :documentation "Randomize the weights of the neural network `self'."
+  :public? TRUE
+  ;; derived from `randomize-neural-network'
+  (let ((num-in (length (input self)))
+	(num-hidden (length (hidden self))))
+    ;; clear all delta values:
+    (foreach h in (interval 0 (1- num-hidden))
+        do (setf (nth (ho-delta self) h) 0.0)
+           (foreach i in (interval 0 (1- num-in))
+               do (setf (2_d_element (ih-delta self) i h) 0.0)))
+    (foreach i in (interval 0 (1- num-hidden))
+	do ;; randomize input to hidden weights:
+           (foreach j in (interval 0 (1- num-in))
+	       do (setf (2_d_element (ih self) j i) (random-weight *Weight-Range*)))
+           ;; randomize hidden to output weights:
+	   (setf (nth (ho self) i) (random-weight *Weight-Range*)))))
+
+(defmethod build-proposition-network ((self PROPOSITION-NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Build a neural network for the proposition `prop'.  This builds a two-layer
+perceptron network whose input nodes are activated by the truth of `prop's arguments and whose
+output node computes the truth of `prop'."
+  :public? TRUE
+  ;; derived from `create-neural-network'
+  (let ((num-in (+ (- (length (arguments prop)) (number-of-ignored-value-arguments self prop)) 1))
+	(num-hidden (min (+ num-in 0) 20)))
+    (when (> num-in 100) ;; for really big input layers
+      (setq num-hidden (+ (floor (/ num-in 10)) 10))) 
+    (allocate-network-arrays self num-in num-hidden 1)
+    ;; set default behavior for network
+    (case (kind prop)
+      ((:AND :OR)
+       (randomize-network-weights self))
+      (otherwise 
+       (randomize-network-weights self)))
+    (link-neural-network self prop)))
+
+
+(defmethod (number-of-inputs INTEGER) ((self PROPOSITION-NEURAL-NETWORK))
+  :documentation "Return the number of input values expected by `self' (ignores bias unit)."
+  :public? TRUE
+  (return (1- (length (input self)))))
+
+(defmethod (nth-input FLOAT) ((self PROPOSITION-NEURAL-NETWORK) (n INTEGER))
+  :documentation "Return the 0-based `n'-th proposition input of `self' (ignores bias unit)."
+  :public? TRUE :globally-inline? TRUE
+  (return (nth (input self) (1+ n))))
+
+(defmethod (nth-input-error FLOAT) ((self PROPOSITION-NEURAL-NETWORK) (n INTEGER))
+  :documentation "Return the 0-based `n'-th proposition input error of `self' (ignores bias unit)."
+  :public? TRUE :globally-inline? TRUE
+  (return (nth (input-error self) (1+ n))))
+
+(defmethod set-input-values ((self PROPOSITION-NEURAL-NETWORK) (values OBJECT))
+  :documentation "Set the current truth-value inputs of the network `self' to float `values' in sequence.
+Missing inputs will be set to 0.0, extra values will be ignored."
+  :public? TRUE
+  (let ((input (input self))
+        (num-in (length input))
+        (cursor 1))
+    ;; ensure bias input unit[0] is activated:
+    (setf (nth input 0) 1.0)
+    (typecase values
+      ((CONS LIST VECTOR SEQUENCE ITERATOR)
+       (foreach val in values
+           where (< cursor num-in)
+           do (when (null? val)
+                (setq val *wrapped-chameleon-default-input-value*))
+              (setf (nth input cursor) val)
+              (++ cursor))))
+    (while (< cursor num-in)
+      (setf (nth input cursor) 0.0)
+      (++ cursor))))
+
+(defmethod (forward-propagate-inputs FLOAT) ((self PROPOSITION-NEURAL-NETWORK))
+  :documentation "Activates the current inputs of the network `self' to compute its output.
+Sets `self's `output' slot and returns the computed value.  Reads input activations and
+weights and updates hidden and output activations."
+  :public? TRUE
+  ;; this is a streamlined version of `activate-propositional-neural-network' which
+  ;; doesn't pass input and output scores through a proposition's argument `match-score's.
+  ;; TO DO: even though this is cleaner than the old scheme, it still isn't thread-safe,
+  ;;    for that all the activations have to become local vars or input/output parameters
+  (let ((input (input self))
+	(hidden (hidden self))
+        (num-in (length input))
+        (num-hidden (length hidden))
+	(ih (ih self))
+	(ho (ho self))
+	(score float 0.0)
+	(sum float 0.0))
+    ;; ensure bias input unit[0] is activated:
+    (setf (nth input 0) 1.0)
+    ;; activate hidden units:
+    (foreach i in (interval 0 (1- num-hidden))
+        do (foreach j in (interval 0 (1- num-in))
+               do (++ sum (* (nth input j) (2_d_element ih j i))))
+           (setf (nth hidden i) (/ 1.0 (+ 1.0 (exp (- sum)))))
+           ;;pass hidden activation to the output unit
+           (++ score (* (nth hidden  i) (nth ho i))))
+    ;; compute output activation:
+    (setf (output self) (/ 1.0 (+ 1.0 (exp (- score)))))
+    (return (output self))))
+
+(defmethod backward-propagate-error ((self PROPOSITION-NEURAL-NETWORK) (error FLOAT))
+  :documentation "Given a properly forward activated network `self' for the current set of inputs,
+and a training `error' between the current output and the goal value, backpropagate the error and
+update `self's vector of input errors.  Reads output, hidden activations and weights and updates
+hidden errors and input errors."
+  :public? TRUE
+  ;; Extracted and streamlined from `cached-backpropagate-error':
+  (let ((last-input (1- (length (input self))))
+        (input-error (input-error self))
+        (ih (ih self))
+	(hidden (hidden self))
+        (last-hidden (1- (length hidden)))
+	(hidden-error (hidden-error self))
+        (ho (ho self))
+        (output (output self)))
+    ;; squash the error by multiplying by the sigmoid derivative:
+    (setq error (* error output (- 1.0 output)))
+    ;; calculate hidden errors:
+    (foreach h in (interval 0 last-hidden)
+        do (setf (nth hidden-error h) (* error (nth ho h)))
+           ;; squash hidden error before passing to input:
+           (setf (nth hidden-error h) 
+             (* (nth hidden-error h) (nth hidden h) (- 1.0 (nth hidden h)))))
+    ;; calculate input layer errors:
+    (foreach i in (interval 0 last-input)
+        do (setf (nth input-error i) 0.0)
+           (foreach h in (interval 0 last-hidden)
+               do (setf (nth input-error i) 
+                    (+ (nth input-error i)
+                       (* (nth hidden-error h) (2_d_element ih i h))))))))
+
+(defmethod update-network-weights ((self PROPOSITION-NEURAL-NETWORK) (error FLOAT))
+  :documentation "Given a properly forward activated and backpropagated network `self' for the current
+inputs and training `error', update the network's weights according to current gradients, learning rate
+and momentum terms to reduce the error for the given inputs.  Reads output, hidden and input activations,
+hidden error, weights and weight deltas, and updates weights and weight deltas."
+  :public? TRUE
+  ;; Extracted and streamlined from `cached-backpropagate-error':
+  (let ((input (input self))
+        (last-input (1- (length input)))
+        (ih (ih self))
+        (ih-delta (ih-delta self))
+	(hidden (hidden self))
+        (last-hidden (1- (length hidden)))
+	(hidden-error (hidden-error self))
+        (ho (ho self))
+        (ho-delta (ho-delta self))
+        (output (output self))
+        (delta 0.0))
+    ;; squash the error by multiplying by the sigmoid derivative:
+    (setq error (* error output (- 1.0 output)))
+    ;; calculate weight adjustments:
+    (foreach h in (interval 0 last-hidden)
+        do (setq delta (+ (* *momentum-term* (nth ho-delta h))
+                          (* *learning-rate* error (nth hidden h))))
+           (setf (nth ho h) (+ (nth ho h) delta))
+           (setf (nth ho-delta h) delta)
+           ;; modify input to hidden weights:
+           (foreach i in (interval 0 last-input)
+               do (setq delta (+ (* *momentum-term* (2_d_element ih-delta i h))
+                                 (* *learning-rate* (nth hidden-error h) (nth input i))))
+                  (setf (2_d_element ih i h) (+ (2_d_element ih i h) delta))
+                  (setf (2_d_element ih-delta i h) delta)))))
+
+
+;;; Neural network API implemented for streamlined Chameleon neural nets
+
+(defclass CHAMELEON-NEURAL-NETWORK (NEURAL-NETWORK)
+  :documentation "Stream-lined neural network structure that doesn't require float wrapping."
+  :slots ((proposition :type PROPOSITION)
+          ;; activations:
+          (input :type FLOAT-ARRAY)
+          (hidden :type FLOAT-ARRAY)
+          (output :type FLOAT)
+          ;; weights:
+          (ih :type 2D-FLOAT-ARRAY)
+          (ho :type FLOAT-ARRAY)
+          ;; errors:
+          (input-error :type FLOAT-ARRAY)
+          (hidden-error :type FLOAT-ARRAY)
+          (output-error :type FLOAT)
+          ;; gradients (for momentum support):
+          (ih-delta :type 2D-FLOAT-ARRAY)
+          (ho-delta :type FLOAT-ARRAY)))
+
+(defmethod link-neural-network ((self CHAMELEON-NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Link the network `self' to its associated proposition `prop'."
+  :public? TRUE
+  (setf (proposition self) prop)
+  (setf (neural-net prop) self))
+
+(defmethod unlink-neural-network ((self CHAMELEON-NEURAL-NETWORK))
+  :documentation "Unlink the network `self' from its associated proposition."
+  :public? TRUE
+  (let ((prop (proposition self)))
+    (setf (proposition self) NULL)
+    (when (defined? prop)
+      (setf (neural-net prop) NULL))))
+
+(defmethod (get-neural-network-proposition PROPOSITION) ((self CHAMELEON-NEURAL-NETWORK))
+  :documentation "Return the proposition linked to `self'."
+  :public? TRUE
+  (return (proposition self)))
+
+(defmethod delete-neural-network ((self CHAMELEON-NEURAL-NETWORK))
+  :documentation "Unlink the network `self' from its associated proposition and mark it as deleted."
+  :public? TRUE
+  (unlink-neural-network self)
+  ;; use this as the deleted mark:
+  (setf (output self) MOST-NEGATIVE-FLOAT))
+
+(defmethod (deleted? BOOLEAN) ((self CHAMELEON-NEURAL-NETWORK))
+  :documentation "Return trun if `self' has been deleted."
+  :public? TRUE
+  (return (= (output self) MOST-NEGATIVE-FLOAT)))
+
+
+(defmethod allocate-network-arrays ((self CHAMELEON-NEURAL-NETWORK) (num-in INTEGER) (num-hidden INTEGER) (num-out INTEGER))
+  :documentation "Allocates array space for a neural network with given number of input, hidden and output units."
+  :public? TRUE
+  ;; derived from `allocate-neural-network':
+  (ignore num-out)
+  (setf (input self) (new FLOAT-ARRAY :dim1 num-in))
+  (setf (hidden self) (new FLOAT-ARRAY :dim1 num-hidden))
+  (setf (ih self) (new 2D-FLOAT-ARRAY :dim1 num-in :dim2 num-hidden))
+  (setf (ih-delta self) (new 2D-FLOAT-ARRAY :dim1 num-in :dim2 num-hidden))
+  (setf (input-error self) (new FLOAT-ARRAY :dim1 num-in))
+  (setf (hidden-error self) (new FLOAT-ARRAY :dim1 num-hidden))    
+  (setf (ho self) (new FLOAT-ARRAY :dim1 num-hidden))
+  (setf (ho-delta self) (new FLOAT-ARRAY :dim1 num-hidden)))
+
+(defmethod randomize-network-weights ((self CHAMELEON-NEURAL-NETWORK))
+  :documentation "Randomize the weights of the neural network `self'."
+  :public? TRUE
+  ;; derived from `randomize-neural-network'
+  (let ((num-in (dim1 (input self)))
+	(num-hidden (dim1 (hidden self)))
+        (ho-delta-array (the-array (ho-delta self)))
+        (ih-delta (ih-delta self))
+        (ih (ih self))
+        (ho-array (the-array (ho self))))
+    ;; clear all delta values:
+    ;; TO DO: improve 2D array indexing
+    (foreach h in (interval 0 (1- num-hidden))
+        do (setf (aref ho-delta-array h) 0.0)
+           (foreach i in (interval 0 (1- num-in))
+               do (setf (2D-aref ih-delta i h) 0.0)))
+    ;; TO DO: improve 2D array indexing
+    (foreach i in (interval 0 (1- num-hidden))
+	do ;; randomize input to hidden weights:
+           (foreach j in (interval 0 (1- num-in))
+	       do (setf (2D-aref ih j i) (random-weight *Weight-Range*)))
+           ;; randomize hidden to output weights:
+	   (setf (aref ho-array i) (random-weight *Weight-Range*)))))
+
+(defmethod build-proposition-network ((self CHAMELEON-NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Build a neural network for the proposition `prop'.  This builds a two-layer
+perceptron network whose input nodes are activated by the truth of `prop's arguments and whose
+output node computes the truth of `prop'."
+  :public? TRUE
+  ;; derived from `create-neural-network'
+  (let ((num-in (+ (- (length (arguments prop)) (number-of-ignored-value-arguments self prop)) 1))
+	(num-hidden (min (+ num-in 0) 20)))
+    (when (> num-in 100) ;; for really big input layers
+      (setq num-hidden (+ (floor (/ num-in 10)) 10))) 
+    (allocate-network-arrays self num-in num-hidden 1)
+    ;; set default behavior for network
+    (case (kind prop)
+      ((:AND :OR)
+       (randomize-network-weights self))
+      (otherwise 
+       (randomize-network-weights self)))
+    (link-neural-network self prop)))
+
+
+(defmethod (number-of-inputs INTEGER) ((self CHAMELEON-NEURAL-NETWORK))
+  :documentation "Return the number of input values expected by `self' (ignores bias unit)."
+  :public? TRUE :globally-inline? TRUE
+  (return (1- (dim1 (input self)))))
+
+(defmethod (nth-input FLOAT) ((self CHAMELEON-NEURAL-NETWORK) (n INTEGER))
+  :documentation "Return the 0-based `n'-th proposition input of `self' (ignores bias unit)."
+  :public? TRUE :globally-inline? TRUE
+  (return (1D-aref (input self) (1+ n))))
+
+(defmethod (nth-input-error FLOAT) ((self CHAMELEON-NEURAL-NETWORK) (n INTEGER))
+  :documentation "Return the 0-based `n'-th proposition input error of `self' (ignores bias unit)."
+  :public? TRUE :globally-inline? TRUE
+  (return (1D-aref (input-error self) (1+ n))))
+
+(defun copy-float-values-to-buffer ((values OBJECT) (buffer (ARRAY () OF FLOAT)) (start INTEGER) (end INTEGER))
+  :documentation "Copy the float `values' in sequence to `buffer' between `start' and `end'.
+Missing values will be set to 0.0, extra values will be ignored."
+  :public? TRUE
+  (let ((cursor start))
+    (typecase values
+      ((VECTOR CONS LIST SEQUENCE ITERATOR)
+       (foreach val in values
+           where (< cursor end)
+           do (when (null? val)
+                (setq val *wrapped-chameleon-default-input-value*))
+              (setf (aref buffer cursor) val)
+              (++ cursor)))
+      (FLOAT-ARRAY
+       (let ((valuesArray (the-array values)))
+         (foreach i in (interval 0 (1- (dim1 values)))
+             where (< cursor end)
+             do (setf (aref buffer cursor) (aref valuesArray i))
+                (++ cursor)))))
+    (while (< cursor end)
+      (setf (aref buffer cursor) 0.0)
+      (++ cursor))))
+
+(defmethod set-input-values ((self CHAMELEON-NEURAL-NETWORK) (values OBJECT))
+  :documentation "Set the current truth-value inputs of the network `self' to float `values' in sequence.
+Missing inputs will be set to 0.0, extra values will be ignored."
+  :public? TRUE
+  (let ((input (input self))
+        (inputArray (the-array input)))
+    ;; ensure bias input unit[0] is activated:
+    (setf (aref inputArray 0) 1.0)
+    (copy-float-values-to-buffer values inputArray 1 (dim1 input))))
+
+(defmethod set-vector-input-values ((self CHAMELEON-NEURAL-NETWORK) (vectorSpecs OBJECT))
+  :documentation "Set the current vector inputs of the network `self' to the vectors described by `vectorSpecs'.
+Each vector spec describes a vector-generating proposition that produces one or more vectors.  How those specs
+are translated into actual numeric vectors such as embeddings is specific to the particular neural network type."
+  :public? TRUE
+  (ignore vectorSpecs)
+  ;; we just have this here for debugging when we temporarily make CHAMELEON-NEURAL-NETWORK a sub of VECTOR-NEURAL-NETWORK:
+  (unless (isa? self @VECTOR-NEURAL-NETWORK)
+    (error "set-vector-input-values: Not defined on " self)))
+
+(defmethod (forward-propagate-inputs FLOAT) ((self CHAMELEON-NEURAL-NETWORK))
+  :documentation "Activates the current inputs of the network `self' to compute its output.
+Sets `self's `output' slot and returns the computed value.  Reads input activations and
+weights and updates hidden and output activations."
+  :public? TRUE
+  ;; this is a streamlined version of `activate-propositional-neural-network' which
+  ;; doesn't pass input and output scores through a proposition's argument `match-score's.
+  ;; TO DO: even though this is cleaner than the old scheme, it still isn't thread-safe,
+  ;;    for that all the activations have to become local vars or input/output parameters
+  (let ((input (input self))
+	(hidden (hidden self))
+        (num-in (dim1 input))
+        (num-hidden (dim1 hidden))
+        (input-array (the-array input))
+        (hidden-array (the-array hidden))
+	(ih (ih self))
+	(ho (ho self))
+        (ho-array (the-array ho))
+	(score float 0.0)
+	(sum float 0.0))
+    ;; ensure bias input unit[0] is activated:
+    (setf (aref input-array 0) 1.0)
+    ;; activate hidden units:
+    (foreach i in (interval 0 (1- num-hidden))
+        do (setq sum 0.0) ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; MISSING IN DAVE'S CODE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+           (foreach j in (interval 0 (1- num-in))
+               do (++ sum (* (aref input-array j) (2D-aref ih j i)))) ;; TO DO: improve 2D array indexing
+           (setf (aref hidden-array i) (/ 1.0 (+ 1.0 (exp (- sum)))))
+           ;;pass hidden activation to the output unit
+           (++ score (* (aref hidden-array i) (aref ho-array i))))
+    ;; compute output activation:
+    (setf (output self) (/ 1.0 (+ 1.0 (exp (- score)))))
+    (return (output self))))
+
+(defmethod backward-propagate-error ((self CHAMELEON-NEURAL-NETWORK) (error FLOAT))
+  :documentation "Given a properly forward activated network `self' for the current set of inputs,
+and a training `error' between the current output and the goal value, backpropagate the error and
+update `self's vector of input errors.  Reads output, hidden activations and weights and updates
+hidden errors and input errors."
+  :public? TRUE
+  ;; Extracted and streamlined from `cached-backpropagate-error':
+  (let ((last-input (1- (dim1 (input self))))
+        (input-error (input-error self))
+        (input-error-array (the-array input-error))
+        (ih (ih self))
+	(hidden (hidden self))
+        (hidden-array (the-array hidden))
+        (last-hidden (1- (dim1 hidden)))
+	(hidden-error (hidden-error self))
+        (hidden-error-array (the-array hidden-error))
+        (ho (ho self))
+        (ho-array (the-array ho))
+        (output (output self)))
+    ;; squash the error by multiplying by the sigmoid derivative:
+    (setq error (* error output (- 1.0 output)))
+    ;; calculate hidden errors:
+    (foreach h in (interval 0 last-hidden)
+        do (setf (aref hidden-error-array h) (* error (aref ho-array h)))
+           ;; squash hidden error before passing to input:
+           (setf (aref hidden-error-array h)
+             (* (aref hidden-error-array h) (aref hidden-array h) (- 1.0 (aref hidden-array h)))))
+    ;; calculate input layer errors:
+    (foreach i in (interval 0 last-input)
+        do (setf (aref input-error-array i) 0.0)
+           (foreach h in (interval 0 last-hidden)
+               do (setf (aref input-error-array i) 
+                    (+ (aref input-error-array i)
+                       (* (aref hidden-error-array h) (2D-aref ih i h)))))))) ;; TO DO: improve 2D array indexing
+
+(defmethod update-network-weights ((self CHAMELEON-NEURAL-NETWORK) (error FLOAT))
+  :documentation "Given a properly forward activated and backpropagated network `self' for the current
+inputs and training `error', update the network's weights according to current gradients, learning rate
+and momentum terms to reduce the error for the given inputs.  Reads output, hidden and input activations,
+hidden error, weights and weight deltas, and updates weights and weight deltas."
+  :public? TRUE
+  ;; Extracted and streamlined from `cached-backpropagate-error':
+  (let ((input (input self))
+        (last-input (1- (dim1 input)))
+        (input-array (the-array input))
+        (ih (ih self))
+        (ih-delta (ih-delta self))
+	(hidden (hidden self))
+        (last-hidden (1- (dim1 hidden)))
+        (hidden-array (the-array hidden))
+	(hidden-error (hidden-error self))
+        (hidden-error-array (the-array hidden-error))
+        (ho (ho self))
+        (ho-array (the-array ho))
+        (ho-delta (ho-delta self))
+        (ho-delta-array (the-array ho-delta))
+        (output (output self))
+        (delta 0.0))
+    ;(print "update-network-weights/" (number-of-inputs self) ": " "target= " (+ output error) " output= " output " error= " error EOL)
+    ;; squash the error by multiplying by the sigmoid derivative:
+    (setq error (* error output (- 1.0 output)))
+    ;; calculate weight adjustments:
+    (foreach h in (interval 0 last-hidden)
+        do (setq delta (+ (* *momentum-term* (aref ho-delta-array h))
+                          (* *learning-rate* error (aref hidden-array h))))
+           (setf (aref ho-array h) (+ (aref ho-array h) delta))
+           (setf (aref ho-delta-array h) delta)
+           ;; modify input to hidden weights
+           ;; TO DO: improve 2D array indexing
+           (foreach i in (interval 0 last-input)
+               do (setq delta (+ (* *momentum-term* (2D-aref ih-delta i h))
+                                 (* *learning-rate* (aref hidden-error-array h) (aref input-array i))))
+                  (setf (2D-aref ih i h) (+ (2D-aref ih i h) delta))
+                  (setf (2D-aref ih-delta i h) delta)))))
+
+
+(defclass VECTOR-NEURAL-NETWORK (NEURAL-NETWORK)
+  :documentation "Neural network that supports vector input arguments."
+  :slots ((n-vector-arguments :type INTEGER :initially -1)
+          (n-vector-argument-specs :type INTEGER :initially -1)
+          (n-vector-argument-inputs :type INTEGER :initially -1)))
+
+(defmethod (vector-argument? BOOLEAN) ((self VECTOR-NEURAL-NETWORK) (arg PROPOSITION))
+  :documentation "Return TRUE if `arg' yields one or more vectors for `self's inputs."
+  :public? TRUE
+  (let ((argRel (surrogate-value (relationRef arg))))
+    (return (and (defined? argRel)
+                 (chameleon-vector-relation? argRel)))))
+
+(defmethod (has-vector-arguments? BOOLEAN) ((self VECTOR-NEURAL-NETWORK))
+  :documentation "Return TRUE if `self' has at least one vector input argument."
+  :public? TRUE
+  (let ((nArgs (n-vector-arguments self)))
+    (when (< nArgs 0)
+      (setq nArgs (number-of-vector-arguments self NULL)))
+    (return (> nArgs 0))))
+
+(defmethod (number-of-vector-arguments INTEGER) ((self VECTOR-NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Return the number of arguments of `prop' that yield one or more vectors
+for `self's inputs.  `prop' can be NULL in which case the linked proposition will be used."
+  :public? TRUE
+  (let ((nArgs (n-vector-arguments self)))
+    (when (< nArgs 0)
+      (when (null? prop)
+        (setq prop (get-neural-network-proposition self)))
+      (setq nArgs 0)
+      (foreach arg in (arguments prop)
+          where (vector-argument? self arg)
+          do (++ nArgs))
+      (setf (n-vector-arguments self) nArgs))
+    (return nArgs)))
+
+(defmethod (vector-argument-index INTEGER) ((self VECTOR-NEURAL-NETWORK) (arg PROPOSITION))
+  :documentation "Return the 0-based input position of vector argument `arg'.  Ignores bias unit which
+is a network-implementation-specific detail.  If `arg' is not a vector argument, returns -1."
+  :public? TRUE
+  (return (memoize (self arg)
+                   :timestamps :KB-UPDATE :max-values 1000
+                   (help-compute-argument-index self arg :vector))))
+
+(defmethod (number-of-vector-argument-specs INTEGER) ((self VECTOR-NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Return the total number of argument specs generated by vector arguments of `prop'.
+This is only different than `number-of-vector-arguments' if at least one of `prop's vector argument
+relations has arity > 1.  `prop' can be NULL in which case the linked proposition will be used."
+  :public? TRUE
+  (let ((nInps (n-vector-argument-specs self)))
+    (when (< nInps 0)
+      (when (null? prop)
+        (setq prop (get-neural-network-proposition self)))
+      (setq nInps 0)
+      (foreach arg in (arguments prop)
+          where (vector-argument? self arg)
+          do (let ((rel (surrogate-value (relationRef (cast arg PROPOSITION))))
+                   (arity (access-binary-value rel cham/@vector-arity)))
+               (unless (integer? arity)
+                 (error "number-of-vector-argument-specs: Missing or incorrect arity specifications for " rel))
+               (++ nInps arity)))
+      (setf (n-vector-argument-specs self) nInps))
+    (return nInps)))
+
+(defmethod (number-of-vector-argument-inputs INTEGER) ((self VECTOR-NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Return the total number of input positions to store all elements of all vector
+arguments of `prop'.  `prop' can be NULL in which case the linked proposition will be used."
+  :public? TRUE
+  (let ((nInps (n-vector-argument-inputs self)))
+    (when (< nInps 0)
+      (when (null? prop)
+        (setq prop (get-neural-network-proposition self)))
+      (setq nInps 0)
+      (foreach arg in (arguments prop)
+          where (vector-argument? self arg)
+          do (let ((rel (surrogate-value (relationRef (cast arg PROPOSITION))))
+                   (arity (access-binary-value rel cham/@vector-arity))
+                   (dims (access-binary-value rel cham/@vector-dimensions)))
+               (unless (and (integer? arity) (integer? dims))
+                 (error "number-of-vector-argument-inputs: Missing or incorrect arity/dimension specifications for " rel))
+               (++ nInps (* arity dims))))
+      (setf (n-vector-argument-inputs self) nInps))
+    (return nInps)))
+
+(defmethod set-vector-input-values ((self VECTOR-NEURAL-NETWORK) (vectorSpecs OBJECT))
+  :documentation "Set the current vector inputs of the network `self' to the vectors described by `vectorSpecs'.
+Each vector spec describes a vector-generating proposition that produces one or more vectors.  How those specs
+are translated into actual numeric vectors such as embeddings is specific to the particular neural network type."
+  :public? TRUE
+  (ignore vectorSpecs)
+  (error "set-vector-input-values: Not defined on " self))
+
+(defmethod (get-vector-argument-spec OBJECT) ((self VECTOR-NEURAL-NETWORK) (arg OBJECT))
+  :documentation "Generate a single argument spec for `arg' that can be used for `set-vector-input-values'.
+`arg' can either be a proposition or justification."
+  :public? TRUE
+  (typecase arg
+    (JUSTIFICATION
+     (special ((*currentJustification* arg))
+       (return (generate-proposition (proposition arg)))))
+    (PROPOSITION
+     (return (generate-proposition arg)))))
+
+
+(defclass TENSORFLOW-NEURAL-NETWORK (VECTOR-NEURAL-NETWORK)
+  :documentation "Neural network that is implemented by callbacks to TensorFlow."
+  :slots ((proposition :type PROPOSITION)
+          (model :type PYTHON-OBJECT-POINTER)))
+
+(defun register-tensorflow-callback ((name STRING) (code FUNCTION-CODE))
+  :documentation "Special-purpose callback support that registers `code' under the logic symbol with `name',
+which by convention we make the qualified method name of the method we are using this for.  This is a
+special-purpose hack which eventually we might want to generalize so others can use it too."
+  :public? TRUE
+  (setf (symbol-value (intern-symbol-in-module (string-upcase name) *logic-module* FALSE)) code))
+  
+(defun (get-tensorflow-callback FUNCTION-CODE) ((name SYMBOL))
+  :documentation "Access the TensorFlow callback code registered under `name'."
+  :public? TRUE :globally-inline? TRUE
+  (return (symbol-value name)))
+
+(defun (tensorflow-backend-available? BOOLEAN) ()
+  :documentation "Return TRUE if TensorFlow callbacks have been properly registered."
+  :public? TRUE
+  (return (defined? (symbol-value (quote TENSORFLOW-NEURAL-NETWORK.build-proposition-network)))))
+
+
+(defmethod link-neural-network ((self TENSORFLOW-NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Link the network `self' to its associated proposition `prop'."
+  :public? TRUE
+  (setf (proposition self) prop)
+  (setf (neural-net prop) self))
+
+(defmethod unlink-neural-network ((self TENSORFLOW-NEURAL-NETWORK))
+  :documentation "Unlink the network `self' from its associated proposition."
+  :public? TRUE
+  (let ((prop (proposition self)))
+    (setf (proposition self) NULL)
+    (when (defined? prop)
+      (setf (neural-net prop) NULL))))
+
+(defmethod (get-neural-network-proposition PROPOSITION) ((self TENSORFLOW-NEURAL-NETWORK))
+  :documentation "Return the proposition linked to `self'."
+  :public? TRUE
+  (return (proposition self)))
+
+(defmethod delete-neural-network ((self TENSORFLOW-NEURAL-NETWORK))
+  :documentation "Unlink the network `self' from its associated proposition and mark it as deleted."
+  :public? TRUE
+  (unlink-neural-network self)
+  ;; use this as the deleted mark (kludgy - exposes the real type), this also readies the model for GC in STELLA and PYTHON:
+  (setf (model self) MOST-NEGATIVE-LONG-INTEGER))
+
+(defmethod (deleted? BOOLEAN) ((self TENSORFLOW-NEURAL-NETWORK))
+  :documentation "Return trun if `self' has been deleted."
+  :public? TRUE
+  (return (eql? (model self) MOST-NEGATIVE-LONG-INTEGER)))
+
+
+(defmethod allocate-network-arrays ((self TENSORFLOW-NEURAL-NETWORK) (num-in INTEGER) (num-hidden INTEGER) (num-out INTEGER))
+  :documentation "Allocates array space for a neural network with given number of input, hidden and output units."
+  :public? TRUE
+  (funcall (get-tensorflow-callback (quote TENSORFLOW-NEURAL-NETWORK.allocate-network-arrays)) self num-in num-hidden num-out))
+
+(defmethod randomize-network-weights ((self TENSORFLOW-NEURAL-NETWORK))
+  :documentation "Randomize the weights of the neural network `self'."
+  :public? TRUE
+  (funcall (get-tensorflow-callback (quote TENSORFLOW-NEURAL-NETWORK.randomize-network-weights)) self))
+
+(defmethod initialize-network-weights ((self TENSORFLOW-NEURAL-NETWORK))
+  :documentation "Initialize the weights of the neural network `self' - eiher randomly or from a saved state."
+  :public? TRUE
+  (funcall (get-tensorflow-callback (quote TENSORFLOW-NEURAL-NETWORK.initialize-network-weights)) self))
+
+(defmethod build-proposition-network ((self TENSORFLOW-NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Build a neural network for the proposition `prop'.  This builds a two-layer
+perceptron network whose input nodes are activated by the truth of `prop's arguments and whose
+output node computes the truth of `prop'."
+  :public? TRUE
+  (funcall (get-tensorflow-callback (quote TENSORFLOW-NEURAL-NETWORK.build-proposition-network)) self prop)
+  (link-neural-network self prop))
+
+(defmethod (number-of-inputs INTEGER) ((self TENSORFLOW-NEURAL-NETWORK))
+  :documentation "Return the number of input values expected by `self' (ignores bias unit)."
+  :public? TRUE :globally-inline? TRUE
+  (return (funcall (get-tensorflow-callback (quote TENSORFLOW-NEURAL-NETWORK.number-of-inputs)) self)))
+
+(defmethod (nth-input FLOAT) ((self TENSORFLOW-NEURAL-NETWORK) (n INTEGER))
+  :documentation "Return the 0-based `n'-th proposition input of `self' (ignores bias unit)."
+  :public? TRUE :globally-inline? TRUE
+  (return (funcall (get-tensorflow-callback (quote TENSORFLOW-NEURAL-NETWORK.nth-input)) self n)))
+
+(defmethod (nth-input-error FLOAT) ((self TENSORFLOW-NEURAL-NETWORK) (n INTEGER))
+  :documentation "Return the 0-based `n'-th proposition input error of `self' (ignores bias unit)."
+  :public? TRUE :globally-inline? TRUE
+  (return (funcall (get-tensorflow-callback (quote TENSORFLOW-NEURAL-NETWORK.nth-input-error)) self n)))
+
+(defmethod set-input-values ((self TENSORFLOW-NEURAL-NETWORK) (values OBJECT))
+  :documentation "Set the current truth-value inputs of the network `self' to float `values' in sequence.
+Missing inputs will be set to 0.0, extra values will be ignored."
+  :public? TRUE
+  ;; TO DO: improve values type coercion for Python
+  (funcall (get-tensorflow-callback (quote TENSORFLOW-NEURAL-NETWORK.set-input-values)) self (consify values)))
+
+(defmethod (get-vector-argument-spec OBJECT) ((self TENSORFLOW-NEURAL-NETWORK) (arg OBJECT))
+  :documentation "Generate a single argument spec for `arg' that can be used for `set-vector-input-values'.
+`arg' can either be a proposition or justification."
+  :public? TRUE
+  (let ((spec (call-super-method self arg))
+        (evalArgs NIL))
+    (typecase spec
+      (CONS
+       ;; only pointer and string arguments matter on the Python side, so filter out everything else:
+       (foreach elt in spec
+           where (or (long-integer? elt)
+                     (string? elt))
+           collect elt into evalArgs))
+      (otherwise NULL))
+    (if (non-empty? evalArgs)
+        (return evalArgs)
+      (return spec))))
+
+(defmethod set-vector-input-values ((self TENSORFLOW-NEURAL-NETWORK) (vectorSpecs OBJECT))
+  :documentation "Set the current vector inputs of the network `self' to the vectors described by `vectorSpecs'.
+Each vector spec describes a vector-generating proposition that produces one or more vectors.  How those specs
+are translated into actual numeric vectors such as embeddings is specific to the particular neural network type."
+  :public? TRUE
+  (funcall (get-tensorflow-callback (quote TENSORFLOW-NEURAL-NETWORK.set-vector-input-values)) self (consify vectorSpecs)))
+
+(defmethod (forward-propagate-inputs FLOAT) ((self TENSORFLOW-NEURAL-NETWORK))
+  :documentation "Activates the current inputs of the network `self' to compute its output.
+Sets `self's `output' slot and returns the computed value.  Reads input activations and
+weights and updates hidden and output activations."
+  :public? TRUE
+  (return (funcall (get-tensorflow-callback (quote TENSORFLOW-NEURAL-NETWORK.forward-propagate-inputs)) self)))
+
+(defmethod backward-propagate-error ((self TENSORFLOW-NEURAL-NETWORK) (error FLOAT))
+  :documentation "Given a properly forward activated network `self' for the current set of inputs,
+and a training `error' between the current output and the goal value, backpropagate the error and
+update `self's vector of input errors.  Reads output, hidden activations and weights and updates
+hidden errors and input errors."
+  :public? TRUE
+  (funcall (get-tensorflow-callback (quote TENSORFLOW-NEURAL-NETWORK.backward-propagate-error)) self error))
+
+(defmethod update-network-weights ((self TENSORFLOW-NEURAL-NETWORK) (error FLOAT))
+  :documentation "Given a properly forward activated and backpropagated network `self' for the current
+inputs and training `error', update the network's weights according to current gradients, learning rate
+and momentum terms to reduce the error for the given inputs.  Reads output, hidden and input activations,
+hidden error, weights and weight deltas, and updates weights and weight deltas."
+  :public? TRUE
+  (funcall (get-tensorflow-callback (quote TENSORFLOW-NEURAL-NETWORK.update-network-weights)) self error))
+
+
+  ;;
+;;;;;; Training
+  ;;
+
+(defun (get-cached-network-proof JUSTIFICATION) ((example TRAINING-EXAMPLE))
+  :documentation "Variant of `create-cached-network' that takes a training `example',
+runs its cons query, and stores a compacted version of the associated proof tree
+as the `example's cached solution which will also be returned.  If a cached and
+up-to-date solution already exists, it will be returned instead."
+  :public? TRUE
+  (cond ((and (defined? (cached-solution example))
+              (eql? (timestamp example) (get-now-timestamp)))
+         ;; we already have a cached network and no new KB assertions have been made:
+         (return (cached-solution example)))
+        (otherwise
+         ;; KLUDGE: work around vrlet/within-module bug (see macros.ste):
+         (let ((module (first-defined (module example) *module*)))
+           (within-module module
+             (let ((queryIter 
+                    (create-ask-query 
+                     (cons-list (query example) :record-justifications? TRUE :match-mode :chameleon))))
+               (call-ask-partial queryIter)
+               (setf (cached-solution example) (justification (base-control-frame queryIter)))
+               (when (null? (cached-solution example))
+                 ;; the query failed which is probably unintended, print a warning and generate a FAIL justification:
+                 (signal-proposition-warning "get-cached-network-proof: training example query failed: " (query example))
+                 (record-fail-justification (base-control-frame queryIter) :UP-FAIL)
+                 (setf (cached-solution example) (justification (base-control-frame queryIter))))
+               (setf (cached-solution example) (compact-partial-proof-to-network-proof (cached-solution example)))
+               (setf (timestamp example) (get-now-timestamp))
+               (return (cached-solution example))))))))
+
+(defun (compact-partial-proof-to-network-proof JUSTIFICATION) ((proof JUSTIFICATION))
+  :documentation "Convert `proof' into a compacted network tree form that only contains
+:AND, :OR, :MULTI and :PRIMITIVE nodes (some of which such as `instance-of' might contain
+further antecedents if they were computed by specialists, for example)."
+  :public? TRUE
+  (case (inference-rule proof)
+    (:primitive-strategy
+     (cond ((eql? (strategy (cast proof PRIMITIVE-STRATEGY)) :goal-complement)
+            ;; KLUDGE: the current use of a primitive strategy for goal complement proofs is inappropriate,
+            ;; since they are basically like a NOT with an arbitrarily deep tree of antecdents; we work
+            ;; around this here but we should fix this properly in `strategies.ste' and we anticipate here
+            ;; that eventually :goal-complement will be a bonafide inference rule and not just a strategy:
+            (setq proof (shallow-copy proof))
+            (setf (inference-rule proof) :goal-complement)
+            (return (compact-partial-proof-to-network-proof proof)))
+           ((empty? (antecedents proof))
+            (return proof))
+           (otherwise
+            (error "INTERNAL ERROR: unexpected primitive justifications with antecedents for: " (proposition proof)))))
+    ((:and-introduction :or-introduction :multiple-proofs :disproof :goal-complement)
+     (setq proof (shallow-copy proof))
+     (setf (antecedents proof) (collect (compact-partial-proof-to-network-proof ant) foreach ant in (antecedents proof)))
+     (return proof))
+    ((:modus-ponens :modus-tollens)
+     (let ((relation (surrogate-value (relationRef (proposition proof)))))
+       (cond ((and (defined? relation)
+                   (chameleon-truth-value-relation? relation))
+              ;; ignore the justification for the rule:
+              ;(return (compact-partial-proof-to-network-proof (second (antecedents proof))))
+              ;;; EXPERIMENT: (KLUDGE): simply replacing a rule consequent with its antecedent trips us up when
+              ;;; when we want to lookup an argument in an AND which we won't be able to find if it has been
+              ;;; replaced with an antecedent proposition; for now we convert those to degenerate :multiple-proofs
+              ;;; which only have a single proof, but in the future we might want to treat them separately;
+              ;;; however, that entails updating all the case statements as we did for :disproof, etc.:
+              (setq proof (shallow-copy proof))
+              (setf (inference-rule proof) :multiple-proofs)
+              (setf (antecedents proof)
+                ;; ignore the justification for the rule:
+                (cons (compact-partial-proof-to-network-proof (second (antecedents proof))) NIL))
+              (return proof))
+             (otherwise
+              ;; it is an ignored or vector relation, treat it as primitive and forget any antecedents:
+              (setq proof (shallow-copy proof))
+              (setf (inference-rule proof) :primitive-strategy)
+              (setf (antecedents proof) NIL)
+              (return proof)))))
+    (:subsumption-reasoning
+     ;; we have a specialist-computed inference, ignore the antecedents and treat it as primitive:
+     (setq proof (shallow-copy proof))
+     (setf (inference-rule proof) :primitive-strategy)
+     (setf (antecedents proof) NIL)
+     (return proof))
+    (:fail-introduction
+     (setq proof (shallow-copy proof))
+     (setf (inference-rule proof) :primitive-strategy)
+     (setf (antecedents proof) NIL)
+     (return proof))
+    (otherwise
+     (let ((relation (surrogate-value (relationRef (proposition proof)))))
+       (cond ((and (defined? relation)
+                   (chameleon-primitive-value-relation? relation))
+              ;; treat it as primitive and forget any antecedents:
+              (setq proof (shallow-copy proof))
+              (setf (inference-rule proof) :primitive-strategy)
+              (setf (antecedents proof) NIL)
+              (return proof))
+             (otherwise
+              (case (length (antecedents proof))
+                (0 (return proof))
+                (1 (return (compact-partial-proof-to-network-proof (first (antecedents proof)))))
+                (otherwise
+                 (error "Unhandled network proof justification with multiple antecedents: " (inference-rule proof))))))))))
+
+(defun (combine-multiple-match-scores FLOAT) ((scores (CONS OF FLOAT-WRAPPER)))
+  :documentation "Combine partial match scores from alternative :multiple-proofs `scores'
+according to the current `*rule-combination*' strategy."
+  :public? TRUE
+  (case *rule-combination*
+    (:MAX
+     (let ((max 0.0))
+       (foreach score in scores
+           where (> score max)
+           do (setq max score))
+       (return max)))
+    (:NOISY-OR
+     (case (length scores)
+       (0 (return 0.0))
+       (1 (return (first scores)))
+       (2 (return (probabilistic-sum (first scores) (second scores))))
+       (otherwise
+        (return (probabilistic-sum-n scores)))))))
+
+(defun (forward-propagate-cached-network-proof FLOAT) ((proof JUSTIFICATION))
+  :documentation "Compute the same partial match score as the call to `compute-partial-truth'
+that generated `proof' (which is assumed to have been compacted with a call to
+`compact-partial-proof-to-network-proof'.  The score will only be identical of course, if
+the various networks and their weights have not yet been updated during learning."
+  :public? TRUE
+  (let ((score 0.0))
+    (case (inference-rule proof)
+      (:primitive-strategy
+       (return (match-score proof)))
+      ((:and-introduction :or-introduction)
+       (let ((net (get-justification-neural-network proof))
+             (inputs (new VECTOR :array-size (number-of-inputs net)))
+             (vectorArgs
+              (only-if (has-vector-arguments? net)
+                (new VECTOR :array-size (number-of-vector-arguments net NULL))))
+             (index -1))
+         (foreach ant in (antecedents proof)
+             do (setq index (truth-value-argument-index net (proposition ant)))
+                (when (>= index 0)
+                  (setq score (forward-propagate-cached-network-proof ant))
+                  (setf (nth inputs index) score))
+                (when (defined? vectorArgs)
+                  (setq index (vector-argument-index net (proposition ant)))
+                  (when (>= index 0)
+                    (setf (nth vectorArgs index) (get-vector-argument-spec net ant)))))
+         ;; this provides default values for missing args in case we have an OR:
+         (set-input-values net inputs)
+         (when (defined? vectorArgs)
+           (set-vector-input-values net vectorArgs))
+         (setq score (forward-propagate-inputs net))
+         ;; we cache the computed score for the benefit of backprop:
+         (setf (match-score proof) score)
+         (return score)))
+      (:multiple-proofs
+       (setq score (combine-multiple-match-scores
+                    (collect (forward-propagate-cached-network-proof ant) foreach ant in (antecedents proof))))
+       ;; we cache the computed score for the benefit of backprop:
+       (setf (match-score proof) score)
+       (return score))
+      ((:disproof :goal-complement)
+       (setq score (invert-chameleon-match-score (match-score (first (antecedents proof)))))
+       ;; we cache the computed score for the benefit of backprop:
+       (setf (match-score proof) score)
+       (return score)))))
+
+
+;;; Recursion problem
+;;;
+;;; It is possible for a subgoal such as `(happy ?x)' to occur at multiple points in a proof tree, thus, the
+;;; associated network will be invoked at different points, possibly with different bindings and inputs.
+;;; For this reason, Dave's code had some ugly recursion check portions that tried to determine that and
+;;; restore or save inputs and activations in those cases.
+;;;
+;;; The main reason for doing it this way is efficiency, since we don't have to recompute an identical activation
+;;; for those cases and can simply reuse what has previously been computed.  However, this is ugly and requires
+;;; some checking every time and then we are still not sure whether we might have missed a required update.
+;;; It is also an artifact of storing those activations in the first place instead of just the network weights.
+;;;
+;;; This problem does not occur during forward propagation through the tree, since that does not depend on any
+;;; network state, it only happens during backward propagation.  Our solution is to unconditionally restore
+;;; forward activations and errors whenever there is a chance that they might have been overwritten somewhere
+;;; which should make the code cleaner even if slightly less efficient.  Once we move to TensorFlow we have
+;;; less control over this kind of caching anyway.  To facilitate this we store forward output activations
+;;; in the associated proof tree justifications, so we don't have to recurse through the entire tree to restore.
+;;;
+;;; TO DO: a simple way to determine network consistency would be to store the activating justification with
+;;; the network and then only reactivate whenever that justification or timestamp is out of sync.
+
+
+(defun (forward-propagate-cached-network-from-justification FLOAT) ((just JUSTIFICATION))
+  :documentation "Locally forward-propagate the network associated with `just' based on
+previously cached `positive-score's of antecedents."
+  :public? TRUE
+  (let ((score 0.0))
+    (case (inference-rule just)
+      ((:and-introduction :or-introduction)
+       (let ((net (get-justification-neural-network just))
+             (inputs (new VECTOR :array-size (number-of-inputs net)))
+             (vectorArgs
+              (only-if (has-vector-arguments? net)
+                (new VECTOR :array-size (number-of-vector-arguments net NULL))))
+             (index -1))
+         (foreach ant in (antecedents just)
+             do (setq index (truth-value-argument-index net (proposition ant)))
+                (when (>= index 0)
+                  (setq score (match-score ant))
+                  (setf (nth inputs index) score))
+                (when (defined? vectorArgs)
+                  (setq index (vector-argument-index net (proposition ant)))
+                  (when (>= index 0)
+                    (setf (nth vectorArgs index) (get-vector-argument-spec net ant)))))
+         ;; this provides default values for missing args in case we have an OR:
+         (set-input-values net inputs)
+         (when (defined? vectorArgs)
+           (set-vector-input-values net vectorArgs))
+         ;; note that this score might be different from `(match-score just)' in case
+         ;; `net's weights have been updated since its previously cached activation:
+         (setq score (forward-propagate-inputs net))
+         (return score))))))
+
+(defun backward-propagate-cached-network-proof ((proof JUSTIFICATION) (error FLOAT))
+  :documentation "Propagate the `error' between `proof's conclusion and the desired target value
+through `proof's network and its antecedents, and adjust weights to decrease the error.  Multiple
+iterations through `forward/backward-propagate-cached-network-proof' with updated top-level
+errors will train the involved networks to minimize the error as much as possible."
+  :public? TRUE
+  ;; Extracted and streamlined from `cached-backpropagate-error'
+  ;; Seems to work for some simple tests...needs more extensive testing
+  ;; TO DO: address the recursive/shared network issue described below
+  (case (inference-rule proof)
+    (:multiple-proofs
+     ;; we have multiple networks/proofs, divide blame between them based on score:
+     (backward-propagate-cached-network-multi-proof proof error))
+    ((:disproof :goal-complement)
+     (backward-propagate-cached-network-proof (first (antecedents proof)) error))
+    ((:and-introduction :or-introduction)
+     ;; backpropagate within this network:
+     (let ((net (get-justification-neural-network proof))
+           (reactivate? FALSE))
+       ;; TO DO: a simple way to determine need-to-update would be to store the justification
+       ;; of the latest activation with the network and then only update if that is out of sync
+       ;; ensure network state consistent with this justification:
+       (forward-propagate-cached-network-from-justification proof)
+       ;; compute input errors:
+       (backward-propagate-error net error)
+       ;; pass input errors back to any antecedent networks:
+       (foreach ant in (antecedents proof)
+           where (not (eql? (inference-rule ant) :primitive-strategy))
+           do (let ((index (truth-value-argument-index net (proposition ant))))
+                (when (>= index 0)
+                  (backward-propagate-cached-network-proof ant (nth-input-error net index))
+                  (setq reactivate? TRUE))))
+       (when reactivate?
+         ;; again, ensure network state consistent with this justification - note that
+         ;; at this point weights might have been updated in a recursive invocation:
+         (forward-propagate-cached-network-from-justification proof)
+         (backward-propagate-error net error))
+       ;; finally, modify weights:
+       (update-network-weights net error)))
+    ;; :primitive-strategy justifications are simply ignored:
+    (:primitive-strategy NULL)))
+
+(defun backward-propagate-cached-network-multi-proof ((proof JUSTIFICATION) (error FLOAT))
+  :documentation "Recurse through :multiple-proofs antecedents guided by the current rule combination scheme."
+  :public? TRUE
+  ;; relies on the fact that forward activations have been stored in `positive-score' of justifications:
+  (case *rule-combination*
+    (:MAX 
+     (let ((max MOST-NEGATIVE-FLOAT))
+       (foreach ant in (antecedents proof)
+           do (when (> (match-score ant) max)
+		(setq max (match-score ant))
+		(setq proof ant)))
+       (backward-propagate-cached-network-proof proof error)))
+    (:NOISY-OR
+     (foreach ant in (antecedents proof)
+         do (backward-propagate-cached-network-proof ant (* error (match-score ant)))))))
+
+
+  ;;
+;;;;;; Batch processing support
+  ;;
+
+;;; In order to get any reasonable performance out of TensorFlow2 or similar paradigms, we have to process
+;;; batches of inputs instead of one input at a time.  Otherwise, the overhead for each individual forward or
+;;; backward propagation through a TensorFlow graph kills our performance (we are currently about 500x slower).
+;;; With batching we are now down to about 3.5x slower for 2,500 training examples and a batch size of 1024.
+;;; One explanation for this ceiling might be that with our batch queue implementation, we currently have to
+;;; run forward propagation 3 times (for all of forward/backward/update ops).  However, this picture should
+;;; further improve towards TensorFlow once we use more complex networks (e.g., with embeddings), and when
+;;; we start running on GPUs instead of a single CPU.
+
+;;; Abstract API methods:
+
+(defmethod clear-batch-arrays ((self NEURAL-NETWORK))
+  :documentation "Clear all currently batched inputs (with keys) and associated target values."
+  :public? TRUE
+  (error "clear-batch-arrays: Not defined on " self))
+
+(defmethod (current-batch-size INTEGER) ((self NEURAL-NETWORK))
+  :documentation "Return the number of currently batched inputs."
+  :public? TRUE
+  (error "current-batch-size: Not defined on " self))
+
+(defmethod (batch-is-full? BOOLEAN) ((self NEURAL-NETWORK))
+  :documentation "Return true if input batch arrays have been filled to capacity."
+  :public? TRUE
+  (error "batch-is-full?: Not defined on " self))
+
+(defmethod push-input-values ((self NEURAL-NETWORK) (key OBJECT) (values OBJECT))
+  :documentation "Push input `values' onto the input batch array and associate them with `key' (which can be NULL).
+Associating a key lets us easily map inputs/outputs to some processing object of interest (e.g., a justification)."
+  :public? TRUE
+  (ignore key values)
+  (error "push-input-values: Not defined on " self))
+
+(defmethod push-vector-input-values ((self NEURAL-NETWORK) (vectorSpecs OBJECT))
+  :documentation "Push `vectorSpecs' onto the vector argument batch array which is assumed to correspond to the input
+values at the same respective position in the batch.  Truth-valued and vector-valued inputs are associated by position
+in the batch, they can be pushed independently, as long as they are fully synchronized when processing of the batch starts.
+If `self' has no vector-valued argument, the associated batch array can be left undefined."
+  :public? TRUE
+  (ignore vectorSpecs)
+  (error "push-vector-input-values: Not defined on " self))
+
+(defmethod push-target-value ((self NEURAL-NETWORK) (value FLOAT))
+  :documentation "Push a target `value' onto the target batch array which is assumed to correspond to the input
+values at the same respective position in the batch.  Inputs and targets are associated by position in the batch,
+they can be pushed independently, as long as they are fully synchronized when processing of the batch starts."
+  :public? TRUE
+  (ignore value)
+  (error "push-target-value: Not defined on " self))
+
+(defmethod (nth-batch-key OBJECT) ((self NEURAL-NETWORK) (n INTEGER))
+  :documentation "Return the key associated with the `n'-th set of inputs in the input batch."
+  :public? TRUE
+  (ignore n)
+  (error "nth-batch-key: Not defined on " self))
+
+(defmethod (nth-kth-batch-input-error FLOAT) ((self NEURAL-NETWORK) (n INTEGER) (k INTEGER))
+  :documentation "Return error of the `k'-th input in the `n'-th set of inputs in the input batch.
+`k' ignores the bias unit."
+  :public? TRUE
+  (ignore n k)
+  (error "nth-kth-batch-input-error: Not defined on " self))
+
+(defmethod (nth-batch-output FLOAT) ((self NEURAL-NETWORK) (n INTEGER))
+  :documentation "Return the output value for the `n'-th set of inputs in the input batch."
+  :public? TRUE
+  (ignore n)
+  (error "nth-batch-output: Not defined on " self))
+
+(defmethod (batch-forward-propagate-inputs FLOAT-ARRAY) ((self NEURAL-NETWORK))
+  :documentation "Run forward propagation on the current input batch and store outputs in the output batch."
+  :public? TRUE
+  (error "batch-forward-propagate-inputs: Not defined on " self))
+
+(defmethod batch-backward-propagate-error ((self NEURAL-NETWORK))
+  :documentation "Run backward propagation on the current input and target batch and store back-propagated
+errors in the input error batch."
+  :public? TRUE
+  (error "batch-backward-propagate-error: Not defined on " self))
+
+(defmethod batch-update-network-weights ((self NEURAL-NETWORK))
+  :documentation "Run weight updates for the current input and target batches."
+  :public? TRUE
+  (error "batch-update-network-weights: Not defined on " self))
+
+
+;;; CHAMELEON batch implementation (mainly for debugging the queueing algorithm)
+
+(defglobal *neural-network-batch-size* INTEGER 128
+  :demon-property "powerloom.chameleon.neuralNetworkBatchSize"
+  :public? TRUE)
+  
+(defclass CHAMELEON-BATCH-NEURAL-NETWORK (CHAMELEON-NEURAL-NETWORK)
+  :documentation "Chameleon neural network that supports batch operations via emulation."
+  :slots ((input-batch :type (VECTOR-SEQUENCE OF OBJECT)
+            :documentation "Each element is a set of values that may be legally passed to `set-input-values'.")
+          (key-batch :type (VECTOR-SEQUENCE OF OBJECT)
+            :documentation "Each element is a key to identify a specific set of input values.")
+          (target-batch :type (VECTOR-SEQUENCE OF FLOAT-WRAPPER)
+            :documentation "Each element is a target output value for the respective set of input values.")
+          (output-batch :type FLOAT-ARRAY)
+          (input-error-batch :type (VECTOR-SEQUENCE OF FLOAT-ARRAY)
+            :documentation "Copies of `input-error' but without the bias unit, thus shifted by 1.")))
+
+(defmethod allocate-network-arrays ((self CHAMELEON-BATCH-NEURAL-NETWORK) (num-in INTEGER) (num-hidden INTEGER) (num-out INTEGER))
+  :public? TRUE
+  (call-super-method self num-in num-hidden num-out)
+  (setf (input-batch self) (new (VECTOR-SEQUENCE OF OBJECT) :array-size *neural-network-batch-size*))
+  (setf (key-batch self) (new (VECTOR-SEQUENCE OF OBJECT) :array-size *neural-network-batch-size*))
+  (setf (output-batch self) (new FLOAT-ARRAY :dim1 *neural-network-batch-size*))
+  (setf (target-batch self) (new (VECTOR-SEQUENCE OF FLOAT-WRAPPER) :array-size *neural-network-batch-size*))
+  (setf (input-error-batch self) (new (VECTOR-SEQUENCE OF FLOAT-ARRAY) :array-size *neural-network-batch-size*)))
+
+(defmethod clear-batch-arrays ((self CHAMELEON-BATCH-NEURAL-NETWORK))
+  (clear (input-batch self))
+  (clear (key-batch self))
+  (clear (target-batch self))
+  (clear (input-error-batch self)))
+
+(defmethod (current-batch-size INTEGER) ((self CHAMELEON-BATCH-NEURAL-NETWORK))
+  (return (length (input-batch self))))
+
+(defmethod (batch-is-full? BOOLEAN) ((self CHAMELEON-BATCH-NEURAL-NETWORK))
+  (return (>= (length (input-batch self)) (length (output-batch self)))))
+
+(defmethod push-input-values ((self CHAMELEON-BATCH-NEURAL-NETWORK) (key OBJECT) (values OBJECT))
+  (safety 3 (not (batch-is-full? self)) "INTERNAL ERROR: input batch overrun")
+  (insert (key-batch self) key)
+  (insert (input-batch self) values))
+
+(defmethod push-target-value ((self CHAMELEON-BATCH-NEURAL-NETWORK) (value FLOAT))
+  (insert (target-batch self) value))
+
+(defmethod (nth-batch-key OBJECT) ((self CHAMELEON-BATCH-NEURAL-NETWORK) (n INTEGER))
+  (return (nth (key-batch self) n)))
+
+(defmethod (nth-kth-batch-input-error FLOAT) ((self CHAMELEON-BATCH-NEURAL-NETWORK) (n INTEGER) (k INTEGER))
+  (return (1d-aref (nth (input-error-batch self) n) (1+ k))))
+
+(defmethod (nth-batch-output FLOAT) ((self CHAMELEON-BATCH-NEURAL-NETWORK) (n INTEGER))
+  (return (1d-aref (output-batch self) n)))
+
+(defglobal *batch-operation-count* INTEGER 0)
+(defglobal *batch-total-count* INTEGER 0)
+
+(defmethod (batch-forward-propagate-inputs FLOAT-ARRAY) ((self CHAMELEON-BATCH-NEURAL-NETWORK))
+  :public? TRUE
+  (let ((outputs (the-array (output-batch self))))
+    ;(++ *batch-operation-count* 1)
+    ;(++ *batch-total-count* (current-batch-size self))
+    (foreach input in (input-batch self)
+        as i in (interval 0 NULL)
+        do (set-input-values self input)
+           (setf (aref outputs i) (forward-propagate-inputs self)))
+    (return (output-batch self))))
+
+(defmethod (copy-input-error FLOAT-ARRAY) ((self CHAMELEON-BATCH-NEURAL-NETWORK))
+  ;; This method is specific to this type of batch networks and doesn't need to go into the API
+  ;; This version copies input-error arrays literally and keeps the error for the bias unit which
+  ;; is assumed by `nth-kth-batch-input-error'.
+  (let ((inputError (input-error self))
+        (copyError (new FLOAT-ARRAY :dim1 (dim1 inputError))))
+    (copy-float-values-to-buffer inputError (the-array copyError) 0 (dim1 inputError))
+    (return copyError)))
+
+(defmethod batch-backward-propagate-error ((self CHAMELEON-BATCH-NEURAL-NETWORK))
+  :public? TRUE
+  (let ((targets (the-array (target-batch self)))
+        (errors (input-error-batch self))
+        (output 0.0)
+        (error 0.0))
+    (clear errors)
+    ;(++ *batch-operation-count* 1)
+    ;(++ *batch-total-count* (current-batch-size self))
+    (foreach input in (input-batch self)
+        as i in (interval 0 NULL)
+        do (set-input-values self input)
+           (setq output (forward-propagate-inputs self))
+           (setq error (- (nth targets i) output))
+           (backward-propagate-error self error)
+           (insert errors (copy-input-error self)))))
+
+(defmethod batch-update-network-weights ((self CHAMELEON-BATCH-NEURAL-NETWORK))
+  :public? TRUE
+  (let ((targets (the-array (target-batch self)))
+        (output 0.0)
+        (error 0.0))
+    ;(++ *batch-operation-count* 1)
+    ;(++ *batch-total-count* (current-batch-size self))
+    (foreach input in (input-batch self)
+        as i in (interval 0 NULL)
+        do (set-input-values self input)
+           (setq output (forward-propagate-inputs self))
+           (setq error (- (nth targets i) output))
+           (backward-propagate-error self error)
+           (update-network-weights self error))))
+
+
+;;; Tensorflow batch implementation
+
+(defclass 2D-LONG-ARRAY (ABSTRACT-DIMENSIONAL-ARRAY 2-DIMENSIONAL-ARRAY-MIXIN)
+  :documentation "2-dimensional array with long integer values."
+  :public? TRUE
+  :parameters ((any-value :type LONG-INTEGER)))
+
+(defmethod (the-array-reader (ARRAY () OF (LIKE (any-value self)))) ((self 2D-LONG-ARRAY))
+  :public? TRUE
+  (return (the-array self)))
+
+(defclass TENSORFLOW-BATCH-NEURAL-NETWORK (TENSORFLOW-NEURAL-NETWORK)
+  :documentation "Tensorflow neural network that supports batch operations.  We implement input and result
+batches as 1-D and 2-D float arrays to enable fast back-and-forth copying in a single shot instead of having
+multiple method calls.  For this reason, we maintain the input and target sequences manually."
+  :slots ((input-modified? :type BOOLEAN :initially TRUE
+            :documentation "Cleared by Python/Tensorflow side, used to avoid unnecessary copying.")
+          (input-batch :type 2D-FLOAT-ARRAY
+            :documentation "Each row is a set of inputs for the input units of the network, including the bias.")
+          (input-batch-length :type INTEGER :initially 0)
+          (key-batch :type (VECTOR-SEQUENCE OF OBJECT)
+            :documentation "Each element is a key to identify a specific set of input values.")
+          (vector-batch :type 2D-LONG-ARRAY
+            :documentation "Each row is a set of vector argument specs for the inputs of the network.")
+          (vector-batch-length :type INTEGER :initially 0)
+          (target-batch :type FLOAT-ARRAY
+            :documentation "Each element is a target output value for the respective set of input values.")
+          (target-batch-length :type INTEGER :initially 0)
+          (output-batch :type FLOAT-ARRAY)
+          (input-error-batch :type 2D-FLOAT-ARRAY
+            :documentation "Each row is a set of errors the respective inputs including the bias.")))
+
+(defmethod print-network-arrays ((self TENSORFLOW-BATCH-NEURAL-NETWORK))
+  ;; Debugging aid to test if we are copying data properly.
+  (let ((batchLength (input-batch-length self)))
+    (print "input batch (" batchLength "):" EOL)
+    (foreach i in (interval 0 (1- batchLength))
+        do (foreach j in (interval 0 (1- (dim2 (input-batch self))))
+               do (print (2d-aref (input-batch self) i j) " "))
+           (print EOL))
+    (setq batchLength (target-batch-length self))
+    (print "target batch (" batchLength "):" EOL)
+    (foreach i in (interval 0 (1- batchLength))
+        do (print (1d-aref (target-batch self) i) " "))
+    (print EOL)
+    (setq batchLength (input-batch-length self))
+    (print "output batch (" batchLength "):" EOL)
+    (foreach i in (interval 0 (1- batchLength))
+        do (print (1d-aref (output-batch self) i) " "))
+    (print EOL)
+    (print "input error batch (" batchLength "):" EOL)
+    (foreach i in (interval 0 (1- batchLength))
+        do (foreach j in (interval 0 (1- (dim2 (input-error-batch self))))
+               do (print (2d-aref (input-error-batch self) i j) " "))
+           (print EOL))))
+
+(defmethod allocate-network-arrays ((self TENSORFLOW-BATCH-NEURAL-NETWORK) (num-in INTEGER) (num-hidden INTEGER) (num-out INTEGER))
+  :public? TRUE
+  ;; allocate the model structures on the TensorFlow side just as we do for the non-batch version:
+  (call-super-method self num-in num-hidden num-out)
+  (let ((tvNumIn (+ (number-of-truth-value-arguments self (proposition self)) 1))) ;; also include bias
+    ;; now additionally allocate batch input/output arrays on the C++ size to support more course-grained API calls:
+    (setf (input-batch self) (new 2D-FLOAT-ARRAY :dim1 *neural-network-batch-size* :dim2 tvNumIn))
+    (setf (key-batch self) (new (VECTOR-SEQUENCE OF OBJECT) :array-size *neural-network-batch-size*))
+    (when (> (number-of-vector-argument-specs self NULL) 0)
+      (setf (vector-batch self) (new 2D-LONG-ARRAY :dim1 *neural-network-batch-size* :dim2 (number-of-vector-argument-specs self NULL))))
+    (setf (target-batch self) (new FLOAT-ARRAY :dim1 *neural-network-batch-size*))
+    (setf (output-batch self) (new FLOAT-ARRAY :dim1 *neural-network-batch-size*))
+    (setf (input-error-batch self) (new 2D-FLOAT-ARRAY :dim1 *neural-network-batch-size* :dim2 tvNumIn))
+    (setf (input-modified? self) TRUE)))
+
+(defmethod build-proposition-network ((self TENSORFLOW-BATCH-NEURAL-NETWORK) (prop PROPOSITION))
+  :documentation "Build a neural network for the proposition `prop'.  This builds a two-layer
+perceptron network whose input nodes are activated by the truth of `prop's arguments and whose
+output node computes the truth of `prop'."
+  :public? TRUE
+  ;; this is identical to what we do for `CHAMELEON-NEURAL-NETWORK':
+  (let ((num-in (+ (number-of-truth-value-arguments self prop)
+                   (number-of-vector-argument-inputs self prop)
+                   1)) ;; bias
+	(num-hidden (min (+ num-in 0) 20)))
+    ;; TO DO: think about this some more, we easily exceed these numbers with vector arguments
+    (when (> num-in 100)
+      (setq num-hidden (+ (floor (/ num-in 10)) 10)))
+    ;; we need this so we can recompute the number of truth-value inputs in `allocate-network-arrays':
+    (setf (proposition self) prop)
+    (allocate-network-arrays self num-in num-hidden 1)
+    ;; set default behavior for network
+    (case (kind prop)
+      ((:AND :OR)
+       (initialize-network-weights self))
+      (otherwise 
+       (initialize-network-weights self)))
+    (link-neural-network self prop)))
+
+(defmethod (number-of-inputs INTEGER) ((self TENSORFLOW-BATCH-NEURAL-NETWORK))
+  :documentation "Return the number of input values expected by `self' (ignores bias unit)."
+  :public? TRUE :globally-inline? TRUE
+  (return (1- (dim2 (input-batch self)))))
+
+(defmethod (nth-input FLOAT) ((self TENSORFLOW-BATCH-NEURAL-NETWORK) (n INTEGER))
+  :documentation "Return the 0-based `n'-th proposition input of `self' (ignores bias unit)."
+  :public? TRUE :globally-inline? TRUE
+  (ignore n)
+  (error "nth-input: not supported on: " self))
+
+(defmethod (nth-input-error FLOAT) ((self TENSORFLOW-BATCH-NEURAL-NETWORK) (n INTEGER))
+  :documentation "Return the 0-based `n'-th proposition input error of `self' (ignores bias unit)."
+  :public? TRUE :globally-inline? TRUE
+  (ignore n)
+  (error "nth-input-error: not supported on: " self))
+
+(defmethod set-input-values ((self TENSORFLOW-BATCH-NEURAL-NETWORK) (values OBJECT))
+  :documentation "Set the current truth-value inputs of the network `self' to float `values' in sequence.
+Missing inputs will be set to 0.0, extra values will be ignored."
+  :public? TRUE
+  ;; even on a batch network, we need to be able to support forward-computation for individual inputs,
+  ;; e.g., during cached proof generation, so - for now - we use the non-batch method for that:
+  (call-super-method self values))
+
+(defmethod (get-vector-argument-spec OBJECT) ((self TENSORFLOW-BATCH-NEURAL-NETWORK) (arg OBJECT))
+  :documentation "Generate a single argument spec for `arg' that can be used for `set-vector-input-values'.
+`arg' can either be a proposition or justification."
+  :public? TRUE
+  (let ((spec (call-super-method self arg))
+        (evalArgs NIL))
+    (typecase spec
+      (CONS
+       ;; for batch networks, only pointer arguments matter on the Python side, so filter out everything else:
+       (foreach elt in spec
+           where (long-integer? elt)
+           collect elt into evalArgs))
+      (otherwise NULL))
+    (if (non-empty? evalArgs)
+        (return evalArgs)
+      (return spec))))
+
+(defmethod set-vector-input-values ((self TENSORFLOW-BATCH-NEURAL-NETWORK) (vectorSpecs OBJECT))
+  :documentation "Set the current vector inputs of the network `self' to the vectors described by `vectorSpecs'.
+Each vector spec describes a vector-generating proposition that produces one or more vectors.  How those specs
+are translated into actual numeric vectors such as embeddings is specific to the particular neural network type."
+  :public? TRUE
+  ;; even on a batch network, we need to be able to support forward-computation for individual inputs,
+  ;; e.g., during cached proof generation, so - for now - we use the non-batch method for that:
+  (call-super-method self vectorSpecs))
+
+(defmethod (forward-propagate-inputs FLOAT) ((self TENSORFLOW-BATCH-NEURAL-NETWORK))
+  :documentation "Activates the current inputs of the network `self' to compute its output.
+Sets `self's `output' slot and returns the computed value.  Reads input activations and
+weights and updates hidden and output activations."
+  :public? TRUE
+  ;; even on a batch network, we need to be able to support forward-compuation for individual inputs,
+  ;; e.g., during cached proof generation, so - for now - we use the non-batch method for that:
+  (return (call-super-method self)))
+
+(defmethod clear-batch-arrays ((self TENSORFLOW-BATCH-NEURAL-NETWORK))
+  (setf (input-batch-length self) 0)
+  (clear (key-batch self))
+  (setf (vector-batch-length self) 0)
+  (setf (target-batch-length self) 0)
+  (setf (input-modified? self) TRUE))
+
+(defmethod (current-batch-size INTEGER) ((self TENSORFLOW-BATCH-NEURAL-NETWORK))
+  (return (input-batch-length self)))
+
+(defmethod (batch-is-full? BOOLEAN) ((self TENSORFLOW-BATCH-NEURAL-NETWORK))
+  (return (>= (input-batch-length self) *neural-network-batch-size*)))
+
+(defmethod push-input-values ((self TENSORFLOW-BATCH-NEURAL-NETWORK) (key OBJECT) (values OBJECT))
+  (safety 3 (not (batch-is-full? self)) "INTERNAL ERROR: input batch overrun")
+  (let ((inputBatch (input-batch self))
+        (inputArray (the-array inputBatch))
+        (start (2d-aref-address inputBatch (input-batch-length self) 0)))
+    ;; ensure bias input unit[0] is activated:
+    (setf (aref inputArray start) 1.0)
+    (copy-float-values-to-buffer values inputArray (1+ start) (+ start (dim2 inputBatch)))
+    (++ (input-batch-length self))
+    (insert (key-batch self) key)
+    (setf (input-modified? self) TRUE)))
+
+(defmethod push-vector-input-values ((self TENSORFLOW-BATCH-NEURAL-NETWORK) (vectorSpecs OBJECT))
+  ;; no safety checking done here, we assume this is parallel to setting inputs:
+  (when (defined? (vector-batch self))
+    (let ((vectorBatch (vector-batch self))
+          (vectorArray (the-array vectorBatch))
+          (start (2d-aref-address vectorBatch (vector-batch-length self) 0))
+          (i start))
+      (typecase vectorSpecs
+        ((VECTOR CONS)
+         (foreach spec in vectorSpecs
+             do (typecase spec
+                  (CONS
+                   (foreach elt in spec
+                       do (typecase elt
+                            (LONG-INTEGER-WRAPPER
+                             (setf (aref vectorArray i) elt)
+                             (++ i))
+                            (otherwise
+                             (error "push-vector-input-values: unexpected vector argument spec: " elt)))))
+                  (otherwise NULL)))))
+      (when (> i start)
+        (++ (vector-batch-length self))
+        (setf (input-modified? self) TRUE)))))
+
+(defmethod push-target-value ((self TENSORFLOW-BATCH-NEURAL-NETWORK) (value FLOAT))
+  ;; no safety checking done here, we assume this is parallel to setting inputs:
+  (let ((cursor (target-batch-length self)))
+    (setf (1d-aref (target-batch self) cursor) value)
+    (setf (target-batch-length self) (1+ cursor))
+    (setf (input-modified? self) TRUE)))
+
+(defmethod (nth-batch-key OBJECT) ((self TENSORFLOW-BATCH-NEURAL-NETWORK) (n INTEGER))
+  (return (nth (key-batch self) n)))
+
+(defmethod (nth-kth-batch-input-error FLOAT) ((self TENSORFLOW-BATCH-NEURAL-NETWORK) (n INTEGER) (k INTEGER))
+  (return (2d-aref (input-error-batch self) n (1+ k))))
+
+(defmethod (nth-batch-output FLOAT) ((self TENSORFLOW-BATCH-NEURAL-NETWORK) (n INTEGER))
+  (return (1d-aref (output-batch self) n)))
+
+(defmethod (batch-forward-propagate-inputs FLOAT-ARRAY) ((self TENSORFLOW-BATCH-NEURAL-NETWORK))
+  :public? TRUE
+  ;(++ *batch-operation-count* 1)
+  ;(++ *batch-total-count* (current-batch-size self))
+  (funcall (get-tensorflow-callback (quote TENSORFLOW-BATCH-NEURAL-NETWORK.batch-forward-propagate-inputs)))
+  (return (output-batch self)))
+
+(defmethod batch-backward-propagate-error ((self TENSORFLOW-BATCH-NEURAL-NETWORK))
+  :public? TRUE
+  ;(++ *batch-operation-count* 1)
+  ;(++ *batch-total-count* (current-batch-size self))
+  (funcall (get-tensorflow-callback (quote TENSORFLOW-BATCH-NEURAL-NETWORK.batch-backward-propagate-error))))
+
+(defmethod batch-update-network-weights ((self TENSORFLOW-BATCH-NEURAL-NETWORK))
+  :public? TRUE
+  ;(++ *batch-operation-count* 1)
+  ;(++ *batch-total-count* (current-batch-size self))
+  (funcall (get-tensorflow-callback (quote TENSORFLOW-BATCH-NEURAL-NETWORK.batch-update-network-weights))))
+
+
+;;; Operation queuing
+
+;;; The basic idea here is the following: in non-batched training, we walk through a cached proof and at each
+;;; point perform the current computation based on values computed so far and stored in the proof.  For example,
+;;; during back propagation we start with the top-level error and propagate that back through the proof and
+;;; the rules and associated networks touched in the proof.
+
+;;; For batched training we want to combine those individual network computations into batches.  Unfortunately,
+;;; a computation at a particular point in a proof depends on completed computations of its preconditions,
+;;; e.g., the output scores of a rule's antecedents during forward propagation.  To deal with these dependencies
+;;; we use a queue.  We walk the tree as before (e.g., up from the leaves during forward propagation).  At
+;;; each point where we would normally perform a network computation, we now check whether all prerequisite
+;;; computations have been performed.  If so, we queue the current network computation with those inputs (and
+;;; targets if applicable).  If one or more prerequisites are not satisfied, we simply record that dependency
+;;; in the queue.  When a network's input batch has been filled to capacity, it will execute its computation
+;;; and then notify its dependents of the completion of this prerequisite.  Any of the dependents that is
+;;; now ready to compute (and has reached batch capacity) can now be computed, and so on.
+
+;;; For each computation, initially only the first layer in a cached inference tree can be computed (at the leaves
+;;; for forward propagation and at the root for backwards and update).  To get batches filled, we therefore need
+;;; a sufficient number of training examples that repeatedly exercise the rules associated with networks.
+;;; Without that, batch sizes will be small and performance gains minimal (if any).  However, we want to speed
+;;; up training for cases with large numbers of examples, so this usually shouldn't be a problem.
+
+;;; One issue with batched training is that we cannot easily reuse outputs from forward propagation in an immediately
+;;; following backward propagation step.  Instead, we have to rerun forward prop for backward and update operations
+;;; which might explain why with TensorFlow we only come within a factor of 3.5 of the non-batched implementation.
+
+(defclass NETWORK-PROOF-QUEUE (STANDARD-OBJECT)
+  :slots ((dependents :type (KEY-VALUE-MAP OF JUSTIFICATION (CONS OF JUSTIFICATION)) :initially (new KEY-VALUE-MAP)
+             :documentation "Map from computation prerequisites to their dependents.")
+          (prerequisites :type (KEY-VALUE-MAP OF JUSTIFICATION (CONS OF JUSTIFICATION)) :initially (new KEY-VALUE-MAP)
+             :documentation "Map from dependents to their computation prerequisites.")
+          (active-networks :type (HASH-SET OF NEURAL-NETWORK NEURAL-NETWORK) :initially (new HASH-SET))
+          (min-batch-size :type INTEGER :initially (floor (* *neural-network-batch-size* 0.8)))
+          (n-queued :type INTEGER :initially 0)))
+
+(defclass NETWORK-PROOF-FORWARD-QUEUE (NETWORK-PROOF-QUEUE))
+(defclass NETWORK-PROOF-BACKWARD-QUEUE (NETWORK-PROOF-QUEUE))
+(defclass NETWORK-PROOF-UPDATE-QUEUE (NETWORK-PROOF-QUEUE))
+
+(defun add-network-proof-dependency-link ((table KEY-VALUE-MAP) (subject JUSTIFICATION) (object JUSTIFICATION))
+  ;; Record a dependency link between `subject' and `object' (there could be multiple).
+  (let ((links CONS (lookup table subject)))
+    (cond ((null? links)
+           (insert-at table subject (cons object NIL)))
+          ((nil? links)
+           ;; shouldn't happen, but just to be safe:
+           (insert-at table subject (cons object NIL)))
+          ((not (memb? links object))
+           (concatenate links (cons object NIL))))))
+
+(defun remove-network-proof-dependency-link ((table KEY-VALUE-MAP) (subject JUSTIFICATION) (object JUSTIFICATION))
+  ;; Remove a dependency link between `subject' and `object'.
+  (let ((links CONS (lookup table subject)))
+    (when (and (defined? links)
+               (not (nil? links)))
+      (setq links (remove links object))
+      (when (nil? links)
+        (remove-at table subject)))))
+
+(defmethod add-dependent ((queue NETWORK-PROOF-QUEUE) (prerequisite JUSTIFICATION) (dependent JUSTIFICATION))
+  ;; Record `dependent' as being dependent on the completion of `prerequisite' (there could be multiple).
+  (add-network-proof-dependency-link (dependents queue) prerequisite dependent)
+  ;; inverse link from dependent to prerequisites:
+  (add-network-proof-dependency-link (prerequisites queue) dependent prerequisite))
+
+(defmethod remove-dependent ((queue NETWORK-PROOF-QUEUE) (prerequisite JUSTIFICATION) (dependent JUSTIFICATION))
+  ;; Remove `dependent' from the list of `prerequisite''s dependents.
+  (remove-network-proof-dependency-link (dependents queue) prerequisite dependent)
+  ;; inverse link from dependent to prerequisites:
+  (remove-network-proof-dependency-link (prerequisites queue) dependent prerequisite))
+
+(defmethod (get-dependents (CONS OF JUSTIFICATION)) ((queue NETWORK-PROOF-QUEUE) (prerequisite JUSTIFICATION))
+  ;; Return list of dependents depending on `prerequisite' (NIL if there aren't any).
+  (return (first-defined (lookup (dependents queue) prerequisite) NIL)))
+
+(defmethod (has-dependent? BOOLEAN) ((queue NETWORK-PROOF-QUEUE) (prerequisite JUSTIFICATION) (dependent JUSTIFICATION))
+  ;; Return TRUE if `dependent' is a dependent of `prerequisite'.
+  (return (memb? (get-dependents queue prerequisite) dependent)))
+
+(defmethod (get-prerequisites (CONS OF JUSTIFICATION)) ((queue NETWORK-PROOF-QUEUE) (dependent JUSTIFICATION))
+  ;; Return list of prerequisites of `dependent' (NIL if there aren't any).
+  (return (first-defined (lookup (prerequisites queue) dependent) NIL)))
+
+(defmethod (has-prerequisite? BOOLEAN) ((queue NETWORK-PROOF-QUEUE) (dependent JUSTIFICATION) (prerequisite JUSTIFICATION))
+  ;; Return TRUE if `prerequisite' is a prerequisite of `dependent'.
+  (return (memb? (get-prerequisites queue dependent) prerequisite)))
+
+
+;;; abstract forward/backward/update processing methods:
+(defmethod batch-process-cached-network-proof ((queue NETWORK-PROOF-QUEUE) (proof JUSTIFICATION))
+  (ignore proof)
+  (error "batch-process-cached-network-proof: not implemented on: " queue))
+  
+(defmethod queue-network-operation ((queue NETWORK-PROOF-QUEUE) (proof JUSTIFICATION))
+  (ignore proof)
+  (error "queue-network-operation: not implemented on: " queue))
+
+(defmethod execute-network-operation ((queue NETWORK-PROOF-QUEUE) (net NEURAL-NETWORK) (force? BOOLEAN))
+  (ignore net force?)
+  (error "execute-network-operation: not implemented on: " queue))
+
+
+(defmethod batch-process-cached-network-proof ((queue NETWORK-PROOF-FORWARD-QUEUE) (proof JUSTIFICATION))
+  :documentation "Compute the same partial match score as the call to `compute-partial-truth'
+that generated `proof' (which is assumed to have been compacted with a call to
+`compact-partial-proof-to-network-proof'.  The score will only be identical of course, if
+the various networks and their weights have not yet been updated during learning."
+  :public? TRUE
+  (case (inference-rule proof)
+    (:primitive-strategy
+     (foreach dep in (get-dependents queue proof)
+         do (notify-of-completion queue dep proof)))
+    ((:and-introduction :or-introduction)
+     (let ((net (get-justification-neural-network proof)))
+       ;; record dependencies before we recurse, otherwise the tests there for parallel ants will fail:
+       (foreach ant in (antecedents proof)
+           where (not (ignored-value-argument? net (proposition ant)))
+           do (add-dependent queue ant proof))
+       (foreach ant in (antecedents proof)
+           where (not (ignored-value-argument? net (proposition ant)))
+           do (batch-process-cached-network-proof queue ant))))
+    ((:multiple-proofs :disproof :goal-complement)
+     ;; record dependencies before we recurse, otherwise the tests there for parallel ants will fail:
+     (foreach ant in (antecedents proof)
+         do (add-dependent queue ant proof))
+     (foreach ant in (antecedents proof)
+         do (batch-process-cached-network-proof queue ant)))))
+
+(defmethod notify-of-completion ((queue NETWORK-PROOF-QUEUE) (proof JUSTIFICATION) (prerequisite JUSTIFICATION))
+  :documentation "Notify `proof' that one of its `prerequisite's had its computation completed."
+  :public? TRUE
+  (remove-dependent queue prerequisite proof)
+  (when (empty? (get-prerequisites queue proof))
+    ;; all prerequisites have finished, queue this goal for computation:
+    (queue-network-operation queue proof)))
+
+(defmethod queue-input-values ((queue NETWORK-PROOF-QUEUE) (net NEURAL-NETWORK) (proof JUSTIFICATION) (inputs OBJECT) (vectorSpecs OBJECT))
+  :documentation "Queue `inputs' in `net's input batch.  Execute the current batch if we are full."
+  :public? TRUE
+  (insert (active-networks queue) net)
+  (while (batch-is-full? net)
+    ;; forced execution will clear `net's batch, but it might trigger further queueing which is why we loop:
+    (execute-network-operation queue net TRUE))
+  ;; now there should be room to at least push one set of inputs:
+  (push-input-values net proof inputs)
+  (when (defined? vectorSpecs)
+    (push-vector-input-values net vectorSpecs))
+  (++ (n-queued queue)))
+
+(defmethod queue-network-operation ((queue NETWORK-PROOF-FORWARD-QUEUE) (proof JUSTIFICATION))
+  ;; Assume all prerequisites have finished and queue this goal for score computation.
+  ;; Implementation for `forward-propagate-inputs'.
+  :public? TRUE
+  (let ((score 0.0))
+    (case (inference-rule proof)
+      (:primitive-strategy
+       (error "INTERNAL ERROR: unexpected justification type in batch forward computation"))
+      ((:and-introduction :or-introduction)
+       (let ((net (get-justification-neural-network proof))
+             (inputs (new VECTOR :array-size (number-of-inputs net)))
+             (vectorArgs
+              (only-if (has-vector-arguments? net)
+                (new VECTOR :array-size (number-of-vector-arguments net NULL))))
+             (index -1))
+         (foreach ant in (antecedents proof)
+             do (setq index (truth-value-argument-index net (proposition ant)))
+                (when (>= index 0)
+                  (setq score (match-score ant))
+                  (setf (nth inputs index) score))
+                (when (defined? vectorArgs)
+                  (setq index (vector-argument-index net (proposition ant)))
+                  (when (>= index 0)
+                    (setf (nth vectorArgs index) (get-vector-argument-spec net ant)))))
+         ;; this provides default values for missing args in case we have an OR:
+         (queue-input-values queue net proof inputs vectorArgs)))
+      (:multiple-proofs
+       (setq score (combine-multiple-match-scores
+                    (collect (match-score ant) foreach ant in (antecedents proof))))
+       (setf (match-score proof) score)
+       (foreach dep in (get-dependents queue proof)
+           do (notify-of-completion queue dep proof)))
+      ((:disproof :goal-complement)
+       (setq score (invert-chameleon-match-score (match-score (first (antecedents proof)))))
+       (setf (match-score proof) score)
+       (foreach dep in (get-dependents queue proof)
+           do (notify-of-completion queue dep proof))))))
+
+(defmethod execute-network-operation ((queue NETWORK-PROOF-FORWARD-QUEUE) (net NEURAL-NETWORK) (force? BOOLEAN))
+  ;; Implementation for `forward-propagate-inputs'.
+  :public? TRUE
+  (let ((batchSize (current-batch-size net)))
+    (when (and (> batchSize 0)
+               (or force?
+                   (>= batchSize (min-batch-size queue))))
+      (let ((output 0.0)
+            (proof JUSTIFICATION NULL)
+            (scoredProofs (new (VECTOR-SEQUENCE OF JUSTIFICATION) :array-size batchSize)))
+        (batch-forward-propagate-inputs net)
+        (foreach i in (interval 0 (1- batchSize))
+            do (setq output (nth-batch-output net i))
+               (setq proof (nth-batch-key net i))
+               (setf (match-score proof) output)
+               (insert scoredProofs proof))
+        ;; ensure we clear everything in this network before we cause any further queueing:
+        (-- (n-queued queue) batchSize)
+        (clear-batch-arrays net)
+        (foreach proof in scoredProofs
+            do (foreach dep in (get-dependents queue proof)
+                   do (notify-of-completion queue dep proof)))))))
+
+(defmethod execute-all ((queue NETWORK-PROOF-QUEUE))
+  :documentation "Execute queued ops in `queue' until there is nothing more to do."
+  :public? TRUE
+  (let ((lowWaterMark
+         ;; if we have more than `lowWaterMark' inputs queued, than at least one network must
+         ;; exist with >= `(min-batch-size queue)' inputs, thus at least one network op will
+         ;; execute even if force? is false:
+         (* (length (active-networks queue)) (min-batch-size queue))))
+    (while (> (n-queued queue) 0)
+      (foreach net in (active-networks queue)
+          do (execute-network-operation queue net (<= (n-queued queue) lowWaterMark))))))
+
+
+;;; Back-propagate error (we can dissociate that from updating of weights and do that in a separate pass):
+
+(defslot JUSTIFICATION training-error :renames error-score
+   :documentation "More suggestive name for this slot which is used to store and propagate errors during training.")
+
+(defmethod batch-process-cached-network-proof ((queue NETWORK-PROOF-BACKWARD-QUEUE) (proof JUSTIFICATION))
+  :documentation "Queue and process operations for `update-network-weights' for `proof'."
+  :public? TRUE
+  (case (inference-rule proof)
+    ((:and-introduction :or-introduction)
+     (let ((net (get-justification-neural-network proof)))
+       (foreach ant in (antecedents proof)
+           where (and (not (eql? (inference-rule ant) :primitive-strategy))
+                      (not (ignored-value-argument? net (proposition ant))))
+           do (add-dependent queue proof ant))
+       (when (empty? (get-prerequisites queue proof))
+         (queue-network-operation queue proof))
+       (foreach ant in (antecedents proof)
+           where (and (not (eql? (inference-rule ant) :primitive-strategy))
+                      (not (ignored-value-argument? net (proposition ant))))
+           do (batch-process-cached-network-proof queue ant))))
+    ((:multiple-proofs :disproof :goal-complement)
+     (foreach ant in (antecedents proof)
+         where (not (eql? (inference-rule ant) :primitive-strategy))
+         do (add-dependent queue proof ant))
+     (when (empty? (get-prerequisites queue proof))
+       (queue-network-operation queue proof))
+     (foreach ant in (antecedents proof)
+           where (not (eql? (inference-rule ant) :primitive-strategy))
+         do (batch-process-cached-network-proof queue ant)))
+    ;; :primitive-strategy justifications are simply ignored:
+    (:primitive-strategy NULL)))
+
+(defmethod queue-network-operation ((queue NETWORK-PROOF-BACKWARD-QUEUE) (proof JUSTIFICATION))
+  ;; Assume all prerequisites have finished and queue this goal for computation.
+  ;; Implementation for `backward-propagate-error'.
+  :public? TRUE
+  (let ((score 0.0)
+        (error (training-error proof)))
+    (case (inference-rule proof)
+      (:primitive-strategy
+       (error "INTERNAL ERROR: unexpected justification type in batch backward computation"))
+      ((:and-introduction :or-introduction)
+       (let ((net (get-justification-neural-network proof))
+             (inputs (new VECTOR :array-size (number-of-inputs net)))
+             (vectorArgs
+              (only-if (has-vector-arguments? net)
+                (new VECTOR :array-size (number-of-vector-arguments net NULL))))
+             (index -1))
+         (foreach ant in (antecedents proof)
+             do (setq index (truth-value-argument-index net (proposition ant)))
+                (when (>= index 0)
+                  (setq score (match-score ant))
+                  (setf (nth inputs index) score))
+                (when (defined? vectorArgs)
+                  (setq index (vector-argument-index net (proposition ant)))
+                  (when (>= index 0)
+                    (setf (nth vectorArgs index) (get-vector-argument-spec net ant)))))
+         (setq score (match-score proof))
+         ;; this provides default values for missing args in case we have an OR:
+         (queue-input-values queue net proof inputs vectorArgs)
+         (push-target-value net (+ score error))))
+      (:multiple-proofs
+       ;; nothing to compute here, we just need to propagate the error to antecedents:
+       (foreach ant in (antecedents proof)
+           do (case *rule-combination*
+                ;; EXPERIMENT: with :max strategy, keep training all rules to try to eliminate
+                ;; the full error, not just the one that currently generates the highest score:
+                (:MAX (setf (training-error ant) error))
+                (:NOISY-OR (setf (training-error ant) (* error (match-score ant)))))
+              (remove-dependent queue proof ant)))
+      ((:disproof :goal-complement)
+       ;; nothing to compute here, we just need to propagate the error to antecedents:
+       (setf (training-error (first (antecedents proof))) error)
+       (remove-dependent queue proof (first (antecedents proof)))))))
+
+(defmethod execute-network-operation ((queue NETWORK-PROOF-BACKWARD-QUEUE) (net NEURAL-NETWORK) (force? BOOLEAN))
+  ;; Implementation for `backward-propagate-error'.
+  :public? TRUE
+  (let ((batchSize (current-batch-size net)))
+    (when (and (> batchSize 0)
+               (or force?
+                   (>= batchSize (min-batch-size queue))))
+      (let ((error 0.0)
+            (index -1)
+            (proof JUSTIFICATION NULL)
+            (processedProofs (new (VECTOR-SEQUENCE OF JUSTIFICATION) :array-size batchSize)))
+        (batch-backward-propagate-error net)
+        (foreach i in (interval 0 (1- batchSize))
+            do (setq proof (nth-batch-key net i))
+               (insert processedProofs proof)
+               (foreach ant in (antecedents proof)
+                   where (not (eql? (inference-rule ant) :primitive-strategy))
+                   do (setq index (truth-value-argument-index net (proposition ant)))
+                      (when (>= index 0)
+                        (setq error (nth-kth-batch-input-error net i index))
+                        (setf (training-error ant) error))))
+        ;; ensure we clear everything in this network before we cause any further queueing:
+        (-- (n-queued queue) batchSize)
+        (clear-batch-arrays net)
+        (foreach proof in processedProofs
+            do (foreach dep in (get-dependents queue proof)
+                   do (notify-of-completion queue dep proof)))))))
+
+
+;;; Update network weights based on previously propagated and stored errors
+
+(defmethod batch-process-cached-network-proof ((queue NETWORK-PROOF-UPDATE-QUEUE) (proof JUSTIFICATION))
+  :documentation "Queue and process operations for `update-network-weights' for `proof'."
+  :public? TRUE
+  (case (inference-rule proof)
+    ((:and-introduction :or-introduction)
+     (let ((net (get-justification-neural-network proof)))
+       (queue-network-operation queue proof)
+       (foreach ant in (antecedents proof)
+           where (and (not (eql? (inference-rule ant) :primitive-strategy))
+                      (not (ignored-value-argument? net (proposition ant))))
+           do (batch-process-cached-network-proof queue ant))))
+    ((:multiple-proofs :disproof :goal-complement)
+     (foreach ant in (antecedents proof)
+         where (not (eql? (inference-rule ant) :primitive-strategy))
+         do (batch-process-cached-network-proof queue ant)))
+    ;; :primitive-strategy justifications are simply ignored:
+    (:primitive-strategy NULL)))
+
+(defmethod queue-network-operation ((queue NETWORK-PROOF-UPDATE-QUEUE) (proof JUSTIFICATION))
+  ;; Assume all prerequisites have finished and queue this goal for computation.
+  ;; Implementation for `update-network-weights'.
+  :public? TRUE
+  (let ((score 0.0)
+        (error (training-error proof)))
+    (case (inference-rule proof)
+      ((:primitive-strategy :multiple-proofs :disproof :goal-complement)
+       (error "INTERNAL ERROR: unexpected justification type in batch update computation"))
+      ((:and-introduction :or-introduction)
+       (let ((net (get-justification-neural-network proof))
+             (inputs (new VECTOR :array-size (number-of-inputs net)))
+             (vectorArgs
+              (only-if (has-vector-arguments? net)
+                (new VECTOR :array-size (number-of-vector-arguments net NULL))))
+             (index -1))
+         (foreach ant in (antecedents proof)
+             do (setq index (truth-value-argument-index net (proposition ant)))
+                (when (>= index 0)
+                  (setq score (match-score ant))
+                  (setf (nth inputs index) score))
+                (when (defined? vectorArgs)
+                  (setq index (vector-argument-index net (proposition ant)))
+                  (when (>= index 0)
+                    (setf (nth vectorArgs index) (get-vector-argument-spec net ant)))))
+         (setq score (match-score proof))
+         ;; this provides default values for missing args in case we have an OR:
+         (queue-input-values queue net proof inputs vectorArgs)
+         (push-target-value net (+ score error)))))))
+
+(defmethod execute-network-operation ((queue NETWORK-PROOF-UPDATE-QUEUE) (net NEURAL-NETWORK) (force? BOOLEAN))
+  ;; Implementation for `update-network-weights'.
+  :public? TRUE
+  (let ((batchSize (current-batch-size net)))
+    (when (and (> batchSize 0)
+               (or force?
+                   (>= batchSize (min-batch-size queue))))
+        (batch-update-network-weights net)
+        (-- (n-queued queue) batchSize)
+        (clear-batch-arrays net))))
+
+
+  ;;
+;;;;;; Top-level training commands
+  ;;
+
+(defun (retrieve-training-examples (LIST OF TRAINING-EXAMPLE)) (&rest (options OBJECT))
+  :documentation "Retrieve a subset of current training examples defined via `cham/training-example'."
+  :public? TRUE :command? TRUE
+  (let ((theOptions
+         (parse-options
+          (coerce-&rest-to-cons options)
+          (bquote (:module @MODULE
+                   :local? @BOOLEAN
+                   :n-train @INTEGER))
+          TRUE TRUE))
+        (theModule MODULE (lookup-with-default theOptions :module *module*))
+        ;; we are not using/enforcing this yet:
+        ;(local? BOOLEAN (lookup-with-default theOptions :local? FALSE))
+        (numTraining INTEGER (lookup-with-default theOptions :n-train MOST-POSITIVE-INTEGER))
+        (example TRAINING-EXAMPLE NULL)
+        (examples (new LIST)))
+    (within-module theModule
+      (foreach solution in (solutions (call-retrieve (bquote (& numTraining (cham/training-example ?p ?s)))))
+          do (setq example
+               (new TRAINING-EXAMPLE
+                    :query (generate-proposition (nth (bindings solution) 0))
+                    :score (coerce-to-float (nth (bindings solution) 1))
+                    :module theModule))
+          collect example into examples)
+      (return examples))))
+                                   
+(defun (select-training-examples (VECTOR OF TRAINING-EXAMPLE)) (&rest (options OBJECT))
+  :documentation "Select a subset of currently defined training examples.  Currently the selection
+is purely based on module and/or number.  Results will be shuffled if :shuffle? is TRUE (default)."
+  :public? TRUE :command? TRUE
+  (let ((theOptions
+         (parse-options
+          (coerce-&rest-to-cons options)
+          (bquote (:module @MODULE
+                   :local? @BOOLEAN
+                   :n-train @INTEGER
+                   :shuffle? @BOOLEAN))
+          TRUE FALSE))
+        (trainingExamples (LIST OF TRAINING-EXAMPLE)
+         ;; combine new-style with old-style examples:
+         (concatenate (retrieve-training-examples :options theOptions) *training-examples*))
+        (theModule MODULE (lookup-with-default theOptions :module *module*))
+        (local? BOOLEAN (lookup-with-default theOptions :local? FALSE))
+        (numTraining INTEGER (lookup-with-default theOptions :n-train MOST-POSITIVE-INTEGER))
+        (shuffle? BOOLEAN (lookup-with-default theOptions :shuffle? TRUE))
+        (examples (new (VECTOR-SEQUENCE OF TRAINING-EXAMPLE) :array-size 100)))
+    (foreach exp in trainingExamples
+        where (> numTraining 0)
+        do (when (or (null? (module exp))
+                     (eql? (module exp) theModule)
+                     (and (not local?)
+                          (visible-from? (module exp) theModule)))
+             (insert examples exp)
+             (-- numTraining)))
+    (setf (array-size examples) (sequence-length examples))
+    (when shuffle?
+      (shuffle-vector examples))
+    (return examples)))
+
+(defun (normalize-chameleon-training-options PROPERTY-LIST) ((options OBJECT))
+  :documentation "Normalize and provide defaults for `options' supplied
+to `train-chameleon-neural-networks'."
+  :public? TRUE
+  (let ((theOptions
+         (parse-options
+          options
+          (bquote (:module @MODULE
+                   :local? @BOOLEAN
+                   :epochs @INTEGER
+                   :n-train @INTEGER
+                   :print-cycle @INTEGER
+                   :error-cutoff @FLOAT
+                   :shuffle? @BOOLEAN
+                   :batch? @BOOLEAN
+                   :examples @OBJECT))
+          TRUE FALSE))
+        (batchDefault?
+         ;; TO DO: this is kludgy, abstract this test better:
+         (defined? (string-search-ignore-case (symbol-name *chameleon-neural-network-implementation*) "-batch" 0))))
+    (insert-at theOptions :module (lookup-with-default theOptions :module *module*))
+    (insert-at theOptions :local? (lookup-with-default theOptions :local? FALSE))
+    (insert-at theOptions :epochs (lookup-with-default theOptions :epochs 20))
+    (insert-at theOptions :print-cycle (lookup-with-default theOptions :print-cycle -1))
+    (insert-at theOptions :error-cutoff (lookup-with-default theOptions :error-cutoff *Error-Cutoff*))
+    (insert-at theOptions :shuffle? (lookup-with-default theOptions :shuffle? TRUE))
+    (insert-at theOptions :batch? (lookup-with-default theOptions :batch? batchDefault?))
+    (insert-at theOptions :examples
+               (select-training-examples :module (lookup theOptions :module) :local? (lookup theOptions :local?)
+                                         :n-train (lookup theOptions :n-train) :shuffle? (lookup theOptions :shuffle?)))
+    (insert-at theOptions :n-train (lookup-with-default theOptions :n-train (length (cast (lookup theOptions :examples) SEQUENCE))))
+    (return theOptions)))
+
+(defun train-chameleon-neural-networks (&rest (options OBJECT))
+  :documentation "Train rule neural networks based on :n-train (or all) training examples looked
+up in :module/:local?.  Train for :epochs (defaults to 20) or until :error-cutoff is reached.
+Print every :print-cycle epochs or not at all.  If :shuffle? (the default) randomly shuffle the
+selected training examples before every epoch.  If :batch?, use batch training mechanism (which
+will fail if the current network implementation does not support it)."
+  :public? TRUE :command? TRUE
+  (let ((theOptions (normalize-chameleon-training-options (coerce-&rest-to-cons options)))
+        (epochs INTEGER (lookup theOptions :epochs))
+        (numTraining INTEGER (lookup theOptions :n-train))
+        (printCycle INTEGER (lookup theOptions :print-cycle))
+        (errorCutoff FLOAT (lookup theOptions :error-cutoff))
+        (shuffle? BOOLEAN (lookup theOptions :shuffle?))
+        (batch? BOOLEAN (lookup theOptions :batch?))
+        (examples (VECTOR OF TRAINING-EXAMPLE) (lookup theOptions :examples))
+        (cachedProof JUSTIFICATION NULL)
+        (batchQueue NETWORK-PROOF-QUEUE NULL)
+	(target 0.0)
+	(output 0.0)
+	(error 0.0)
+	(totalAbsError float 0.0)
+        (log STANDARD-OUTPUT))
+    ;; Eagerly create cached network proofs:
+    (foreach exp in examples
+        do (get-cached-network-proof exp))
+    (when (> printCycle 0)
+      (print-stream log "Training networks..." EOL))
+    (foreach cycle in (interval 1 epochs)
+        do (setq totalAbsError 0.0)
+           (when shuffle?
+             (shuffle-vector examples))
+
+           ;; TO DO: add some safety logic to make sure the neural network type supports batching,
+           ;; and if a batching type is used, that we are using the appropriate training loop.
+           (cond (batch?
+                  ;; Phase 1: compute scores of top-level goals through forward propagation from leaves,
+                  ;; and as a side-effect, compute scores of all intermediate goals in the proof tree:
+                  (setq batchQueue (new NETWORK-PROOF-FORWARD-QUEUE))
+                  (foreach exp in examples
+                      do (setq cachedProof (get-cached-network-proof exp))
+                         (batch-process-cached-network-proof batchQueue cachedProof))
+                  (execute-all batchQueue)
+           
+                  ;; Phase 2: backward propagate top-level training error to antecedents, and as a
+                  ;; side-effect, compute errors for all intermediate goals in the proof tree:
+                  (setq batchQueue (new NETWORK-PROOF-BACKWARD-QUEUE))
+                  (foreach exp in examples
+                      do (setq target (score exp))
+                         (setq cachedProof (get-cached-network-proof exp))
+                         (setq output (match-score cachedProof))
+                         (setq error (- target output))
+                         (setf (training-error cachedProof) error)
+                         (setq totalAbsError (+ totalAbsError (abs error)))
+                         (batch-process-cached-network-proof batchQueue cachedProof))
+                  (execute-all batchQueue)
+           
+                  ;; Phase 3: update network weights based on previously computed and stored errors:
+                  (setq batchQueue (new NETWORK-PROOF-UPDATE-QUEUE))
+                  (foreach exp in examples
+                      do (setq cachedProof (get-cached-network-proof exp))
+                         (batch-process-cached-network-proof batchQueue cachedProof))
+                  (execute-all batchQueue))
+
+                  (otherwise
+                   ;; Eager non-batched training:
+                   (foreach exp in examples
+                       do (setq target (score exp))
+                          (setq cachedProof (get-cached-network-proof exp))
+                          (setq output (forward-propagate-cached-network-proof cachedProof))
+                          (setq error (- target output))
+                          (setq totalAbsError (+ totalAbsError (abs error)))
+                          (backward-propagate-cached-network-proof cachedProof error))))
+           
+           (when (and (> printCycle 0)
+                      (= (rem cycle printCycle) 0))
+             (print-stream log "Cycle " cycle " Error: " (/ totalAbsError numTraining) EOL))
+           (when (<= (/ totalAbsError numTraining) errorCutoff)
+             (break)))
+    (when (> printCycle 0)
+      (print-stream log "Final error: " (/ totalAbsError numTraining) EOL))))
+
+#|
+;;; EXPERIMENTS:
+
+(defun (beautify-network-tree CONS) ((tree CONS))
+  (let ((out NIL))
+    (foreach elt in tree
+        do (typecase elt
+             (CONS (pushq out (beautify-network-tree elt)))
+             (PROPOSITION-NEURAL-NETWORK (pushq out (proposition elt)))
+             (otherwise (pushq out elt))))
+    (return (reverse out))))
+
+STELLA(48): (set-partial-match-mode :nn)
+:NN
+STELLA(49): (setq net-tree (create-cached-network (unstringify "(happily-married mary)")))
+
+PATTERN: [] cutoff=0.0
+| GOAL: (HAPPILY-MARRIED MARY)
+| | STRATEGY: :ANTECEDENTS
+| | RULE: (FORALL (?x)
+              (<= (HAPPILY-MARRIED ?x)
+                  (AND (INSTANCE-OF ?x PERSON) (MARRIED ?x) (OLD ?x) (HAPPY ?x))))
+| | | GOAL: (AND (INSTANCE-OF ?x/MARY PERSON) (MARRIED ?x/MARY) (OLD ?x/MARY) (HAPPY ?x/MARY))
+| | | | GOAL: (INSTANCE-OF ?x/MARY PERSON)
+| | | | | GOAL: (PERSON ?x/MARY)
+| | | | | SUCC: ?X=MARY truth=T score=1.0
+1.0
+| | | | SUCC: ?X=MARY truth=T score=1.0
+1.0, 0.5050818104144827
+| | | | GOAL: (MARRIED ?x/MARY)
+| | | | SUCC: ?X=MARY truth=T score=1.0
+1.0, 0.5050818104144827
+| | | | GOAL: (OLD ?x/MARY)
+| | | | FAIL: score=0.0
+0.0, 0.5050818104144827
+| | | | GOAL: (HAPPY ?x/MARY)
+| | | | | STRATEGY: :ANTECEDENTS
+| | | | | RULE: (FORALL (?x)
+                    (<= (HAPPY ?x)
+                        (AND (INSTANCE-OF ?x PERSON) (RICH ?x))))
+| | | | | | GOAL: (AND (INSTANCE-OF ?x/MARY PERSON) (RICH ?x/MARY))
+| | | | | | | GOAL: (INSTANCE-OF ?x/MARY PERSON)
+| | | | | | | | GOAL: (PERSON ?x/MARY)
+| | | | | | | | SUCC: ?X=MARY truth=T score=1.0
+1.0
+| | | | | | | SUCC: ?X=MARY truth=T score=1.0
+1.0, 0.5043546317652393
+| | | | | | | GOAL: (RICH ?x/MARY)
+| | | | | | | FAIL: score=0.0
+0.0, 0.5043546317652393
+| | | | | | SUCC: ?X=MARY truth=U score=0.5043546317652393
+| | | | | SUCC: ?X=MARY truth=U score=0.5043546317652393
+0.5043546317652393
+| | | | | STRATEGY: :ANTECEDENTS
+| | | | | RULE: (FORALL (?x)
+                    (<= (HAPPY ?x)
+                        (AND (INSTANCE-OF ?x PERSON) (OR (YOUNG ?x) (TEENAGER ?x)))))
+| | | | | | GOAL: (AND (INSTANCE-OF ?x/MARY PERSON) (OR (YOUNG ?x/MARY) (TEENAGER ?x/MARY)))
+| | | | | | | GOAL: (INSTANCE-OF ?x/MARY PERSON)
+| | | | | | | | GOAL: (PERSON ?x/MARY)
+| | | | | | | | SUCC: ?X=MARY truth=T score=1.0
+1.0
+| | | | | | | SUCC: ?X=MARY truth=T score=1.0
+1.0, 0.5045785092859297
+| | | | | | | GOAL: (OR (YOUNG ?x/MARY) (TEENAGER ?x/MARY))
+| | | | | | | | GOAL: (YOUNG ?x/MARY)
+| | | | | | | | SUCC: ?X=MARY truth=T score=1.0
+1.0, 0.5044165699560064
+| | | | | | | | GOAL: (TEENAGER ?x/MARY)
+| | | | | | | | SUCC: ?X=MARY truth=T score=1.0
+1.0, 0.5044165699560064
+| | | | | | | SUCC: ?X=MARY truth=T score=0.5044165699560064
+0.5044165699560064, 0.5045785092859297
+| | | | | | SUCC: ?X=MARY truth=T score=0.5045785092859297
+| | | | | SUCC: ?X=MARY truth=T score=0.5045785092859297
+0.5045785092859297
+| | | | SUCC: ?X=MARY truth=T score=0.5045785092859297
+0.5045785092859297, 0.5050818104144827
+| | | SUCC: ?X=MARY truth=U score=0.5050818104144827
+| | SUCC: ?X=MARY truth=U score=0.5050818104144827
+0.5050818104144827
+| SUCC: truth=U score=0.5050818104144827
+((|i|@PROPOSITION-NEURAL-NETWORK |L|1.0 |L|1.0 |L|0.0 ((|i|@PROPOSITION-NEURAL-NETWORK |L|1.0 |L|0.0) (|i|@PROPOSITION-NEURAL-NETWORK |L|1.0 (#)))))
+STELLA(50): 
+STELLA(50): (cl:pprint (beautify-network-tree net-tree))
+
+((|Pd?|(AND (INSTANCE-OF ?x PERSON) (MARRIED ?x) (OLD ?x) (HAPPY ?x)) 
+            1.0                     1.0          0.0    
+                                                          ((|Pd?|(AND (INSTANCE-OF ?x PERSON) (RICH ?x)) 
+                                                                      1.0                     0.0) 
+                                                           (|Pd?|(AND (INSTANCE-OF ?x PERSON) (OR (YOUNG ?x) (TEENAGER ?x))) 
+                                                                      1.0                     ((|Pd?|(OR (YOUNG ?x) (TEENAGER ?x)) 
+                                                                                                          1.0       1.0))))))
+STELLA(51): 
+|#
+
+;; TO DO: the Moriarty NN partial matcher allows multiple supports (proofs) for subgoal propositions
+;; (really at any level).  The question is whether those can actually arise except at the top where
+;; we have seen them, or whether we need to collect them all as well when using proper justifications.
+;; - yes, the NN matcher collects multiple supports (e.g., from multiple rules as in theory-revision2.plm
+;; - interesting: the proposition pointed to by a neural network is not the same (does not have the same
+;;   clause order) as the one in the supports and network trees, probably due to optimization; this could
+;;   be a problem but if it is consistent, the learner will simply smooth this out probably; anyway,
+;;   something to be aware of.  Possibly, we might have to run the NN matcher with the static optimizer
+
+
+  ;;
+;;;;;; Specialists
+  ;;
+
+(defclass SCORED-QUERY-PROOF-ADJUNCT (PROOF-ADJUNCT)
+  :slots ((partial-match-strategy :type PARTIAL-MATCH-FRAME)
+          (down-frame :type CONTROL-FRAME)))
+
+(defun (SCORED-QUERY-specialist KEYWORD) ((frame CONTROL-FRAME) (lastMove KEYWORD))
+  ;; Specialist to compute `(scored-query <query> ?score)'.  If we are not in partial-match mode,
+  ;; this simply runs <query>.  If in partial-match mode, temporarily switches to strict mode and
+  ;; associates each solution found for <query> with partial match score ?score.  ?score can either
+  ;; be fixed or be generated on a per-solution basis within <query>.
+  (let ((proposition (proposition frame))
+        (argPropValue (argument-bound-to (first (arguments proposition))))
+        (argScoreValue (argument-bound-to (second (arguments proposition))))
+        (adjunct SCORED-QUERY-PROOF-ADJUNCT (proof-adjunct frame)))
+    (case lastMove
+      (:DOWN
+       (when (null? adjunct)
+         ;; first time through:
+         (when (or (null? argPropValue)
+                   (not (isa? argPropValue @PROPOSITION)))
+           (return :TERMINAL-FAILURE))
+         ;; clear the choice point for this goal, since we really want to use <query>'s choice points:
+         (setf (choice-point-unbinding-offset frame) NULL)
+         (setq adjunct
+           (new SCORED-QUERY-PROOF-ADJUNCT
+                :down-frame (create-down-frame frame argPropValue)))
+         ;; save current match strategy and down frame so we can switch back and forth:
+         (setf (proof-adjunct frame) adjunct))
+       (setf (down frame) (down-frame adjunct))
+       (setf (partial-match-frame (down frame)) NULL)
+       ;; turn off partial match mode if it was active, always save the current strategy to be safe:
+       (setf (partial-match-strategy adjunct) (partial-match-strategy *queryIterator*))
+       (setf (partial-match-strategy *queryIterator*) NULL)
+       (return :MOVE-DOWN))
+      ;; returning from below:
+      (:UP-TRUE
+       ;; at this point at the latest, the score argument needs to be bound to a valid number:
+       (when (or (null? argScoreValue)
+                 (not (isa? argScoreValue @NUMBER-WRAPPER)))
+         (return (SCORED-QUERY-specialist frame :UP-FAIL)))
+       (setf (partial-match-strategy *queryIterator*) (partial-match-strategy adjunct))
+       (propagate-frame-truth-value (result frame) frame)
+       (when (partial-match-mode?)
+         (set-frame-partial-truth (partial-match-frame frame)
+                                  (truth-value (result frame))
+                                  (coerce-to-float argScoreValue)
+                                  TRUE))
+       (when (record-justifications?)
+         (record-goal-justification
+          frame
+          (new JUSTIFICATION
+               :inference-rule :SCORED-QUERY
+               :antecedents (cons (justification (result frame)) NIL))))
+       (cond ((defined? (down frame))
+              ;; save the current down frame and set the `down' frame of this `frame' to
+              ;; NULL, so it will be reentered upon the next down move; this ensures that
+              ;; we'll properly establish the context before retrieving the next solution:
+              (setf (down-frame adjunct) (down frame))
+              (setf (down frame) NULL)
+              (return :CONTINUING-SUCCESS))
+             (otherwise
+              (return :FINAL-SUCCESS))))
+      (:UP-FAIL
+       (setf (partial-match-strategy *queryIterator*) (partial-match-strategy adjunct))
+       (propagate-frame-truth-value (result frame) frame)
+       (when (partial-match-mode?)
+         (set-frame-partial-truth (partial-match-frame frame) UNKNOWN-TRUTH-VALUE NULL TRUE))
+       (when (record-justifications?)
+         (record-primitive-justification frame :UP-FAIL))
+       (return :TERMINAL-FAILURE)))))
+
+(defun (MATCH-SCORE-specialist KEYWORD) ((frame CONTROL-FRAME) (lastMove KEYWORD))
+  ;; Specialist to compute `(cham/match-score <goal> ?score)'.  This is the dual to `scored-query',
+  ;; since it propagates a frame-internal partial match score to the goal level.  If this is
+  ;; run in strict mode, it creates a partial match frame to ensure that a match score from
+  ;; the subgoal gets appropriately propagated to it.
+  (let ((proposition (proposition frame))
+        (argPropValue (argument-bound-to (first (arguments proposition))))
+        (argScore (second (arguments proposition)))
+        (adjunct SCORED-QUERY-PROOF-ADJUNCT (proof-adjunct frame)))
+    (case lastMove
+      (:DOWN
+       (when (null? adjunct)
+         ;; first time through:
+         (when (or (null? argPropValue)
+                   (not (isa? argPropValue @PROPOSITION)))
+           (return :TERMINAL-FAILURE))
+         ;; clear the choice point for this goal, since we really want to use <query>'s choice points:
+         (setf (choice-point-unbinding-offset frame) NULL)
+         (setq adjunct
+           (new SCORED-QUERY-PROOF-ADJUNCT
+                :down-frame (create-down-frame frame argPropValue)))
+         ;; save current match strategy and down frame so we can switch back and forth:
+         (setf (proof-adjunct frame) adjunct))
+       (setf (down frame) (down-frame adjunct))
+       (when (null? (partial-match-frame (down frame)))
+         (setf (partial-match-frame (down frame))
+           (new CHAMELEON-PARTIAL-MATCH :control-frame (down frame) :kind NULL)))
+       ;; turn on partial match mode if it was inactive, always save the current strategy to be safe:
+       (setf (partial-match-strategy adjunct) (partial-match-strategy *queryIterator*))
+       (setf (partial-match-strategy *queryIterator*) (partial-match-frame (down frame)))
+       (return :MOVE-DOWN))
+      ;; returning from below:
+      (:UP-TRUE
+       (setf (partial-match-strategy *queryIterator*) (partial-match-strategy adjunct))
+       (let ((score (match-score (partial-match-frame (result frame)))))
+         (cond ((bind-argument-to-value? argScore score TRUE)
+                (propagate-frame-truth-value (result frame) frame)
+                (when (partial-match-mode?)
+                  (propagate-frame-partial-truth (partial-match-frame (result frame)) frame))
+                (when (record-justifications?)
+                  (record-goal-justification
+                   frame
+                   (new JUSTIFICATION
+                        :inference-rule :MATCH-SCORE
+                        :antecedents (cons (justification (result frame)) NIL))))
+                (cond ((defined? (down frame))
+                       ;; save the current down frame and set the `down' frame of this `frame' to
+                       ;; NULL, so it will be reentered upon the next down move; this ensures that
+                       ;; we'll properly establish the context before retrieving the next solution:
+                       (setf (down-frame adjunct) (down frame))
+                       (setf (down frame) NULL)
+                       (return :CONTINUING-SUCCESS))
+                      (otherwise
+                       (return :FINAL-SUCCESS))))
+               (otherwise
+                (return (match-score-specialist frame :UP-FAIL))))))
+      (:UP-FAIL
+       (setf (partial-match-strategy *queryIterator*) (partial-match-strategy adjunct))
+       (propagate-frame-truth-value (result frame) frame)
+       (when (partial-match-mode?)
+         (set-frame-partial-truth (partial-match-frame frame) UNKNOWN-TRUTH-VALUE NULL TRUE))
+       (when (record-justifications?)
+         (record-primitive-justification frame :UP-FAIL))
+       (return :TERMINAL-FAILURE)))))

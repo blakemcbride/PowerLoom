@@ -1,0 +1,1078 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;; address-example.slisp
+
+#|
++---------------------------- BEGIN LICENSE BLOCK ---------------------------+
+|                                                                            |
+| Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          |
+|                                                                            |
+| The contents of this file are subject to the Mozilla Public License        |
+| Version 1.1 (the "License"); you may not use this file except in           |
+| compliance with the License. You may obtain a copy of the License at       |
+| http://www.mozilla.org/MPL/                                                |
+|                                                                            |
+| Software distributed under the License is distributed on an "AS IS" basis, |
+| WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   |
+| for the specific language governing rights and limitations under the       |
+| License.                                                                   |
+|                                                                            |
+| The Original Code is the STELLA Programming Language.                      |
+|                                                                            |
+| The Initial Developer of the Original Code is                              |
+| UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          |
+| 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               |
+|                                                                            |
+| Portions created by the Initial Developer are Copyright (C) 2003-2023      |
+| the Initial Developer. All Rights Reserved.                                |
+|                                                                            |
+| Contributor(s):                                                            |
+|                                                                            |
+| Alternatively, the contents of this file may be used under the terms of    |
+| either the GNU General Public License Version 2 or later (the "GPL"), or   |
+| the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   |
+| in which case the provisions of the GPL or the LGPL are applicable instead |
+| of those above. If you wish to allow use of your version of this file only |
+| under the terms of either the GPL or the LGPL, and not to allow others to  |
+| use your version of this file under the terms of the MPL, indicate your    |
+| decision by deleting the provisions above and replace them with the notice |
+| and other provisions required by the GPL or the LGPL. If you do not delete |
+| the provisions above, a recipient may use your version of this file under  |
+| the terms of any one of the MPL, the GPL or the LGPL.                      |
+|                                                                            |
++---------------------------- END LICENSE BLOCK -----------------------------+
+|#
+
+(CL:IN-PACKAGE "STELLA")
+
+;;; Auxiliary variables:
+
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-getAddressFromName| NULL)
+(CL:DEFVAR |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-nameElement| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-return| NULL)
+(CL:DEFVAR |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-streetNum| NULL)
+(CL:DEFVAR |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-streetName| NULL)
+(CL:DEFVAR |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-city| NULL)
+(CL:DEFVAR |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-state| NULL)
+(CL:DEFVAR |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-zip| NULL)
+(CL:DEFVAR |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-phone| NULL)
+(CL:DEFVAR |SYM-ADDRESS-EXAMPLE-XSI-type| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-getAddressFromNameResponse| NULL)
+(CL:DEFVAR |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-return| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-nameToLookup| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-Address| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-StreetNum| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-StreetName| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-City| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-State| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-Zip| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-PhoneNumber| NULL)
+(CL:DEFVAR |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-areaCode| NULL)
+(CL:DEFVAR |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-exchange| NULL)
+(CL:DEFVAR |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-number| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-AreaCode| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-Exchange| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-Number| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-streetNum| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-streetName| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-city| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-state| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-zip| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-phoneNumber| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-areaCode| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-exchange| NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-number| NULL)
+(CL:DEFVAR KWD-ADDRESS-EXAMPLE-METHOD NULL)
+(CL:DEFVAR KWD-ADDRESS-EXAMPLE-POST NULL)
+(CL:DEFVAR KWD-ADDRESS-EXAMPLE-CONTENT NULL)
+(CL:DEFVAR KWD-ADDRESS-EXAMPLE-HEADERS NULL)
+(CL:DEFVAR |SGT-ADDRESS-EXAMPLE-SOAP-ENV-Fault| NULL)
+(CL:DEFVAR SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-STARTUP-ADDRESS-EXAMPLE NULL)
+(CL:DEFVAR SYM-ADDRESS-EXAMPLE-STELLA-METHOD-STARTUP-CLASSNAME NULL)
+
+;;; Forward declarations:
+
+(CL:DECLAIM
+ (CL:SPECIAL *STARTUP-TIME-PHASE* *MODULE* *ADDRESS-REQUEST*
+  STANDARD-OUTPUT EOL))
+
+(CL:DEFUN |new-getAddressFromName| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-getAddressFromName|))
+   (CL:SETF (|%getAddressFromName.cdataContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%getAddressFromName.textContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%getAddressFromName.nameElement| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |getAddressFromName|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-getAddressFromName|)
+
+(CL:DEFUN |access-getAddressFromName-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-nameElement|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%getAddressFromName.nameElement| SELF) VALUE)
+     (CL:SETQ VALUE (|%getAddressFromName.nameElement| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-return| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-return|))
+   (CL:SETF (|%return.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%return.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%return.type| SELF) "ADDRESS-DEMO:address")
+   (CL:SETF (|%return.phone| SELF) NULL)
+   (CL:SETF (|%return.zip| SELF) NULL)
+   (CL:SETF (|%return.state| SELF) NULL)
+   (CL:SETF (|%return.city| SELF) NULL)
+   (CL:SETF (|%return.streetName| SELF) NULL)
+   (CL:SETF (|%return.streetNum| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |return|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-return|)
+
+(CL:DEFUN |access-return-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-streetNum|)
+    (CL:IF SETVALUE? (CL:SETF (|%return.streetNum| SELF) VALUE)
+     (CL:SETQ VALUE (|%return.streetNum| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-streetName|)
+    (CL:IF SETVALUE? (CL:SETF (|%return.streetName| SELF) VALUE)
+     (CL:SETQ VALUE (|%return.streetName| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-city|)
+    (CL:IF SETVALUE? (CL:SETF (|%return.city| SELF) VALUE)
+     (CL:SETQ VALUE (|%return.city| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-state|)
+    (CL:IF SETVALUE? (CL:SETF (|%return.state| SELF) VALUE)
+     (CL:SETQ VALUE (|%return.state| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-zip|)
+    (CL:IF SETVALUE? (CL:SETF (|%return.zip| SELF) VALUE)
+     (CL:SETQ VALUE (|%return.zip| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-phone|)
+    (CL:IF SETVALUE? (CL:SETF (|%return.phone| SELF) VALUE)
+     (CL:SETQ VALUE (|%return.phone| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-XSI-type|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%return.type| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%return.type| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-getAddressFromNameResponse| ()
+  (CL:LET* ((SELF NULL))
+   (CL:SETQ SELF (|%MAKE-getAddressFromNameResponse|))
+   (CL:SETF (|%getAddressFromNameResponse.cdataContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%getAddressFromNameResponse.textContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%getAddressFromNameResponse.return| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |getAddressFromNameResponse|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-getAddressFromNameResponse|)
+
+(CL:DEFUN |access-getAddressFromNameResponse-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-return|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%getAddressFromNameResponse.return| SELF) VALUE)
+     (CL:SETQ VALUE (|%getAddressFromNameResponse.return| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-nameToLookup| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-nameToLookup|))
+   (CL:SETF (|%nameToLookup.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%nameToLookup.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%nameToLookup.type| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |nameToLookup|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-nameToLookup|)
+
+(CL:DEFUN |access-nameToLookup-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-XSI-type|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%nameToLookup.type| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%nameToLookup.type| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-Address| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-Address|))
+   (CL:SETF (|%Address.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%Address.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%Address.phone| SELF) NULL)
+   (CL:SETF (|%Address.zip| SELF) NULL)
+   (CL:SETF (|%Address.state| SELF) NULL)
+   (CL:SETF (|%Address.city| SELF) NULL)
+   (CL:SETF (|%Address.streetName| SELF) NULL)
+   (CL:SETF (|%Address.streetNum| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |Address|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-Address|)
+
+(CL:DEFUN |access-Address-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-streetNum|)
+    (CL:IF SETVALUE? (CL:SETF (|%Address.streetNum| SELF) VALUE)
+     (CL:SETQ VALUE (|%Address.streetNum| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-streetName|)
+    (CL:IF SETVALUE? (CL:SETF (|%Address.streetName| SELF) VALUE)
+     (CL:SETQ VALUE (|%Address.streetName| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-city|)
+    (CL:IF SETVALUE? (CL:SETF (|%Address.city| SELF) VALUE)
+     (CL:SETQ VALUE (|%Address.city| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-state|)
+    (CL:IF SETVALUE? (CL:SETF (|%Address.state| SELF) VALUE)
+     (CL:SETQ VALUE (|%Address.state| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-zip|)
+    (CL:IF SETVALUE? (CL:SETF (|%Address.zip| SELF) VALUE)
+     (CL:SETQ VALUE (|%Address.zip| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-phone|)
+    (CL:IF SETVALUE? (CL:SETF (|%Address.phone| SELF) VALUE)
+     (CL:SETQ VALUE (|%Address.phone| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-StreetNum| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-StreetNum|))
+   (CL:SETF (|%StreetNum.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%StreetNum.textContent| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |StreetNum|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-StreetNum|)
+
+(CL:DEFUN |new-StreetName| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-StreetName|))
+   (CL:SETF (|%StreetName.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%StreetName.textContent| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |StreetName|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-StreetName|)
+
+(CL:DEFUN |new-City| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-City|))
+   (CL:SETF (|%City.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%City.textContent| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |City|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-City|)
+
+(CL:DEFUN |new-State| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-State|))
+   (CL:SETF (|%State.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%State.textContent| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |State|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-State|)
+
+(CL:DEFUN |new-Zip| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-Zip|))
+   (CL:SETF (|%Zip.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%Zip.textContent| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |Zip|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-Zip|)
+
+(CL:DEFUN |new-PhoneNumber| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PhoneNumber|))
+   (CL:SETF (|%PhoneNumber.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PhoneNumber.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PhoneNumber.number| SELF) NULL)
+   (CL:SETF (|%PhoneNumber.exchange| SELF) NULL)
+   (CL:SETF (|%PhoneNumber.areaCode| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PhoneNumber|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-PhoneNumber|)
+
+(CL:DEFUN |access-PhoneNumber-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-areaCode|)
+    (CL:IF SETVALUE? (CL:SETF (|%PhoneNumber.areaCode| SELF) VALUE)
+     (CL:SETQ VALUE (|%PhoneNumber.areaCode| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-exchange|)
+    (CL:IF SETVALUE? (CL:SETF (|%PhoneNumber.exchange| SELF) VALUE)
+     (CL:SETQ VALUE (|%PhoneNumber.exchange| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-number|)
+    (CL:IF SETVALUE? (CL:SETF (|%PhoneNumber.number| SELF) VALUE)
+     (CL:SETQ VALUE (|%PhoneNumber.number| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-AreaCode| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-AreaCode|))
+   (CL:SETF (|%AreaCode.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%AreaCode.textContent| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |AreaCode|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-AreaCode|)
+
+(CL:DEFUN |new-Exchange| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-Exchange|))
+   (CL:SETF (|%Exchange.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%Exchange.textContent| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |Exchange|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-Exchange|)
+
+(CL:DEFUN |new-Number| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-Number|))
+   (CL:SETF (|%Number.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%Number.textContent| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |Number|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-Number|)
+
+(CL:DEFUN |new-streetNum| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-streetNum|))
+   (CL:SETF (|%streetNum.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%streetNum.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%streetNum.type| SELF) "XSD:int") SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |streetNum|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-streetNum|)
+
+(CL:DEFUN |access-streetNum-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-XSI-type|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%streetNum.type| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%streetNum.type| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-streetName| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-streetName|))
+   (CL:SETF (|%streetName.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%streetName.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%streetName.type| SELF) "XSD:string") SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |streetName|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-streetName|)
+
+(CL:DEFUN |access-streetName-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-XSI-type|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%streetName.type| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%streetName.type| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-city| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-city|))
+   (CL:SETF (|%city.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%city.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%city.type| SELF) "XSD:string") SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |city|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-city|)
+
+(CL:DEFUN |access-city-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-XSI-type|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%city.type| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%city.type| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-state| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-state|))
+   (CL:SETF (|%state.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%state.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%state.type| SELF) "XSD:string") SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |state|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-state|)
+
+(CL:DEFUN |access-state-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-XSI-type|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%state.type| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%state.type| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-zip| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-zip|))
+   (CL:SETF (|%zip.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%zip.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%zip.type| SELF) "XSD:int") SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |zip|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-zip|)
+
+(CL:DEFUN |access-zip-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-XSI-type|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%zip.type| SELF) (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%zip.type| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-phoneNumber| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-phoneNumber|))
+   (CL:SETF (|%phoneNumber.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%phoneNumber.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%phoneNumber.type| SELF) "ADDRESS-DEMO:phone")
+   (CL:SETF (|%phoneNumber.number| SELF) NULL)
+   (CL:SETF (|%phoneNumber.exchange| SELF) NULL)
+   (CL:SETF (|%phoneNumber.areaCode| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |phoneNumber|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-phoneNumber|)
+
+(CL:DEFUN |access-phoneNumber-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-areaCode|)
+    (CL:IF SETVALUE? (CL:SETF (|%phoneNumber.areaCode| SELF) VALUE)
+     (CL:SETQ VALUE (|%phoneNumber.areaCode| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-exchange|)
+    (CL:IF SETVALUE? (CL:SETF (|%phoneNumber.exchange| SELF) VALUE)
+     (CL:SETQ VALUE (|%phoneNumber.exchange| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-number|)
+    (CL:IF SETVALUE? (CL:SETF (|%phoneNumber.number| SELF) VALUE)
+     (CL:SETQ VALUE (|%phoneNumber.number| SELF))))
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-XSI-type|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%phoneNumber.type| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%phoneNumber.type| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-areaCode| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-areaCode|))
+   (CL:SETF (|%areaCode.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%areaCode.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%areaCode.type| SELF) "XSD:int") SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |areaCode|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-areaCode|)
+
+(CL:DEFUN |access-areaCode-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-XSI-type|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%areaCode.type| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%areaCode.type| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-exchange| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-exchange|))
+   (CL:SETF (|%exchange.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%exchange.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%exchange.type| SELF) "XSD:string") SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |exchange|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-exchange|)
+
+(CL:DEFUN |access-exchange-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-XSI-type|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%exchange.type| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%exchange.type| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-number| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-number|))
+   (CL:SETF (|%number.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%number.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%number.type| SELF) "XSD:string") SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |number|))
+  |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-number|)
+
+(CL:DEFUN |access-number-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-ADDRESS-EXAMPLE-XSI-type|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%number.type| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%number.type| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+;;; (DEFUN (getAddressFromName getAddressFromNameResponse) ...)
+
+(CL:DEFUN |getAddressFromName| (|name|)
+  (CL:LET* ((|theName| (|%nameToLookup.textContent| |name|)))
+   (CL:DECLARE (CL:TYPE CL:SIMPLE-STRING |theName|))
+   (CL:LET* ((SELF-000 (|new-areaCode|)))
+    (CL:SETF (|%areaCode.textContent| SELF-000) "789")
+    (CL:LET* ((|areaCode| SELF-000))
+     (CL:LET* ((SELF-001 (|new-exchange|)))
+      (CL:SETF (|%exchange.textContent| SELF-001) "654")
+      (CL:LET* ((|exchange| SELF-001))
+       (CL:LET* ((SELF-002 (|new-number|)))
+        (CL:SETF (|%number.textContent| SELF-002) "3210")
+        (CL:LET* ((|number| SELF-002))
+         (CL:LET* ((SELF-003 (|new-phoneNumber|)))
+          (CL:SETF (|%phoneNumber.areaCode| SELF-003) |areaCode|)
+          (CL:SETF (|%phoneNumber.exchange| SELF-003) |exchange|)
+          (CL:SETF (|%phoneNumber.number| SELF-003) |number|)
+          (CL:LET* ((|phone| SELF-003))
+           (CL:LET* ((SELF-004 (|new-streetNum|)))
+            (CL:SETF (|%streetNum.textContent| SELF-004) "919")
+            (CL:LET* ((|streetNum| SELF-004))
+             (CL:LET* ((SELF-005 (|new-streetName|)))
+              (CL:SETF (|%streetName.textContent| SELF-005)
+               (CONCATENATE "Street for " |theName|))
+              (CL:LET* ((|streetName| SELF-005))
+               (CL:LET* ((SELF-006 (|new-city|)))
+                (CL:SETF (|%city.textContent| SELF-006) "Sunnytown")
+                (CL:LET* ((|city| SELF-006))
+                 (CL:LET* ((SELF-007 (|new-state|)))
+                  (CL:SETF (|%state.textContent| SELF-007) "UT")
+                  (CL:LET* ((|state| SELF-007))
+                   (CL:LET* ((SELF-008 (|new-zip|)))
+                    (CL:SETF (|%zip.textContent| SELF-008) "43434")
+                    (CL:LET* ((|zip| SELF-008))
+                     (CL:LET* ((SELF-009 (|new-return|)))
+                      (CL:SETF (|%return.streetNum| SELF-009)
+                       |streetNum|)
+                      (CL:SETF (|%return.streetName| SELF-009)
+                       |streetName|)
+                      (CL:SETF (|%return.city| SELF-009) |city|)
+                      (CL:SETF (|%return.state| SELF-009) |state|)
+                      (CL:SETF (|%return.zip| SELF-009) |zip|)
+                      (CL:SETF (|%return.phone| SELF-009) |phone|)
+                      (CL:LET* ((|return| SELF-009))
+                       (CL:LET*
+                        ((SELF-010 (|new-getAddressFromNameResponse|)))
+                        (CL:SETF
+                         (|%getAddressFromNameResponse.return|
+                          SELF-010)
+                         |return|)
+                        (CL:LET* ((|result| SELF-010))
+                         |result|))))))))))))))))))))))))
+
+;;; (DEFUN (MAKE-REQUEST-OBJECT1 getAddressFromName) ...)
+
+(CL:DEFUN MAKE-REQUEST-OBJECT1 ()
+  (CL:LET* ((SELF-000 (|new-nameToLookup|)))
+   (CL:SETF (|%nameToLookup.textContent| SELF-000) "John B. Good")
+   (CL:LET* ((|nameToLookup| SELF-000))
+    (CL:LET* ((SELF-001 (|new-getAddressFromName|)))
+     (CL:SETF (|%getAddressFromName.nameElement| SELF-001)
+      |nameToLookup|)
+     (CL:LET* ((|requestObject| SELF-001))
+      (CL:SETF (|%nameToLookup.type| |nameToLookup|) "XSD:string")
+      |requestObject|)))))
+
+;;; (DEFUN ADDRESS-TEST1 ...)
+
+(CL:DEFUN ADDRESS-TEST1 ()
+  (CL:LET* ((|result| (NEW-OUTPUT-STRING-STREAM)))
+   (PROCESS-SOAP-RPC-REQUEST *ADDRESS-REQUEST* CL:NIL |result|)
+   (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-OUTPUT)
+    "Retrieved envelope is: " EOL
+    (TO-XML-STRING (FROM-XML-STRING (THE-STRING-READER |result|))))))
+
+;;; (DEFUN ADDRESS-TEST2 ...)
+
+(CL:DEFUN ADDRESS-TEST2 ()
+  (CL:LET*
+   ((|resultString|
+     (%DO-HTTP-REQUEST "http://localhost:8012/ploom/soap-rpc"
+      (CONS-LIST KWD-ADDRESS-EXAMPLE-METHOD KWD-ADDRESS-EXAMPLE-POST
+       KWD-ADDRESS-EXAMPLE-CONTENT (WRAP-STRING *ADDRESS-REQUEST*)))))
+   (CL:DECLARE (CL:TYPE CL:SIMPLE-STRING |resultString|))
+   (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-OUTPUT)
+    "Retrieved envelope is: " EOL |resultString|)))
+
+;;; (DEFUN GET-APACHE-RESPONSE1 ...)
+
+(CL:DEFUN GET-APACHE-RESPONSE1 ()
+  (CL:LET*
+   ((|url| "http://localhost:8080/soap/servlet/rpcrouter")
+    (|headers| (NEW-PROPERTY-LIST)) (|response| STELLA::NULL-STRING)
+    (|responseEnvelope| NULL) (|address| NULL)
+    (|addressString| STELLA::NULL-STRING))
+   (CL:DECLARE
+    (CL:TYPE CL:SIMPLE-STRING |url| |response| |addressString|))
+   (INSERT-AT |headers| (WRAP-STRING "content-type")
+    (WRAP-STRING "text/xml; charset=utf-8"))
+   (CL:SETQ |response|
+    (%DO-HTTP-REQUEST |url|
+     (CONS-LIST KWD-ADDRESS-EXAMPLE-METHOD KWD-ADDRESS-EXAMPLE-POST
+      KWD-ADDRESS-EXAMPLE-HEADERS |headers| KWD-ADDRESS-EXAMPLE-CONTENT
+      (WRAP-STRING *ADDRESS-REQUEST*))))
+   (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-OUTPUT)
+    "Response: " EOL |response| EOL)
+   (CL:SETQ |responseEnvelope| (FROM-XML-STRING |response|))
+   (CL:SETQ |address|
+    (|%Body.contents| (|%Envelope.body| |responseEnvelope|)))
+   (CL:LET* ((*SUPRESS-NAMESPACES?* CL:T))
+    (CL:DECLARE (CL:SPECIAL *SUPRESS-NAMESPACES?*))
+    (CL:SETQ |addressString| (TO-XML-STRING |address|))
+    (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-OUTPUT)
+     "Retrieved Address is: " EOL |addressString|))))
+
+;;; (DEFUN GET-APACHE-RESPONSE2 ...)
+
+(CL:DEFUN GET-APACHE-RESPONSE2 ()
+  (CL:LET*
+   ((|url| "http://tubular.isi.edu:8080/soap/servlet/rpcrouter")
+    (|requestObject| (MAKE-REQUEST-OBJECT1))
+    (|responseObject| (CALL-WEBSERVICE |requestObject| |url|)))
+   (CL:DECLARE (CL:TYPE CL:SIMPLE-STRING |url|))
+   (CL:LET* ((*SUPRESS-NAMESPACES?* CL:T))
+    (CL:DECLARE (CL:SPECIAL *SUPRESS-NAMESPACES?*))
+    (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-OUTPUT)
+     "Retrieved Response object is: " EOL
+     (TO-XML-STRING |responseObject|) EOL EOL)
+    (CL:LET* ((TEST-VALUE-000 (SAFE-PRIMARY-TYPE |responseObject|)))
+     (CL:COND
+      ((SUBTYPE-OF? TEST-VALUE-000
+        |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-getAddressFromNameResponse|)
+       (CL:PROGN
+        (CL:LET*
+         ((|streetName|
+           (|%streetName.textContent|
+            (|%return.streetName|
+             (|%getAddressFromNameResponse.return|
+              |responseObject|)))))
+         (CL:DECLARE (CL:TYPE CL:SIMPLE-STRING |streetName|))
+         (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-OUTPUT)
+          "Retrieved Street Name is: " |streetName| EOL))))
+      ((SUBTYPE-OF? TEST-VALUE-000
+        |SGT-ADDRESS-EXAMPLE-SOAP-ENV-Fault|)
+       (CL:PROGN
+        (CL:LET*
+         ((|code|
+           (|%FaultCode.textContent|
+            (|%Fault.faultcode| |responseObject|)))
+          (|string|
+           (|%FaultString.textContent|
+            (|%Fault.faultstring| |responseObject|)))
+          (|actor|
+           (|%FaultActor.textContent|
+            (|%Fault.faultactor| |responseObject|))))
+         (CL:DECLARE
+          (CL:TYPE CL:SIMPLE-STRING |code| |string| |actor|))
+         (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-OUTPUT)
+          "Received SOAP Fault:" EOL)
+         (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-OUTPUT)
+          " CODE   : " |code| EOL)
+         (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-OUTPUT)
+          " STRING : " |string| EOL)
+         (%%PRINT-STREAM (%OUTPUT-STREAM.NATIVE-STREAM STANDARD-OUTPUT)
+          " ACTOR  : " |actor| EOL))))
+      (CL:T
+       (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+        (%%PRINT-STREAM
+         (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000) "`"
+         TEST-VALUE-000 "' is not a valid case option")
+        (CL:ERROR
+         (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))))))
+
+;;; (DEFGLOBAL *ADDRESS-REQUEST* ...)
+
+(CL:DEFVAR *ADDRESS-REQUEST* "<?xml version='1.0' encoding='UTF-8'?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">
+<SOAP-ENV:Body>
+<ns1:getAddressFromName xmlns:ns1=\"urn:AddressFetcher\" SOAP-ENV:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">
+<ns1:nameToLookup xsi:type=\"xsd:string\">John B. Good</ns1:nameToLookup>
+</ns1:getAddressFromName>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>
+")
+(CL:DECLAIM (CL:TYPE CL:SIMPLE-STRING *ADDRESS-REQUEST*))
+
+(CL:DEFUN HELP-STARTUP-ADDRESS-EXAMPLE1 ()
+  (CL:PROGN
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-getAddressFromName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "getAddressFromName" NULL 1))
+   (CL:SETQ |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-nameElement|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "nameElement" NULL 0))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-return|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "return" NULL 1))
+   (CL:SETQ |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-streetNum|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "streetNum" NULL 0))
+   (CL:SETQ |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-streetName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "streetName" NULL 0))
+   (CL:SETQ |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-city|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "city" NULL 0))
+   (CL:SETQ |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-state|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "state" NULL 0))
+   (CL:SETQ |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-zip|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "zip" NULL 0))
+   (CL:SETQ |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-phone|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "phone" NULL 0))
+   (CL:SETQ |SYM-ADDRESS-EXAMPLE-XSI-type|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "type"
+     (GET-STELLA-MODULE "/STELLA/XML-OBJECTS/XSI" CL:T) 0))
+   (CL:SETQ
+    |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-getAddressFromNameResponse|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "getAddressFromNameResponse" NULL
+     1))
+   (CL:SETQ |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-return|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "return" NULL 0))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-nameToLookup|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "nameToLookup" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-Address|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "Address" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-StreetNum|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "StreetNum" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-StreetName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "StreetName" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-City|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "City" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-State|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "State" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-Zip|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "Zip" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-PhoneNumber|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PhoneNumber" NULL 1))
+   (CL:SETQ |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-areaCode|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "areaCode" NULL 0))
+   (CL:SETQ |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-exchange|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "exchange" NULL 0))
+   (CL:SETQ |SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-number|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "number" NULL 0))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-AreaCode|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "AreaCode" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-Exchange|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "Exchange" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-Number|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "Number" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-streetNum|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "streetNum" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-streetName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "streetName" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-city|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "city" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-state|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "state" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-zip|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "zip" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-phoneNumber|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "phoneNumber" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-areaCode|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "areaCode" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-exchange|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "exchange" NULL 1))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-number|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "number" NULL 1))
+   (CL:SETQ KWD-ADDRESS-EXAMPLE-METHOD
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "METHOD" NULL 2))
+   (CL:SETQ KWD-ADDRESS-EXAMPLE-POST
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "POST" NULL 2))
+   (CL:SETQ KWD-ADDRESS-EXAMPLE-CONTENT
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "CONTENT" NULL 2))
+   (CL:SETQ KWD-ADDRESS-EXAMPLE-HEADERS
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "HEADERS" NULL 2))
+   (CL:SETQ |SGT-ADDRESS-EXAMPLE-SOAP-ENV-Fault|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "Fault"
+     (GET-STELLA-MODULE "/STELLA/XML-OBJECTS/SOAP-ENV" CL:T) 1))
+   (CL:SETQ SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-STARTUP-ADDRESS-EXAMPLE
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "STARTUP-ADDRESS-EXAMPLE" NULL 0))
+   (CL:SETQ SYM-ADDRESS-EXAMPLE-STELLA-METHOD-STARTUP-CLASSNAME
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "METHOD-STARTUP-CLASSNAME"
+     (GET-STELLA-MODULE "/STELLA" CL:T) 0))))
+
+(CL:DEFUN STARTUP-ADDRESS-EXAMPLE ()
+  (CL:LET*
+   ((*MODULE*
+     (GET-STELLA-MODULE "/STELLA/XML-OBJECTS/ADDRESS-EXAMPLE"
+      (> *STARTUP-TIME-PHASE* 1)))
+    (*CONTEXT* *MODULE*))
+   (CL:DECLARE (CL:SPECIAL *MODULE* *CONTEXT*))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 2)
+    (HELP-STARTUP-ADDRESS-EXAMPLE1))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 5)
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "getAddressFromName"
+        "(DEFCLASS getAddressFromName (XMLObject) :PUBLIC-SLOTS ((nameElement :TYPE nameToLookup)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-getAddressFromName|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-getAddressFromName-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "return"
+        "(DEFCLASS return (XMLObject) :PUBLIC-SLOTS ((streetNum :TYPE streetNum) (streetName :TYPE streetName) (city :TYPE city) (state :TYPE state) (zip :TYPE zip) (phone :TYPE phoneNumber) (/STELLA/XML-OBJECTS/XSI/type :TYPE STRING :INITIALLY \"ADDRESS-DEMO:address\")))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-return|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-return-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE
+        "getAddressFromNameResponse"
+        "(DEFCLASS getAddressFromNameResponse (XMLObject) :PUBLIC-SLOTS ((return :TYPE /STELLA/XML-OBJECTS/ADDRESS-DEMO/return)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-getAddressFromNameResponse|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-getAddressFromNameResponse-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "nameToLookup"
+        "(DEFCLASS nameToLookup (XMLObject) :PUBLIC-SLOTS ((/STELLA/XML-OBJECTS/XSI/type :TYPE STRING)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-nameToLookup|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-nameToLookup-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "Address"
+        "(DEFCLASS Address (XMLObject) :PUBLIC-SLOTS ((streetNum :TYPE StreetNum) (streetName :TYPE StreetName) (city :TYPE City) (state :TYPE State) (zip :TYPE Zip) (phone :TYPE PhoneNumber)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-Address|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-Address-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "StreetNum"
+        "(DEFCLASS StreetNum (XMLObject))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-StreetNum|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "StreetName"
+        "(DEFCLASS StreetName (XMLObject))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-StreetName|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "City"
+        "(DEFCLASS City (XMLObject))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-City|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "State"
+        "(DEFCLASS State (XMLObject))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-State|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "Zip"
+        "(DEFCLASS Zip (XMLObject))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-Zip|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PhoneNumber"
+        "(DEFCLASS PhoneNumber (XMLObject) :PUBLIC-SLOTS ((areaCode :TYPE AreaCode) (exchange :TYPE Exchange) (number :TYPE Number)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PhoneNumber|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PhoneNumber-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "AreaCode"
+        "(DEFCLASS AreaCode (XMLObject))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-AreaCode|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "Exchange"
+        "(DEFCLASS Exchange (XMLObject))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-Exchange|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "Number"
+        "(DEFCLASS Number (XMLObject))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-Number|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "streetNum"
+        "(DEFCLASS streetNum (XMLObject) :PUBLIC-SLOTS ((/STELLA/XML-OBJECTS/XSI/type :TYPE STRING :INITIALLY \"XSD:int\")))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-streetNum|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-streetNum-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "streetName"
+        "(DEFCLASS streetName (XMLObject) :PUBLIC-SLOTS ((/STELLA/XML-OBJECTS/XSI/type :TYPE STRING :INITIALLY \"XSD:string\")))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-streetName|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-streetName-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "city"
+        "(DEFCLASS city (XMLObject) :PUBLIC-SLOTS ((/STELLA/XML-OBJECTS/XSI/type :TYPE STRING :INITIALLY \"XSD:string\")))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-city|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-city-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "state"
+        "(DEFCLASS state (XMLObject) :PUBLIC-SLOTS ((/STELLA/XML-OBJECTS/XSI/type :TYPE STRING :INITIALLY \"XSD:string\")))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-state|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-state-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "zip"
+        "(DEFCLASS zip (XMLObject) :PUBLIC-SLOTS ((/STELLA/XML-OBJECTS/XSI/type :TYPE STRING :INITIALLY \"XSD:int\")))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-zip|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-zip-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "phoneNumber"
+        "(DEFCLASS phoneNumber (XMLObject) :PUBLIC-SLOTS ((areaCode :TYPE areaCode) (exchange :TYPE exchange) (number :TYPE number) (/STELLA/XML-OBJECTS/XSI/type :TYPE STRING :INITIALLY \"ADDRESS-DEMO:phone\")))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-phoneNumber|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-phoneNumber-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "areaCode"
+        "(DEFCLASS areaCode (XMLObject) :PUBLIC-SLOTS ((/STELLA/XML-OBJECTS/XSI/type :TYPE STRING :INITIALLY \"XSD:int\")))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-areaCode|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-areaCode-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "exchange"
+        "(DEFCLASS exchange (XMLObject) :PUBLIC-SLOTS ((/STELLA/XML-OBJECTS/XSI/type :TYPE STRING :INITIALLY \"XSD:string\")))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-exchange|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-exchange-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "number"
+        "(DEFCLASS number (XMLObject) :PUBLIC-SLOTS ((/STELLA/XML-OBJECTS/XSI/type :TYPE STRING :INITIALLY \"XSD:string\")))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-number|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-number-Slot-Value|))))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 6) (FINALIZE-CLASSES))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 7)
+    (DEFINE-FUNCTION-OBJECT "getAddressFromName"
+     "(DEFUN (getAddressFromName getAddressFromNameResponse) ((name nameToLookup)))"
+     (CL:FUNCTION |getAddressFromName|) NULL)
+    (DEFINE-FUNCTION-OBJECT "MAKE-REQUEST-OBJECT1"
+     "(DEFUN (MAKE-REQUEST-OBJECT1 getAddressFromName) ())"
+     (CL:FUNCTION MAKE-REQUEST-OBJECT1) NULL)
+    (DEFINE-FUNCTION-OBJECT "ADDRESS-TEST1" "(DEFUN ADDRESS-TEST1 ())"
+     (CL:FUNCTION ADDRESS-TEST1) NULL)
+    (DEFINE-FUNCTION-OBJECT "ADDRESS-TEST2" "(DEFUN ADDRESS-TEST2 ())"
+     (CL:FUNCTION ADDRESS-TEST2) NULL)
+    (DEFINE-FUNCTION-OBJECT "GET-APACHE-RESPONSE1"
+     "(DEFUN GET-APACHE-RESPONSE1 ())"
+     (CL:FUNCTION GET-APACHE-RESPONSE1) NULL)
+    (DEFINE-FUNCTION-OBJECT "GET-APACHE-RESPONSE2"
+     "(DEFUN GET-APACHE-RESPONSE2 ())"
+     (CL:FUNCTION GET-APACHE-RESPONSE2) NULL)
+    (DEFINE-FUNCTION-OBJECT "STARTUP-ADDRESS-EXAMPLE"
+     "(DEFUN STARTUP-ADDRESS-EXAMPLE () :PUBLIC? TRUE)"
+     (CL:FUNCTION STARTUP-ADDRESS-EXAMPLE) NULL)
+    (CL:LET*
+     ((FUNCTION
+       (LOOKUP-FUNCTION
+        SYM-ADDRESS-EXAMPLE-ADDRESS-EXAMPLE-STARTUP-ADDRESS-EXAMPLE)))
+     (SET-DYNAMIC-SLOT-VALUE (%METHOD-SLOT.DYNAMIC-SLOTS FUNCTION)
+      SYM-ADDRESS-EXAMPLE-STELLA-METHOD-STARTUP-CLASSNAME
+      (WRAP-STRING "_StartupAddressExample") NULL-STRING-WRAPPER)))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 8) (FINALIZE-SLOTS)
+    (CLEANUP-UNFINALIZED-CLASSES))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 9)
+    (%IN-MODULE (COPY-CONS-TREE (WRAP-STRING "ADDRESS-EXAMPLE")))
+    (INSERT-AT *NAMESPACE-PREFIX-URI-TABLE*
+     (WRAP-STRING "ADDRESS-EXAMPLE")
+     (WRAP-STRING "urn:AddressFetcher"))
+    (INSERT-AT *NAMESPACE-URI-PREFIX-TABLE*
+     (WRAP-STRING "urn:AddressFetcher")
+     (WRAP-STRING "ADDRESS-EXAMPLE"))
+    (CL:SETQ *INVISIBLE-NAMESPACES-ON-OUTPUT*
+     (CONS (WRAP-STRING "ADDRESS-EXAMPLE")
+      *INVISIBLE-NAMESPACES-ON-OUTPUT*))
+    (DEFINE-GLOBAL-VARIABLE-OBJECT
+     "(DEFGLOBAL *ADDRESS-REQUEST* STRING \"<?xml version='1.0' encoding='UTF-8'?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV=\\\"http://schemas.xmlsoap.org/soap/envelope/\\\" xmlns:xsi=\\\"http://www.w3.org/2001/XMLSchema-instance\\\" xmlns:xsd=\\\"http://www.w3.org/2001/XMLSchema\\\">
+<SOAP-ENV:Body>
+<ns1:getAddressFromName xmlns:ns1=\\\"urn:AddressFetcher\\\" SOAP-ENV:encodingStyle=\\\"http://schemas.xmlsoap.org/soap/encoding/\\\">
+<ns1:nameToLookup xsi:type=\\\"xsd:string\\\">John B. Good</ns1:nameToLookup>
+</ns1:getAddressFromName>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>
+\")" NULL))))

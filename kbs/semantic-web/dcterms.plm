@@ -1,0 +1,740 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;; dcterms.owl
+
+#|
+;;; This is a translation of an OWL2 version of the Dublin Core Terms ontology (see http://bloody-byte.net/rdf/dc_owl2dl/
+;;; for more information on translation and representation choices).
+
+;;; Dependencies: webcore.plm, rdfx.plm, owl.plm
+
+;;; Translation process:
+kbs/semantic-web> java -jar /opt/lib/rdf2rdf-1.0.1-2.3.1.jar dcterms.owl.ttl dcterms.owl
+converting dcterms.owl.ttl to dcterms.owl (Turtle to RDF/XML)
+
+STELLA(2): (load-configuration-file "~/Projects/powerloom/sources/kagg/config/TAC-KBP-2015-coldstart-lisp-test.dat")
+STELLA(3): (load "PL:sources;kagg;scripts;TAC-KBP;TAC-KBP-initialize.plm")
+STELLA(4): (DEFMODULE "/XMLNS/DCT"
+  :documentation "Namespace for symbols of the Dublin Core Terms ontology."
+  :CASE-SENSITIVE? TRUE)
+STELLA(5): (DEFMODULE "/XMLNS/SKOS"
+  :documentation "Namespace for symbols of the Simple Knowledge Organization System (SKOS) data model."
+  :CASE-SENSITIVE? TRUE)
+STELLA(6): (set-property "dcMap"
+  (semweb/define-namespace-map
+    :base-map (semweb/define-namespace-map)
+    (quote (:namespace "dct" :uri "http://purl.org/dc/terms/" :module "/XMLNS/DCT" :style :bare-name))
+    (quote (:namespace "skos" :uri "http://www.w3.org/2004/02/skos/core#" :module "/XMLNS/SKOS" :style :bare-name))
+    (quote (:uri "" :module "WEB-CORE" :style :full-uri :default? TRUE))))
+STELLA(7): (eval (semweb/owl-to-powerloom
+ "PL:kbs;semantic-web;dcterms.owl"
+ "PL:kbs;semantic-web;dcterms.plm"
+ (get-property "dcMap")
+ null
+ (get WEB-CORE)))
+
+;;; minor post-editing for module definitions and external/undefined references
+;;; (we did not import "http://purl.org/dc/dcmitype/" and "http://purl.org/dc/dcam/")
+|#
+
+(CL:IN-PACKAGE "STELLA")
+
+(IN-MODULE "WEB-CORE")
+
+
+;;; Forward definitions, so we don't have to import SKOS first which itself references DC Elements:
+
+(DEFRELATION /XMLNS/SKOS/note (?X ?Y)
+  :BINARY-RELATION TRUE
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/SKOS/note "note")
+  :AXIOMS (/XMLNS/RDFS/isDefinedBy /XMLNS/SKOS/note |http://www.w3.org/2004/02/skos/core|)
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/SKOS/note "A general note, for any purpose.")
+  :AXIOMS (/XMLNS/SKOS/scopeNote /XMLNS/SKOS/note "This property may be used directly, or as a super-property for more specific note types.")
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/SKOS/note))
+
+(DEFRELATION /XMLNS/SKOS/definition (?X ?Y)
+  :SUBSET-OF /XMLNS/SKOS/note
+  :BINARY-RELATION TRUE
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/SKOS/definition "definition")
+  :AXIOMS (/XMLNS/RDFS/isDefinedBy /XMLNS/SKOS/definition |http://www.w3.org/2004/02/skos/core|)
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/SKOS/definition "A statement or formal explanation of the meaning of a concept.")
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/SKOS/definition))
+
+(DEFRELATION /XMLNS/SKOS/scopeNote (?X ?Y)
+  :SUBSET-OF /XMLNS/SKOS/note
+  :BINARY-RELATION TRUE
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/SKOS/scopeNote "scope note")
+  :AXIOMS (/XMLNS/RDFS/isDefinedBy /XMLNS/SKOS/scopeNote |http://www.w3.org/2004/02/skos/core|)
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/SKOS/scopeNote "A note that helps to clarify the meaning and/or the use of a concept.")
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/SKOS/scopeNote))
+
+
+(ASSERT
+ (AND (/XMLNS/OWL/Ontology |http://purl.org/NET/dc_owl2dl/terms|) (/XMLNS/RDFS/label |http://purl.org/NET/dc_owl2dl/terms| "DCMI metadata terms")
+  (DOCUMENTATION |http://purl.org/NET/dc_owl2dl/terms|
+   "OWL 2 DL ontology for Dublin Core metadata terms from the http://purl.org/dc/terms/ namespace; this version is grounded in the DC elements ontology and only uses annotation properties.")
+  (/XMLNS/DCT/creator |http://purl.org/NET/dc_owl2dl/terms| |http://simon-reinhardt.de/#me|)
+  (/XMLNS/DCT/modified |http://purl.org/NET/dc_owl2dl/terms| "2009-09-07")
+  (/XMLNS/DCT/license |http://purl.org/NET/dc_owl2dl/terms| |http://creativecommons.org/licenses/by-sa/3.0/|)
+  (/XMLNS/OWL/imports |http://purl.org/NET/dc_owl2dl/terms| |http://purl.org/NET/dc_owl2dl/elements|)
+  (/XMLNS/OWL/imports |http://purl.org/NET/dc_owl2dl/terms| |http://purl.org/NET/dc_owl2dl/dcam|)
+  (/XMLNS/OWL/imports |http://purl.org/NET/dc_owl2dl/terms| |http://purl.org/NET/dc_owl2dl/dcmitype|)))
+
+(DEFRELATION /XMLNS/DCT/abstract (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/description
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/abstract)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/abstract "Abstract")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/abstract "A summary of the resource."))
+
+(DEFRELATION /XMLNS/DCT/accessRights (?X ?Y)
+  :DOCUMENTATION "Access Rights may include information regarding access or restrictions based on privacy, security, or other policies."
+  :SUBSET-OF /XMLNS/DCT/rights
+  :RANGE /XMLNS/DCT/RightsStatement
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/accessRights)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/accessRights "Access Rights")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/accessRights "Information about who can access the resource or an indication of its security status."))
+
+(DEFRELATION /XMLNS/DCT/accrualMethod (?X ?Y)
+  :DOMAIN |http://purl.org/dc/dcmitype/Collection|
+  :RANGE /XMLNS/DCT/MethodOfAccrual
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/accrualMethod)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/accrualMethod "Accrual Method")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/accrualMethod "The method by which items are added to a collection."))
+
+(DEFRELATION /XMLNS/DCT/accrualPeriodicity (?X ?Y)
+  :DOMAIN |http://purl.org/dc/dcmitype/Collection|
+  :RANGE /XMLNS/DCT/Frequency
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/accrualPeriodicity)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/accrualPeriodicity "Accrual Periodicity")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/accrualPeriodicity "The frequency with which items are added to a collection."))
+
+(DEFRELATION /XMLNS/DCT/accrualPolicy (?X ?Y)
+  :DOMAIN |http://purl.org/dc/dcmitype/Collection|
+  :RANGE /XMLNS/DCT/Policy
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/accrualPolicy)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/accrualPolicy "Accrual Policy")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/accrualPolicy "The policy governing the addition of items to a collection."))
+
+(DEFRELATION /XMLNS/DCT/alternative (?X ?Y)
+  :DOCUMENTATION "The distinction between titles and alternative titles is application-specific."
+  :SUBSET-OF /XMLNS/DCT/title
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/alternative)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/alternative "Alternative Title")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/alternative "An alternative name for the resource.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/alternative
+           "In current practice, this term is used primarily with literal values; however, there are important uses with non-literal values as well. As of December 2007, the DCMI Usage Board is leaving this range unspecified pending an investigation of options."))
+
+(DEFRELATION /XMLNS/DCT/audience (?X ?Y)
+  :RANGE /XMLNS/DCT/AgentClass
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/audience)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/audience "Audience")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/audience "A class of entity for whom the resource is intended or useful."))
+
+(DEFRELATION /XMLNS/DCT/available (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/date
+  :RANGE LITERAL
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/available)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/available "Date Available")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/available "Date (often a range) that the resource became or will become available."))
+
+(DEFRELATION /XMLNS/DCT/bibliographicCitation (?X ?Y)
+  :DOCUMENTATION "Recommended practice is to include sufficient bibliographic detail to identify the resource as unambiguously as possible."
+  :SUBSET-OF /XMLNS/DCT/identifier
+  :DOMAIN /XMLNS/DCT/BibliographicResource
+  :RANGE LITERAL
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/bibliographicCitation)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/bibliographicCitation "Bibliographic Citation")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/bibliographicCitation "A bibliographic reference for the resource."))
+
+(DEFRELATION /XMLNS/DCT/conformsTo (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/relation
+  :RANGE /XMLNS/DCT/Standard
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/conformsTo)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/conformsTo "Conforms To")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/conformsTo "An established standard to which the described resource conforms."))
+
+(DEFRELATION /XMLNS/DCT/contributor (?X ?Y)
+  :DOCUMENTATION "Examples of a Contributor include a person, an organization, or a service. Typically, the name of a Contributor should be used to indicate the entity."
+  :SUBSET-OF /XMLNS/RDFS/contributor
+  :RANGE /XMLNS/DCT/Agent
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/contributor)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/contributor "Contributor")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/contributor "An entity responsible for making contributions to the resource."))
+
+(DEFRELATION /XMLNS/DCT/coverage (?X ?Y)
+  :DOCUMENTATION "Spatial topic and spatial applicability may be a named place or a location specified by its geographic coordinates. Temporal topic may be a named period, date, or date range. A jurisdiction may be a named administrative entity or a geographic place to which the resource applies. Recommended best practice is to use a controlled vocabulary such as the Thesaurus of Geographic Names [TGN]. Where appropriate, named places or time periods can be used in preference to numeric identifiers such as sets of coordinates or date ranges."
+  :SUBSET-OF /XMLNS/RDFS/coverage
+  :RANGE /XMLNS/DCT/LocationPeriodOrJurisdiction
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/coverage)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/coverage "Coverage")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/coverage
+           "The spatial or temporal topic of the resource, the spatial applicability of the resource, or the jurisdiction under which the resource is relevant.")
+  :AXIOMS (/XMLNS/DCT/bibliographicCitation /XMLNS/DCT/coverage "[TGN] http://www.getty.edu/research/tools/vocabulary/tgn/index.html")
+  :AXIOMS (/XMLNS/RDFS/seeAlso /XMLNS/DCT/coverage |http://www.getty.edu/research/tools/vocabulary/tgn/index.html|))
+
+(DEFRELATION /XMLNS/DCT/created (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/date
+  :RANGE LITERAL
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/created)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/created "Date Created")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/created "Date of creation of the resource."))
+
+(DEFRELATION /XMLNS/DCT/creator (?X ?Y)
+  :DOCUMENTATION "Examples of a Creator include a person, an organization, or a service. Typically, the name of a Creator should be used to indicate the entity."
+  :SUBSET-OF /XMLNS/RDFS/creator
+  :SUBSET-OF /XMLNS/DCT/contributor
+  :RANGE /XMLNS/DCT/Agent
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/creator)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/creator "Creator")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/creator "An entity primarily responsible for making the resource."))
+
+(DEFRELATION /XMLNS/DCT/date (?X ?Y)
+  :DOCUMENTATION "Date may be used to express temporal information at any level of granularity. Recommended best practice is to use an encoding scheme, such as the W3CDTF profile of ISO 8601 [W3CDTF]."
+  :SUBSET-OF /XMLNS/RDFS/date
+  :RANGE LITERAL
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/date)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/date "Date")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/date "A point or period of time associated with an event in the lifecycle of the resource.")
+  :AXIOMS (/XMLNS/DCT/bibliographicCitation /XMLNS/DCT/date "[W3CDTF] http://www.w3.org/TR/NOTE-datetime")
+  :AXIOMS (/XMLNS/RDFS/seeAlso /XMLNS/DCT/date |http://www.w3.org/TR/NOTE-datetime|))
+
+(DEFRELATION /XMLNS/DCT/dateAccepted (?X ?Y)
+  :DOCUMENTATION "Examples of resources to which a Date Accepted may be relevant are a thesis (accepted by a university department) or an article (accepted by a journal)."
+  :SUBSET-OF /XMLNS/DCT/date
+  :RANGE LITERAL
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/dateAccepted)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/dateAccepted "Date Accepted")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/dateAccepted "Date of acceptance of the resource."))
+
+(DEFRELATION /XMLNS/DCT/dateCopyrighted (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/date
+  :RANGE LITERAL
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/dateCopyrighted)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/dateCopyrighted "Date Copyrighted")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/dateCopyrighted "Date of copyright."))
+
+(DEFRELATION /XMLNS/DCT/dateSubmitted (?X ?Y)
+  :DOCUMENTATION "Examples of resources to which a Date Submitted may be relevant are a thesis (submitted to a university department) or an article (submitted to a journal)."
+  :SUBSET-OF /XMLNS/DCT/date
+  :RANGE LITERAL
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/dateSubmitted)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/dateSubmitted "Date Submitted")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/dateSubmitted "Date of submission of the resource."))
+
+(DEFRELATION /XMLNS/DCT/description (?X ?Y)
+  :DOCUMENTATION "Description may include but is not limited to: an abstract, a table of contents, a graphical representation, or a free-text account of the resource."
+  :SUBSET-OF /XMLNS/RDFS/description
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/description)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/description "Description")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/description "An account of the resource."))
+
+(DEFRELATION /XMLNS/DCT/educationLevel (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/audience
+  :RANGE /XMLNS/DCT/AgentClass
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/educationLevel)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/educationLevel "Audience Education Level")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/educationLevel
+           "A class of entity, defined in terms of progression through an educational or training context, for which the described resource is intended."))
+
+(DEFRELATION /XMLNS/DCT/extent (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/format
+  :RANGE /XMLNS/DCT/SizeOrDuration
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/extent)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/extent "Extent")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/extent "The size or duration of the resource."))
+
+(DEFRELATION /XMLNS/DCT/format (?X ?Y)
+  :DOCUMENTATION "Examples of dimensions include size and duration. Recommended best practice is to use a controlled vocabulary such as the list of Internet Media Types [MIME]."
+  :SUBSET-OF /XMLNS/RDFS/format
+  :RANGE /XMLNS/DCT/MediaTypeOrExtent
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/format)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/format "Format")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/format "The file format, physical medium, or dimensions of the resource.")
+  :AXIOMS (/XMLNS/DCT/bibliographicCitation /XMLNS/DCT/format "[MIME] http://www.iana.org/assignments/media-types/")
+  :AXIOMS (/XMLNS/RDFS/seeAlso /XMLNS/DCT/format |http://www.iana.org/assignments/media-types/|))
+
+(DEFRELATION /XMLNS/DCT/hasFormat (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/relation
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/hasFormat)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/hasFormat "Has Format")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/hasFormat
+           "A related resource that is substantially the same as the pre-existing described resource, but in another format.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/hasFormat
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/hasPart (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/relation
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/hasPart)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/hasPart "Has Part")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/hasPart "A related resource that is included either physically or logically in the described resource.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/hasPart
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/hasVersion (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/relation
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/hasVersion)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/hasVersion "Has Version")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/hasVersion "A related resource that is a version, edition, or adaptation of the described resource.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/hasVersion
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/identifier (?X ?Y)
+  :DOCUMENTATION "Recommended best practice is to identify the resource by means of a string conforming to a formal identification system."
+  :SUBSET-OF /XMLNS/RDFS/identifier
+  :RANGE LITERAL
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/identifier)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/identifier "Identifier")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/identifier "An unambiguous reference to the resource within a given context."))
+
+(DEFRELATION /XMLNS/DCT/instructionalMethod (?X ?Y)
+  :DOCUMENTATION "Instructional Method will typically include ways of presenting instructional materials or conducting instructional activities, patterns of learner-to-learner and learner-to-instructor interactions, and mechanisms by which group and individual levels of learning are measured. Instructional methods include all aspects of the instruction and learning processes from planning and implementation through evaluation and feedback."
+  :RANGE /XMLNS/DCT/MethodOfInstruction
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/instructionalMethod)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/instructionalMethod "Instructional Method")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/instructionalMethod
+           "A process, used to engender knowledge, attitudes and skills, that the described resource is designed to support."))
+
+(DEFRELATION /XMLNS/DCT/isFormatOf (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/relation
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/isFormatOf)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/isFormatOf "Is Format Of")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/isFormatOf
+           "A related resource that is substantially the same as the described resource, but in another format.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/isFormatOf
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/isPartOf (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/relation
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/isPartOf)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/isPartOf "Is Part Of")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/isPartOf "A related resource in which the described resource is physically or logically included.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/isPartOf
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/isReferencedBy (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/relation
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/isReferencedBy)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/isReferencedBy "Is Referenced By")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/isReferencedBy "A related resource that references, cites, or otherwise points to the described resource.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/isReferencedBy
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/isReplacedBy (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/relation
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/isReplacedBy)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/isReplacedBy "Is Replaced By")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/isReplacedBy "A related resource that supplants, displaces, or supersedes the described resource.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/isReplacedBy
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/isRequiredBy (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/relation
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/isRequiredBy)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/isRequiredBy "Is Required By")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/isRequiredBy
+           "A related resource that requires the described resource to support its function, delivery, or coherence.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/isRequiredBy
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/issued (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/date
+  :RANGE LITERAL
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/issued)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/issued "Date Issued")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/issued "Date of formal issuance (e.g., publication) of the resource."))
+
+(DEFRELATION /XMLNS/DCT/isVersionOf (?X ?Y)
+  :DOCUMENTATION "Changes in version imply substantive changes in content rather than differences in format."
+  :SUBSET-OF /XMLNS/DCT/relation
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/isVersionOf)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/isVersionOf "Is Version Of")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/isVersionOf "A related resource of which the described resource is a version, edition, or adaptation.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/isVersionOf
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/language (?X ?Y)
+  :DOCUMENTATION "Recommended best practice is to use a controlled vocabulary such as RFC 4646 [RFC4646]."
+  :SUBSET-OF /XMLNS/RDFS/language
+  :RANGE /XMLNS/DCT/LinguisticSystem
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/language)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/language "Language")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/language "A language of the resource.")
+  :AXIOMS (/XMLNS/DCT/bibliographicCitation /XMLNS/DCT/language "[RFC4646] http://www.ietf.org/rfc/rfc4646.txt")
+  :AXIOMS (/XMLNS/RDFS/seeAlso /XMLNS/DCT/language |http://www.ietf.org/rfc/rfc4646.txt|))
+
+(DEFRELATION /XMLNS/DCT/license (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/rights
+  :RANGE /XMLNS/DCT/LicenseDocument
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/license)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/license "License")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/license "A legal document giving official permission to do something with the resource."))
+
+(DEFRELATION /XMLNS/DCT/mediator (?X ?Y)
+  :DOCUMENTATION "In an educational context, a mediator might be a parent, teacher, teaching assistant, or care-giver."
+  :SUBSET-OF /XMLNS/DCT/audience
+  :RANGE /XMLNS/DCT/AgentClass
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/mediator)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/mediator "Mediator")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/mediator "An entity that mediates access to the resource and for whom the resource is intended or useful."))
+
+(DEFRELATION /XMLNS/DCT/medium (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/format
+  :DOMAIN /XMLNS/DCT/PhysicalResource
+  :RANGE /XMLNS/DCT/PhysicalMedium
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/medium)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/medium "Medium")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/medium "The material or physical carrier of the resource."))
+
+(DEFRELATION /XMLNS/DCT/modified (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/date
+  :RANGE LITERAL
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/modified)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/modified "Date Modified")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/modified "Date on which the resource was changed."))
+
+(DEFRELATION /XMLNS/DCT/provenance (?X ?Y)
+  :DOCUMENTATION "The statement may include a description of any changes successive custodians made to the resource."
+  :RANGE /XMLNS/DCT/ProvenanceStatement
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/provenance)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/provenance "Provenance")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/provenance
+           "A statement of any changes in ownership and custody of the resource since its creation that are significant for its authenticity, integrity, and interpretation."))
+
+(DEFRELATION /XMLNS/DCT/publisher (?X ?Y)
+  :DOCUMENTATION "Examples of a Publisher include a person, an organization, or a service. Typically, the name of a Publisher should be used to indicate the entity."
+  :SUBSET-OF /XMLNS/RDFS/publisher
+  :RANGE /XMLNS/DCT/Agent
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/publisher)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/publisher "Publisher")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/publisher "An entity responsible for making the resource available."))
+
+(DEFRELATION /XMLNS/DCT/references (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/relation
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/references)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/references "References")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/references "A related resource that is referenced, cited, or otherwise pointed to by the described resource.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/references
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/relation (?X ?Y)
+  :DOCUMENTATION "Recommended best practice is to identify the related resource by means of a string conforming to a formal identification system."
+  :SUBSET-OF /XMLNS/RDFS/relation
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/relation)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/relation "Relation")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/relation "A related resource.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/relation
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/replaces (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/relation
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/replaces)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/replaces "Replaces")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/replaces "A related resource that is supplanted, displaced, or superseded by the described resource.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/replaces
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/requires (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/relation
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/requires)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/requires "Requires")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/requires
+           "A related resource that is required by the described resource to support its function, delivery, or coherence.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/requires
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/rights (?X ?Y)
+  :DOCUMENTATION "Typically, rights information includes a statement about various property rights associated with the resource, including intellectual property rights."
+  :SUBSET-OF /XMLNS/RDFS/rights
+  :RANGE /XMLNS/DCT/RightsStatement
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/rights)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/rights "Rights")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/rights "Information about rights held in and over the resource."))
+
+(DEFRELATION /XMLNS/DCT/rightsHolder (?X ?Y)
+  :RANGE /XMLNS/DCT/Agent
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/rightsHolder)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/rightsHolder "Rights Holder")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/rightsHolder "A person or organization owning or managing rights over the resource."))
+
+(DEFRELATION /XMLNS/DCT/source (?X ?Y)
+  :DOCUMENTATION "The described resource may be derived from the related resource in whole or in part. Recommended best practice is to identify the related resource by means of a string conforming to a formal identification system."
+  :SUBSET-OF /XMLNS/RDFS/source
+  :SUBSET-OF /XMLNS/DCT/relation
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/source)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/source "Source")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/source "A related resource from which the described resource is derived.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/source
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/spatial (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/coverage
+  :RANGE /XMLNS/DCT/Location
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/spatial)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/spatial "Spatial Coverage")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/spatial "Spatial characteristics of the resource."))
+
+(DEFRELATION /XMLNS/DCT/subject (?X ?Y)
+  :DOCUMENTATION "Typically, the subject will be represented using keywords, key phrases, or classification codes. Recommended best practice is to use a controlled vocabulary. To describe the spatial or temporal topic of the resource, use the Coverage element."
+  :SUBSET-OF /XMLNS/RDFS/subject
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/subject)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/subject "Subject")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/subject "The topic of the resource.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/subject
+           "This term is intended to be used with non-literal values as defined in the DCMI Abstract Model (http://dublincore.org/documents/abstract-model/). As of December 2007, the DCMI Usage Board is seeking a way to express this intention with a formal range declaration."))
+
+(DEFRELATION /XMLNS/DCT/tableOfContents (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/description
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/tableOfContents)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/tableOfContents "Table Of Contents")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/tableOfContents "A list of subunits of the resource."))
+
+(DEFRELATION /XMLNS/DCT/temporal (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/coverage
+  :RANGE /XMLNS/DCT/PeriodOfTime
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/temporal)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/temporal "Temporal Coverage")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/temporal "Temporal characteristics of the resource."))
+
+(DEFRELATION /XMLNS/DCT/title (?X ?Y)
+  :SUBSET-OF /XMLNS/RDFS/title
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/title)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/title "Title")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/title "A name given to the resource.")
+  :AXIOMS (/XMLNS/SKOS/note /XMLNS/DCT/title
+           "In current practice, this term is used primarily with literal values; however, there are important uses with non-literal values as well. As of December 2007, the DCMI Usage Board is leaving this range unspecified pending an investigation of options."))
+
+(DEFRELATION /XMLNS/DCT/type (?X ?Y)
+  :DOCUMENTATION "Recommended best practice is to use a controlled vocabulary such as the DCMI Type Vocabulary [DCMITYPE]. To describe the file format, physical medium, or dimensions of the resource, use the Format element."
+  :SUBSET-OF /XMLNS/RDFS/type
+  :RANGE CONCEPT
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/type)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/type "Type")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/type "The nature or genre of the resource.")
+  :AXIOMS (/XMLNS/DCT/bibliographicCitation /XMLNS/DCT/type "[DCMITYPE] http://dublincore.org/documents/dcmi-type-vocabulary/")
+  :AXIOMS (/XMLNS/RDFS/seeAlso /XMLNS/DCT/type |http://dublincore.org/documents/dcmi-type-vocabulary/|))
+
+(DEFRELATION /XMLNS/DCT/valid (?X ?Y)
+  :SUBSET-OF /XMLNS/DCT/date
+  :RANGE LITERAL
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DCT/valid)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/valid "Date Valid")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/valid "Date (often a range) of validity of a resource."))
+
+(ASSERT
+ (AND
+  ;(|http://purl.org/dc/dcam/VocabularyEncodingScheme| /XMLNS/DCT/DCMIType) (/XMLNS/RDFS/label /XMLNS/DCT/DCMIType "DCMI Type Vocabulary")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/DCMIType
+   "The set of classes specified by the DCMI Type Vocabulary, used to categorize the nature or genre of the resource.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/DCMIType |http://dublincore.org/documents/dcmi-type-vocabulary/|)))
+
+(ASSERT
+ (AND
+  ;(|http://purl.org/dc/dcam/VocabularyEncodingScheme| /XMLNS/DCT/DDC) (/XMLNS/RDFS/label /XMLNS/DCT/DDC "DDC")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/DDC "The set of conceptual resources specified by the Dewey Decimal Classification.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/DDC |http://www.oclc.org/dewey/|)))
+
+(ASSERT
+ (AND
+  ;(|http://purl.org/dc/dcam/VocabularyEncodingScheme| /XMLNS/DCT/IMT) (/XMLNS/RDFS/label /XMLNS/DCT/IMT "IMT")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/IMT "The set of media types specified by the Internet Assigned Numbers Authority.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/IMT |http://www.iana.org/assignments/media-types/|)))
+
+(ASSERT
+ (AND
+  ;(|http://purl.org/dc/dcam/VocabularyEncodingScheme| /XMLNS/DCT/LCC) (/XMLNS/RDFS/label /XMLNS/DCT/LCC "LCC")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/LCC "The set of conceptual resources specified by the Library of Congress Classification.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/LCC |http://lcweb.loc.gov/catdir/cpso/lcco/lcco.html|)))
+
+(ASSERT
+ (AND
+  ;(|http://purl.org/dc/dcam/VocabularyEncodingScheme| /XMLNS/DCT/LCSH) (/XMLNS/RDFS/label /XMLNS/DCT/LCSH "LCSH")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/LCSH "The set of labeled concepts specified by the Library of Congress Subject Headings.")))
+
+(ASSERT
+ (AND
+  ;(|http://purl.org/dc/dcam/VocabularyEncodingScheme| /XMLNS/DCT/MESH) (/XMLNS/RDFS/label /XMLNS/DCT/MESH "MeSH")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/MESH "The set of labeled concepts specified by the Medical Subject Headings.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/MESH |http://www.nlm.nih.gov/mesh/meshhome.html|)))
+
+(ASSERT
+ (AND
+  ;(|http://purl.org/dc/dcam/VocabularyEncodingScheme| /XMLNS/DCT/NLM) (/XMLNS/RDFS/label /XMLNS/DCT/NLM "NLM")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/NLM "The set of conceptual resources specified by the National Library of Medicine Classification.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/NLM |http://wwwcf.nlm.nih.gov/class/|)))
+
+(ASSERT
+ (AND
+  ;(|http://purl.org/dc/dcam/VocabularyEncodingScheme| /XMLNS/DCT/TGN) (/XMLNS/RDFS/label /XMLNS/DCT/TGN "TGN")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/TGN "The set of places specified by the Getty Thesaurus of Geographic Names.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/TGN |http://www.getty.edu/research/tools/vocabulary/tgn/index.html|)))
+
+(ASSERT
+ (AND
+  ;(|http://purl.org/dc/dcam/VocabularyEncodingScheme| /XMLNS/DCT/UDC) (/XMLNS/RDFS/label /XMLNS/DCT/UDC "UDC")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/UDC "The set of conceptual resources specified by the Universal Decimal Classification.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/UDC |http://www.udcc.org/|)))
+
+(ASSERT
+ (AND (/XMLNS/RDFS/Datatype /XMLNS/DCT/Box) (/XMLNS/RDFS/label /XMLNS/DCT/Box "DCMI Box")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/Box "The set of regions in space defined by their geographic coordinates according to the DCMI Box Encoding Scheme.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/Box |http://dublincore.org/documents/dcmi-box/|)))
+
+(ASSERT
+ (AND (/XMLNS/RDFS/Datatype /XMLNS/DCT/ISO3166) (/XMLNS/RDFS/label /XMLNS/DCT/ISO3166 "ISO 3166")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/ISO3166 "The set of codes listed in ISO 3166-1 for the representation of names of countries.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/ISO3166 |http://www.iso.org/iso/en/prods-services/iso3166ma/02iso-3166-code-lists/list-en1.html|)))
+
+(ASSERT
+ (AND (/XMLNS/RDFS/Datatype /XMLNS/DCT/ISO639-2) (/XMLNS/RDFS/label /XMLNS/DCT/ISO639-2 "ISO 639-2")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/ISO639-2 "The three-letter alphabetic codes listed in ISO639-2 for the representation of names of languages.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/ISO639-2 |http://lcweb.loc.gov/standards/iso639-2/langhome.html|)))
+
+(ASSERT
+ (AND (/XMLNS/RDFS/Datatype /XMLNS/DCT/ISO639-3) (/XMLNS/RDFS/label /XMLNS/DCT/ISO639-3 "ISO 639-3")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/ISO639-3 "The set of three-letter codes listed in ISO 639-3 for the representation of names of languages.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/ISO639-3 |http://www.sil.org/iso639-3/|)))
+
+(ASSERT
+ (AND (/XMLNS/RDFS/Datatype /XMLNS/DCT/Period) (/XMLNS/RDFS/label /XMLNS/DCT/Period "DCMI Period")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/Period "The set of time intervals defined by their limits according to the DCMI Period Encoding Scheme.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/Period |http://dublincore.org/documents/dcmi-period/|)))
+
+(ASSERT
+ (AND (/XMLNS/RDFS/Datatype /XMLNS/DCT/Point) (/XMLNS/RDFS/label /XMLNS/DCT/Point "DCMI Point")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/Point
+   "The set of points in space defined by their geographic coordinates according to the DCMI Point Encoding Scheme.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/Point |http://dublincore.org/documents/dcmi-point/|)))
+
+(ASSERT
+ (AND (/XMLNS/RDFS/Datatype /XMLNS/DCT/RFC1766) (/XMLNS/RDFS/label /XMLNS/DCT/RFC1766 "RFC 1766")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/RFC1766 "The set of tags, constructed according to RFC 1766, for the identification of languages.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/RFC1766 |http://www.ietf.org/rfc/rfc1766.txt|)))
+
+(ASSERT
+ (AND (/XMLNS/RDFS/Datatype /XMLNS/DCT/RFC3066) (/XMLNS/RDFS/label /XMLNS/DCT/RFC3066 "RFC 3066")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/RFC3066 "The set of tags constructed according to RFC 3066 for the identification of languages.")
+  (DOCUMENTATION /XMLNS/DCT/RFC3066 "RFC 3066 has been obsoleted by RFC 4646.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/RFC3066 |http://www.ietf.org/rfc/rfc3066.txt|)))
+
+(ASSERT
+ (AND (/XMLNS/RDFS/Datatype /XMLNS/DCT/RFC4646) (/XMLNS/RDFS/label /XMLNS/DCT/RFC4646 "RFC 4646")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/RFC4646 "The set of tags constructed according to RFC 4646 for the identification of languages.")
+  (DOCUMENTATION /XMLNS/DCT/RFC4646 "RFC 4646 obsoletes RFC 3066.") (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/RFC4646 |http://www.ietf.org/rfc/rfc4646.txt|)))
+
+(ASSERT
+ (AND (/XMLNS/RDFS/Datatype /XMLNS/DCT/URI) (/XMLNS/RDFS/label /XMLNS/DCT/URI "URI")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/URI
+   "The set of identifiers constructed according to the generic syntax for Uniform Resource Identifiers as specified by the Internet Engineering Task Force.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/URI |http://www.ietf.org/rfc/rfc3986.txt|)))
+
+(ASSERT
+ (AND (/XMLNS/RDFS/Datatype /XMLNS/DCT/W3CDTF) (/XMLNS/RDFS/label /XMLNS/DCT/W3CDTF "W3C-DTF")
+  (/XMLNS/SKOS/definition /XMLNS/DCT/W3CDTF "The set of dates and times constructed according to the W3C Date and Time Formats Specification.")
+  (/XMLNS/RDFS/isDefinedBy /XMLNS/DCT/W3CDTF |http://www.w3.org/TR/NOTE-datetime|)))
+
+(DEFCONCEPT /XMLNS/DCT/Agent (?X)
+  :DOCUMENTATION "Examples of Agent include person, organization, and software agent."
+  :AXIOMS (/XMLNS/DCT/AgentClass /XMLNS/DCT/Agent)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/Agent "Agent")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/Agent "A resource that acts or has the power to act."))
+
+(DEFCONCEPT /XMLNS/DCT/AgentClass (?X)
+  :DOCUMENTATION "Examples of Agent Class include groups seen as classes, such as students, women, charities, lecturers."
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/AgentClass "Agent Class")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/AgentClass "A group of agents."))
+
+(DEFCONCEPT /XMLNS/DCT/BibliographicResource (?X)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/BibliographicResource "Bibliographic Resource")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/BibliographicResource "A book, article, or other documentary resource."))
+
+(DEFCONCEPT /XMLNS/DCT/FileFormat (?X)
+  :DOCUMENTATION "Examples include the formats defined by the list of Internet Media Types."
+  :SUBSET-OF /XMLNS/DCT/MediaType
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/FileFormat "File Format")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/FileFormat "A digital resource format."))
+
+(DEFCONCEPT /XMLNS/DCT/Frequency (?X)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/Frequency "Frequency")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/Frequency "A rate at which something recurs."))
+
+(DEFCONCEPT /XMLNS/DCT/Jurisdiction (?X)
+  :SUBSET-OF /XMLNS/DCT/LocationPeriodOrJurisdiction
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/Jurisdiction "Jurisdiction")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/Jurisdiction "The extent or range of judicial, law enforcement, or other authority."))
+
+(DEFCONCEPT /XMLNS/DCT/LicenseDocument (?X)
+  :SUBSET-OF /XMLNS/DCT/RightsStatement
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/LicenseDocument "License Document")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/LicenseDocument "A legal document giving official permission to do something with a Resource."))
+
+(DEFCONCEPT /XMLNS/DCT/LinguisticSystem (?X)
+  :DOCUMENTATION "Examples include written, spoken, sign, and computer languages."
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/LinguisticSystem "Linguistic System")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/LinguisticSystem "A system of signs, symbols, sounds, gestures, or rules used in communication."))
+
+(DEFCONCEPT /XMLNS/DCT/Location (?X)
+  :SUBSET-OF /XMLNS/DCT/LocationPeriodOrJurisdiction
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/Location "Location")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/Location "A spatial region or named place."))
+
+(DEFCONCEPT /XMLNS/DCT/LocationPeriodOrJurisdiction (?X)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/LocationPeriodOrJurisdiction "Location, Period, or Jurisdiction")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/LocationPeriodOrJurisdiction "A location, period of time, or jurisdiction."))
+
+(DEFCONCEPT /XMLNS/DCT/MediaType (?X)
+  :SUBSET-OF /XMLNS/DCT/MediaTypeOrExtent
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/MediaType "Media Type")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/MediaType "A file format or physical medium."))
+
+(DEFCONCEPT /XMLNS/DCT/MediaTypeOrExtent (?X)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/MediaTypeOrExtent "Media Type or Extent")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/MediaTypeOrExtent "A media type or extent."))
+
+(DEFCONCEPT /XMLNS/DCT/MethodOfAccrual (?X)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/MethodOfAccrual "Method of Accrual")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/MethodOfAccrual "A method by which resources are added to a collection."))
+
+(DEFCONCEPT /XMLNS/DCT/MethodOfInstruction (?X)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/MethodOfInstruction "Method of Instruction")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/MethodOfInstruction "A process that is used to engender knowledge, attitudes, and skills."))
+
+(DEFCONCEPT /XMLNS/DCT/PeriodOfTime (?X)
+  :SUBSET-OF /XMLNS/DCT/LocationPeriodOrJurisdiction
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/PeriodOfTime "Period of Time")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/PeriodOfTime "An interval of time that is named or defined by its start and end dates."))
+
+(DEFCONCEPT /XMLNS/DCT/PhysicalMedium (?X)
+  :DOCUMENTATION "Examples include paper, canvas, or DVD."
+  :SUBSET-OF /XMLNS/DCT/MediaType
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/PhysicalMedium "Physical Medium")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/PhysicalMedium "A physical material or carrier."))
+
+(DEFCONCEPT /XMLNS/DCT/PhysicalResource (?X)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/PhysicalResource "Physical Resource")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/PhysicalResource "A material thing."))
+
+(DEFCONCEPT /XMLNS/DCT/Policy (?X)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/Policy "Policy")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/Policy
+           "A plan or course of action by an authority, intended to influence and determine decisions, actions, and other matters."))
+
+(DEFCONCEPT /XMLNS/DCT/ProvenanceStatement (?X)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/ProvenanceStatement "Provenance Statement")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/ProvenanceStatement
+           "A statement of any changes in ownership and custody of a resource since its creation that are significant for its authenticity, integrity, and interpretation."))
+
+(DEFCONCEPT /XMLNS/DCT/RightsStatement (?X)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/RightsStatement "Rights Statement")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/RightsStatement
+           "A statement about the intellectual property rights (IPR) held in or over a Resource, a legal document giving official permission to do something with a resource, or a statement about access rights."))
+
+(DEFCONCEPT /XMLNS/DCT/SizeOrDuration (?X)
+  :DOCUMENTATION "Examples include a number of pages, a specification of length, width, and breadth, or a period in hours, minutes, and seconds."
+  :SUBSET-OF /XMLNS/DCT/MediaTypeOrExtent
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/SizeOrDuration "Size or Duration")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/SizeOrDuration "A dimension or extent, or a time taken to play or execute."))
+
+(DEFCONCEPT /XMLNS/DCT/Standard (?X)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DCT/Standard "Standard")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DCT/Standard "A basis for comparison; a reference point against which other things can be evaluated."))
+

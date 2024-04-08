@@ -1,0 +1,1675 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;; BEGIN LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                            ;
+; Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          ;
+;                                                                            ;
+; The contents of this file are subject to the Mozilla Public License        ;
+; Version 1.1 (the "License"); you may not use this file except in           ;
+; compliance with the License. You may obtain a copy of the License at       ;
+; http://www.mozilla.org/MPL/                                                ;
+;                                                                            ;
+; Software distributed under the License is distributed on an "AS IS" basis, ;
+; WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   ;
+; for the specific language governing rights and limitations under the       ;
+; License.                                                                   ;
+;                                                                            ;
+; The Original Code is the PowerLoom KR&R System.                            ;
+;                                                                            ;
+; The Initial Developer of the Original Code is                              ;
+; UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          ;
+; 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               ;
+;                                                                            ;
+; Portions created by the Initial Developer are Copyright (C) 2004-2019      ;
+; the Initial Developer. All Rights Reserved.                                ;
+;                                                                            ;
+; Contributor(s):                                                            ;
+;                                                                            ;
+; Alternatively, the contents of this file may be used under the terms of    ;
+; either the GNU General Public License Version 2 or later (the "GPL"), or   ;
+; the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   ;
+; in which case the provisions of the GPL or the LGPL are applicable instead ;
+; of those above. If you wish to allow use of your version of this file only ;
+; under the terms of either the GPL or the LGPL, and not to allow others to  ;
+; use your version of this file under the terms of the MPL, indicate your    ;
+; decision by deleting the provisions above and replace them with the notice ;
+; and other provisions required by the GPL or the LGPL. If you do not delete ;
+; the provisions above, a recipient may use your version of this file under  ;
+; the terms of any one of the MPL, the GPL or the LGPL.                      ;
+;                                                                            ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; END LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; Version: $Id$
+
+(in-package "STELLA")
+
+(in-module "SEMANTIC-WEB")
+
+
+;;; NOTES:
+
+;;; - Information
+;;;   - see http://www.w3.org/TR/REC-rdf-syntax/ (the spec - somewhat cryptic)
+;;;   - see http://www.w3.org/TR/rdf-concepts/ (good resource)
+;;;   - see http://www.w3.org/TR/rdf-primer/ (RDF primer)
+;;;   - see http://www.ibm.com/developerworks/xml/library/x-tiprdfai.html (for about vs. ID tips)
+;;;   - see http://www.w3.org/TR/REC-html40/intro/intro.html#h-2.1.3 (relative URI resolution)
+;;;   - see http://www.zvon.org/xxl/RDFTutorial/General/contents.html (for examples - oldish)
+;;;   - see http://www.zvon.org/comp/r/tut-RDF.html (for same examples - oldish)
+;;;
+;;; - TO DO:
+;;;   - handle nested redefinitions of xml:base (e.g., write a `with-xml-base' macro)
+;;;     - generalize merging with xml:base
+;;;   - handle rdf:ID attribute on a property elements to reify the associated statement
+;;;   - maybe store doctype/namespace info in iterator so an OWL translator can use it
+;;;
+;;;   - clean up/figure out the following issues:
+;;;     - precise syntax of blank nodes (in the spec they are written as _:genid17);
+;;;       also, we might have to guard against a clash with a user-given blank node ID
+;;;     - parsing/handling of urn: URIs
+;;;     - handling of # with ID and about, with splitting of URIs and with putting
+;;;       names and namespaces back together; we want to make sure that we wind up
+;;;       with identical results, e.g., about="#foo" vs. ID="foo", xml:base prepending;
+;;;       looks like ID is always interpreted as a fragment identifier (see 3.2 in Primer)
+;;;     - parseType=Literal with XML literals   - create a different literal object?
+;;;     - support Literal value access/parsing based on stored datatype-uri
+;;;     - maybe `parse-property-value' should always generate a literal only, currently
+;;;       we generate a resource if it is a URI that has a namespace
+;;;     - parseType=Collection, does it have to generate a List instead?
+;;;     - unqualified "about" and "ID", seems to be ok in an rdf: tag but what about
+;;;       contexts such as <lib:book about=mybook ....>?
+;;;       - Jena accepts unqualified about/ID in any context but prints a deprecation warning
+;;;     - should we infer namespaces from string values, e.g., that
+;;;       "http://www.w3.org/2001/XMLSchema#string" represents xml:string (but that would require
+;;;       that we have access to the/a local namespace mapping which is lost at that point);
+;;;       probably not worth doing, since we'll do something equivalent once we map namespaces
+;;;       onto STELLA modules
+;;;
+;;;   - Performance
+;;;     - think about reuse of RDF-NODE objects by the iterator
+;;;     - internment of namespace URIs so we don't allocate copies in each object; in this
+;;;       case we should suppress storing of the surface forms to get the space advantage;
+;;;       the internment table could be held in the RDF-READER or an associated model
+
+
+  ;;
+;;;;;; Representing RDF objects
+  ;;
+
+;;; RDF object hierarchy mirrored from kojak/blackbook/jena-interface.ste
+
+(defspecial *rdf-print-mode* KEYWORD :surface
+  :documentation "Controls how resources will be printed: one of :surface, :local, :uri.")
+
+(defclass RDF-OBJECT (STANDARD-OBJECT)
+  :documentation "Common abstract parent for RDF objects so we can define general methods."
+  :abstract? TRUE
+  :methods (;;; these predicates mirror Jena predicates, we could use type tests in most cases
+            (is-node? ((self RDF-OBJECT)) :type BOOLEAN
+              (return FALSE))
+            (is-literal? ((self RDF-OBJECT)) :type BOOLEAN
+              (return FALSE))
+            (is-resource? ((self RDF-OBJECT)) :type BOOLEAN
+              (return FALSE))
+            (is-uri-resource? ((self RDF-OBJECT)) :type BOOLEAN
+              (return FALSE))
+            (is-anonymous?  ((self RDF-OBJECT)) :type BOOLEAN
+              (return FALSE))
+            (is-property? ((self RDF-OBJECT)) :type BOOLEAN
+              (return FALSE))
+            (is-container? ((self RDF-OBJECT)) :type BOOLEAN
+              (return FALSE))
+            (is-alt? ((self RDF-OBJECT)) :type BOOLEAN
+              (return FALSE))
+            (is-bag? ((self RDF-OBJECT)) :type BOOLEAN
+              (return FALSE))
+            (is-seq? ((self RDF-OBJECT)) :type BOOLEAN
+              (return FALSE))
+            (is-list? ((self RDF-OBJECT)) :type BOOLEAN
+              (return FALSE))
+            (is-statement? ((self RDF-OBJECT)) :type BOOLEAN
+              (return FALSE))
+            (is-reified-statement? ((self RDF-OBJECT)) :type BOOLEAN
+              (return FALSE))
+            (print-rdf-object ((self RDF-OBJECT) (stream NATIVE-OUTPUT-STREAM)) :type VOID
+              (print-stream stream "<" (symbol-name (primary-type self)) ">")))
+  :print-form (print-rdf-object self stream))
+
+(defclass RDF-NODE (RDF-OBJECT)
+  ;; see http://jena.sourceforge.net/javadoc/com/hp/hpl/jena/rdf/model/RDFNode.html
+  :methods ((is-node? ((self RDF-NODE)) :type BOOLEAN
+              (return TRUE))))
+
+(defclass RDF-LITERAL (RDF-NODE)
+  ;; see http://jena.sourceforge.net/javadoc/com/hp/hpl/jena/rdf/model/Literal.html
+  :slots ((surface-form :type STRING)
+          (datatype-uri :type STRING)
+          (value :type OBJECT))
+  :methods ((is-literal? ((self RDF-LITERAL)) :type BOOLEAN
+              (return TRUE))
+            (object-equal? ((self RDF-LITERAL) (x OBJECT)) :type BOOLEAN
+              (typecase x
+                (RDF-LITERAL
+                 (return (and (eql? (surface-form self) (surface-form x))
+                              (eql? (datatype-uri self) (datatype-uri x)))))
+                (otherwise
+                 (return FALSE))))
+            (print-rdf-object ((self RDF-LITERAL) (stream NATIVE-OUTPUT-STREAM)) :type VOID
+              (print-stream stream "<RDF-LITERAL " (surface-form self) ">"))))
+
+(defclass RDF-RESOURCE (RDF-NODE)
+  ;; see http://jena.sourceforge.net/javadoc/com/hp/hpl/jena/rdf/model/Resource.html
+  :slots ((surface-form :type STRING)
+          (name :type STRING)
+          (namespace-name :type STRING)
+          (namespace-uri :type STRING))
+  :methods ((is-resource? ((self RDF-RESOURCE)) :type BOOLEAN
+              (return TRUE))
+            (is-uri-resource? ((self RDF-RESOURCE)) :type BOOLEAN
+              (return (defined? (namespace-uri self))))
+            (is-anonymous?  ((self RDF-RESOURCE)) :type BOOLEAN
+              (return (null? (namespace-uri self))))
+            (get-uri ((self RDF-RESOURCE)) :type STRING
+              (if (defined? (namespace-uri self))
+                  (return (concatenate (namespace-uri self) (name self)))
+                (return (name self))))
+            (to-property ((self RDF-RESOURCE)) :type RDF-PROPERTY
+               ;; convert `self' into a property which we need for unreification.
+               (return (new RDF-PROPERTY
+                            :surface-form (surface-form self)
+                            :name (name self)
+                            :namespace-name (namespace-name self)
+                            :namespace-uri (namespace-uri self))))
+            (object-equal? ((self RDF-RESOURCE) (x OBJECT)) :type BOOLEAN
+              (typecase x
+                (RDF-RESOURCE
+                 (return (and (eql? (name self) (name x))
+                              (eql? (namespace-uri self) (namespace-uri x))
+                              (eql? (primary-type self) (primary-type x)))))
+                (otherwise
+                 (return FALSE))))
+            (print-rdf-object ((self RDF-RESOURCE) (stream NATIVE-OUTPUT-STREAM)) :type VOID
+              (print-stream stream "<" (symbol-name (primary-type self)) " ")
+              (case *rdf-print-mode*
+                (:local (print-stream stream (name self)))
+                (:uri (print-stream stream (namespace-uri self) (name self) ))
+                (otherwise (print-stream stream (surface-form self))))
+              (print-stream stream ">"))))
+
+(defclass RDF-PROPERTY (RDF-RESOURCE)
+  ;; see com.hp.hpl.jena.rdf.model.Property
+  :methods ((is-property? ((self RDF-PROPERTY)) :type BOOLEAN
+              (return TRUE))))
+
+(defclass RDF-CONTAINER (RDF-RESOURCE)
+  ;; see com.hp.hpl.jena.rdf.model.Container
+  :slots ((elements :type (VECTOR-SEQUENCE OF RDF-NODE) :initially (new VECTOR-SEQUENCE :array-size 4)))
+  :methods ((is-container? ((self RDF-CONTAINER)) :type BOOLEAN
+              (return TRUE))
+            (allocate-iterator ((self RDF-CONTAINER)) :type (ITERATOR OF RDF-NODE)
+              (return (allocate-iterator (elements self))))
+            (insert ((self RDF-CONTAINER) (elt RDF-NODE)) :type VOID
+              (insert (elements self) elt))
+            (remove ((self RDF-CONTAINER) (elt RDF-NODE)) :type VOID
+              (remove (elements self) elt))
+            ;; we define this up here for convenience, even though, strictly speaking,
+            ;; indexed access should only be legal for ALT and SEQ:
+            (nth ((self RDF-CONTAINER) (n INTEGER)) :type RDF-NODE
+              (return (nth (elements self) n)))
+            (print-rdf-object ((self RDF-CONTAINER) (stream NATIVE-OUTPUT-STREAM)) :type VOID
+              (print-stream stream "<" (symbol-name (primary-type self)))
+              (unless (is-anonymous? self)
+                (print-stream stream " ")
+                (case *rdf-print-mode*
+                  (:local (print-stream stream (name self)))
+                  (:uri (print-stream stream (namespace-uri self) (name self) ))
+                  (otherwise (print-stream stream (surface-form self)))))
+              (print-stream stream " " (elements self) ">"))))
+
+(defclass RDF-ALT (RDF-CONTAINER)
+  ;; see com.hp.hpl.jena.rdf.model.Alt
+  ;; Jena defines a `getDefault' on this, how would that be represented in RDF?
+  :methods ((is-alt? ((self RDF-ALT)) :type BOOLEAN
+              (return TRUE))))
+
+(defclass RDF-BAG (RDF-CONTAINER)
+  ;; see com.hp.hpl.jena.rdf.model.Bag
+  :methods ((is-bag? ((self RDF-BAG)) :type BOOLEAN
+              (return TRUE))))
+
+(defclass RDF-SEQ (RDF-CONTAINER)
+  ;; see com.hp.hpl.jena.rdf.model.Seq
+  :methods ((is-seq? ((self RDF-SEQ)) :type BOOLEAN
+              (return TRUE))))
+
+(defclass RDF-LIST (RDF-RESOURCE)
+  ;; see com.hp.hpl.jena.rdf.model.RDFList
+  :slots ((first-element :type RDF-NODE)
+          (rest-elements :type RDF-LIST))
+  :methods ((is-list? ((self RDF-LIST)) :type BOOLEAN
+              (return TRUE))))
+
+(defclass RDF-STATEMENT (RDF-OBJECT)
+  :slots ((id :type RDF-REIFIED-STATEMENT)  ;; in case we have a reified triple
+          (subject :type RDF-RESOURCE)
+          (predicate :type RDF-PROPERTY)
+          (object :type RDF-NODE))
+  :methods ((is-statement? ((self RDF-STATEMENT)) :type BOOLEAN
+              (return TRUE))
+            (print-rdf-object ((self RDF-STATEMENT) (stream NATIVE-OUTPUT-STREAM)) :type VOID
+              (print-stream stream "<RDF-STATEMENT ")
+              (when (defined? (id self))
+                (print-stream stream "[" (name (id self)) "]: "))
+              (print-stream stream "(" (subject self) " " (predicate self) " " (object self) ")>"))))
+
+(defclass RDF-REIFIED-STATEMENT (RDF-RESOURCE)
+  :slots ((statement :type RDF-STATEMENT))
+  :methods ((is-reified-statement? ((self RDF-REIFIED-STATEMENT)) :type BOOLEAN
+              (return TRUE))))
+
+
+(defglobal *XML-LITERAL-TYPE-URI* STRING (concatenate *RDF-URI* "XMLLiteral"))
+(defglobal *RDF-STATEMENT-TYPE* RDF-RESOURCE
+           (new RDF-RESOURCE :surface-form "rdf:Statement" :name "Statement" :namespace-name "rdf" :namespace-uri *RDF-URI*))
+(defglobal *RDF-TYPE-PROPERTY* RDF-PROPERTY
+           (new RDF-PROPERTY :surface-form "rdf:type" :name "type" :namespace-name "rdf" :namespace-uri *RDF-URI*))
+(defglobal *RDF-SUBJECT-PROPERTY* RDF-PROPERTY
+           (new RDF-PROPERTY :surface-form "rdf:subject" :name "subject" :namespace-name "rdf" :namespace-uri *RDF-URI*))
+(defglobal *RDF-PREDICATE-PROPERTY* RDF-PROPERTY
+           (new RDF-PROPERTY :surface-form "rdf:predicate" :name "predicate" :namespace-name "rdf" :namespace-uri *RDF-URI*))
+(defglobal *RDF-OBJECT-PROPERTY* RDF-PROPERTY
+           (new RDF-PROPERTY :surface-form "rdf:object" :name "object" :namespace-name "rdf" :namespace-uri *RDF-URI*))
+(defglobal *RDF-FIRST-PROPERTY* RDF-PROPERTY
+           (new RDF-PROPERTY :surface-form "rdf:first" :name "first" :namespace-name "rdf" :namespace-uri *RDF-URI*))
+(defglobal *RDF-REST-PROPERTY* RDF-PROPERTY
+           (new RDF-PROPERTY :surface-form "rdf:rest" :name "rest" :namespace-name "rdf" :namespace-uri *RDF-URI*))
+
+(defglobal *RDF-NIL* RDF-LIST
+           (new RDF-LIST :surface-form "rdf:nil" :name "nil" :namespace-name "rdf" :namespace-uri *RDF-URI*
+                :first-element NULL
+                :rest-elements *RDF-NIL*))
+
+
+  ;;
+;;;;;; Reading and parsing RDF/XML
+  ;;
+
+;;; Utilities:
+
+(defun (rdf-attribute-match? BOOLEAN) ((attribute XML-ATTRIBUTE) (name STRING))
+  ;; In RDF it seems to be ok to use unqualified attributes within the scope of
+  ;; an RDF element.  This special-purpose attribute-match function handles that.
+  ;; Strangely, `xml-local-attribute-match?' doesn't quite do the right thing.
+  (when (eql? (name attribute) name)
+    (typecase attribute
+      (XML-LOCAL-ATTRIBUTE
+       (return (eql? (namespace-uri (parent-element attribute)) *RDF-URI*)))
+      (XML-GLOBAL-ATTRIBUTE
+       (return (eql? (namespace-uri attribute) *RDF-URI*)))))
+  (return FALSE))
+
+(defun (rdf-lookup-attribute STRING) ((attributes CONS)
+                                      (name STRING))
+  ;; Variant of `xml-lookup-attribute' that can handle un/qualified RDF attributes.
+  :public? TRUE
+  (while (non-empty? attributes)
+    (when (rdf-attribute-match? (first attributes) name)
+      (return (unwrap-string (first (rest attributes)))))
+    (setq attributes (rest (rest attributes))))
+  (return NULL))
+
+#|
+;;; Reserved names:
+Syntax:   RDF Description ID about parseType resource li nodeID datatype
+Class:    Seq Bag Alt Statement Property XMLLiteral List
+Property: subject predicate object type value first rest _n
+Resource: nil
+|#
+
+(defun (special-rdf-attribute? BOOLEAN) ((attribute XML-ATTRIBUTE))
+  ;; Return TRUE if `attribute' has a special meaning in RDF,
+  ;; i.e., it should not be used as a property name.
+  (return (or (rdf-attribute-match? attribute "about")
+              (rdf-attribute-match? attribute "ID")
+              (rdf-attribute-match? attribute "nodeID")
+              (rdf-attribute-match? attribute "parseType")
+              (rdf-attribute-match? attribute "datatype")
+              (xml-attribute-match? attribute "base" *XML-URI*))))
+
+(defun (xml-element-to-rdf-resource RDF-RESOURCE) ((element XML-ELEMENT))
+  ;; Create an RDF resource from `element'.
+  (if (and (eql? (name element) "nil")
+           (eql? (namespace-uri element) *RDF-URI*))
+      (return *RDF-NIL*)
+    (return (new RDF-RESOURCE
+                 :surface-form (surface-form element)
+                 :name (name element)
+                 :namespace-name (namespace-name element)
+                 :namespace-uri (namespace-uri element)))))
+
+(defun (xml-element-to-rdf-property RDF-PROPERTY) ((element XML-ELEMENT))
+  ;; Create an RDF property from `element'.
+  (return (new RDF-PROPERTY
+               :surface-form (surface-form element)
+               :name (name element)
+               :namespace-name (namespace-name element)
+               :namespace-uri (namespace-uri element))))
+
+(defun (xml-attribute-to-rdf-property RDF-PROPERTY) ((attribute XML-ATTRIBUTE))
+  ;; Create an RDF property from `attribute'.
+  (typecase attribute
+    (XML-GLOBAL-ATTRIBUTE
+     (return (new RDF-PROPERTY
+                  :surface-form (surface-form attribute)
+                  :name (name attribute)
+                  :namespace-name (namespace-name attribute)
+                  :namespace-uri (namespace-uri attribute))))
+    (XML-LOCAL-ATTRIBUTE
+     (return (new RDF-PROPERTY
+                  :surface-form (surface-form attribute)
+                  :name (name attribute)
+                  :namespace-name (namespace-name (parent-element attribute))
+                  :namespace-uri (namespace-uri (parent-element attribute)))))))
+
+(defun (create-blank-rdf-node-id STRING) ()
+  (return (yield-gensym-name "_blankNode" (++ *gensym-counter*))))
+
+(defun (blank-rdf-node-id? BOOLEAN) ((nodeID STRING))
+  ;; Return true if `nodeID' is the name of a blank node created with `create-blank-rdf-node-id'.
+  (return (and (starts-with? nodeID "_blankNode-" 0)
+               (forall i in (interval 11 (1- (length nodeID)))
+                 always (digit-character? (nth nodeID i))))))
+
+(defun (create-rdf-statement RDF-STATEMENT) ((subject OBJECT) (predicate OBJECT) (object OBJECT))
+  (return (new RDF-STATEMENT :subject subject :predicate predicate :object object)))
+
+
+;;; Statement iterator
+
+(defclass RDF-READER (STANDARD-OBJECT)
+  :documentation "Class to hold various state needing during the processing of an RDF stream.
+For now we primarily store the current xml:base URI.  This can also be subclassed to specialize
+aspects of the behavior of the RDF reader for special purposes (e.g., the type of blank nodes
+generated)."
+  ;; this has similarities to Tom's `collector' class
+  :slots ((base-uri :type STRING)
+          ;; we expose the type here (instead of just making it a COLLECTION), since that makes it
+          ;;  easier to support some manipulation that would otherwise have to be handled by an API.
+          (suppress-implied-statements? :type BOOLEAN :initially FALSE
+            :documentation "If true, statements that are implied by specific RDF object types (e.g.,
+the subject/pred/object statements for reified statements, the element statements for collections,
+etc.) will be suppressed.")
+          (statements :type (VECTOR-SEQUENCE OF RDF-STATEMENT)
+                      :initially (new VECTOR-SEQUENCE :array-size 64))))
+
+(defclass RDF-STATEMENT-ITERATOR (ITERATOR)
+  :parameters ((any-value :type RDF-STATEMENT))
+  :slots ((reader :type RDF-READER)
+          (xml-iterator :type XML-EXPRESSION-ITERATOR)
+          (expressions :type CONS :initially NIL)
+          (statement-cursor :type INTEGER :initially 0)))
+
+(defun (rdf-statements RDF-STATEMENT-ITERATOR) ((istream INPUT-STREAM) (baseURI STRING))
+  (return (new RDF-STATEMENT-ITERATOR
+               :reader (new RDF-READER
+                            :base-uri (first-defined baseURI "file:")
+                            :suppress-implied-statements? TRUE)
+               :xml-iterator (xml-expressions istream NULL))))
+
+(defmethod (next? BOOLEAN) ((self RDF-STATEMENT-ITERATOR))
+  (let ((reader (reader self))
+        (expressions (expressions self))
+        (statements (statements reader))
+        (cursor (statement-cursor self)))
+    (loop
+      (cond ((< cursor (length statements))
+             (setf (slot-value self value) (nth statements cursor))
+             (setf (statement-cursor self) (++ cursor))
+             ;; guard for suppressed statements:
+             (when (defined? (slot-value self value))
+               (return TRUE)))
+            ((non-empty? expressions)
+             (clear statements)
+             (setq cursor 0)
+             (read-body-expression reader (first expressions))
+             (setq expressions (rest expressions))
+             (setf (expressions self) expressions))
+            ((next? (xml-iterator self))
+             (setq expressions
+               (read-preamble-expression reader (value (xml-iterator self)))))
+            (otherwise
+             (setf (slot-value self value) NULL)
+             (return FALSE))))))
+
+#|
+;;; Test:
+
+STELLA(5): (cl:pprint (setq statements (consify (rdf-statements (open-input-file "~/Projects/powerloom/sources/translators/semantic-web/tests/example1.rdf") null-string))))
+
+(<RDF-STATEMENT (<RDF-RESOURCE localdoc/Matilda> <RDF-PROPERTY lib:creator> <RDF-LITERAL Roald Dahl>)>
+ <RDF-STATEMENT (<RDF-RESOURCE localdoc/Matilda> <RDF-PROPERTY lib:pages> <RDF-LITERAL 240>)>
+ <RDF-STATEMENT (<RDF-RESOURCE localdoc/The BFG> <RDF-PROPERTY lib:creator> <RDF-LITERAL Roald Dahl>)>
+ <RDF-STATEMENT (<RDF-RESOURCE localdoc/The BFG> <RDF-PROPERTY lib:pages> <RDF-LITERAL 208>)>
+ <RDF-STATEMENT (<RDF-RESOURCE localdoc/Heart of Darkness> <RDF-PROPERTY lib:creator> <RDF-LITERAL Joseph Conrad>)>
+ <RDF-STATEMENT (<RDF-RESOURCE localdoc/Heart of Darkness> <RDF-PROPERTY lib:pages> <RDF-LITERAL 110>)>
+ <RDF-STATEMENT (<RDF-RESOURCE localdoc/Lord Jim> <RDF-PROPERTY lib:creator> <RDF-LITERAL Joseph Conrad>)>
+ <RDF-STATEMENT (<RDF-RESOURCE localdoc/Lord Jim> <RDF-PROPERTY lib:pages> <RDF-LITERAL 314>)>
+ <RDF-STATEMENT (<RDF-RESOURCE localdoc/The Secret Agent> <RDF-PROPERTY lib:creator> <RDF-LITERAL Joseph Conrad>)>
+ <RDF-STATEMENT (<RDF-RESOURCE localdoc/The Secret Agent> <RDF-PROPERTY lib:pages> <RDF-LITERAL 249>)>)
+STELLA(6):
+|#
+
+
+;;; Collection methods (provide a hook similar to Tom's collector class, even though much of
+;;; that functionality is really achieved by encapsulating reading via a statement iterator):
+
+(defmethod collect-new-statement ((self RDF-READER) (subject OBJECT) (predicate OBJECT) (object OBJECT))
+  ;; Create a new RDF statement from `subject', `predicate' and `object' and insert it into `self'.
+  (insert (statements self) (create-rdf-statement subject predicate object)))
+
+(defmethod collect-statement ((self RDF-READER) (statement RDF-STATEMENT))
+  ;; Insert `statement' into `self'.
+  (insert (statements self) statement))
+
+
+;;; Top-level reading methods (they all take a reader object for dispatch which could be subclassed)
+
+(defmethod (read-preamble-expression CONS) ((self RDF-READER) (expr OBJECT))
+  ;; Read a preamble expression `expr'.
+  ;; If it is an RDF element, return all its content elements.
+  (typecase expr
+    (CONS
+     (let ((operator (first expr)))
+       (cond ((or (xml-doctype-form? expr)
+                  (xml-declaration? operator)
+                  (xml-processing-instruction? operator))
+              (return NIL)) ;; ignore; duplicate doctypes are already checked by the iterator
+             ((xml-element? operator)
+              (let ((tag (get-xml-tag expr)))
+                (when (xml-element-match? tag "RDF" *RDF-URI*)
+                  ;; Handle setting of base uri:
+                  (let ((base (xml-lookup-attribute (get-xml-attributes expr) "base" *XML-URI*)))
+                    (when (defined? base)
+                      ;; we overwrite here, conceivably, we might have to merge them:
+                      (setf (base-uri self) base))
+                    (return (get-xml-content expr)))))))))
+    (otherwise NULL))
+  (warn "Skipping form " expr)
+  (return NIL))
+
+(defmethod read-body-expression ((self RDF-READER) (expression CONS))
+  (read-node-element self expression))
+
+
+;;; Figuring out element types and creating appropriate RDF objects:
+;;;
+;;; In order to create appropriate RDF objects for resources, bags, reified statements,
+;;; etc., we need to know the type of the node element we are parsing.  Unfortunately,
+;;; a type declaration can be quite a ways down from the subject.  The following routines
+;;; deal with the necessary look-ahead to find an element's type regardless of how it
+;;; is described.
+
+(defmethod (get-rdf-type-of-description STRING) ((self RDF-READER) (description CONS))
+  ;; If `description' describes an RDF element such as a Statement or Bag, etc.,
+  ;; return the bare name of that type.  Return NULL if it does not have one
+  ;; of the standard RDF types.
+  (let ((tag (get-xml-tag description))
+        (attributes (get-xml-attributes description))
+        (attribute XML-ATTRIBUTE NULL)
+        (property XML-ELEMENT NULL)
+        (propertyName STRING NULL)
+        (propertyContent CONS NULL)
+        (value STRING NULL)
+        (typeName STRING NULL))
+    (unless (xml-element-match? tag "Description" *RDF-URI*)
+      ;; we have a named description where the name of the tag indicates the type:
+      (if (eql? (namespace-uri tag) *RDF-URI*)
+          (return (name tag))
+        (return NULL)))
+    ;; We have a "Description", check its attributes first for a rdf:type declaration:
+    (while (non-empty? attributes)
+      (setq attribute (popq attributes))
+      (setq value (popq attributes))
+      (when (rdf-attribute-match? attribute "type")
+        (mv-setq (value typeName)
+          (parse-resource-name self value))
+        (return typeName)))
+    ;; Now check the properties either for an explicit rdf:type declaration or an
+    ;; implicit declaration based on the property name (e.g., rdf:subject):
+    (foreach propElement in (get-xml-content description)
+        do (setq property (get-xml-tag propElement))
+           (when (starts-with? (namespace-uri property) *RDF-URI* 0)
+             (setq propertyName (name property))
+             (cond ((eql? propertyName "type")
+                    (setq value (rdf-lookup-attribute (get-xml-attributes propElement) "resource"))
+                    (cond ((defined? value)
+                           (setq typeName value))
+                          (otherwise
+                           (setq propertyContent (get-xml-content propElement))
+                           (when (= (length propertyContent) 1)
+                             (setq typeName (first propertyContent)))))
+                    (when (and (defined? typeName)
+                               (starts-with? typeName *RDF-URI* 0))
+                      (mv-setq (value typeName)
+                        (parse-resource-name self typeName)))
+                    (return typeName))
+                   ((null? typeName)
+                    ;; these are implicit type indications which we will use
+                    ;; if we cannot find any explicit declaration anywhere:
+                    (case propertyName
+                      (("subject" "predicate" "object")
+                       (setq typeName "Statement"))
+                      (("first" "rest")
+                       (setq typeName "List"))
+                      (otherwise
+                       (when (rdf-container-element-property-name? propertyName)
+                         (setq typename "Bag"))))))))
+    (return typename)))
+
+(defun (create-resource-for-type RDF-RESOURCE) ((typeName STRING))
+  ;; Convert a bare RDF `typeName' (such as Bag, Seq, etc.) into the appropriate object.
+  ;; If `typeName' is NULL or unrecognized, create a generic resource object.
+  (when (null? typeName)
+    ;; shortcut the common case:
+    (return (new RDF-RESOURCE)))
+  (case typeName
+    ("Seq" (return (new RDF-SEQ)))
+    ("Bag" (return (new RDF-BAG)))
+    ("Alt" (return (new RDF-ALT)))
+    ("Statement" (return (new RDF-REIFIED-STATEMENT)))
+    ("Property" (return (new RDF-PROPERTY)))
+    ("XMLLiteral" (error "XMLLiteral's not yet supported"))
+    ("List"
+     (return (new RDF-LIST)))
+    (otherwise
+     (return (new RDF-RESOURCE)))))
+
+
+;;; RDF container support:
+
+(defun (rdf-container-element-property-name? BOOLEAN) ((name STRING))
+  ;; True for names such as "li" or "_nnn".
+  (if (eql? name "li")
+      (return TRUE)
+    (let ((length (length name)))
+      (return (and (>= length 2)
+                   (eql? (nth name 0) #\_)
+                   (forall i in (interval 1 (1- length))
+                     always (digit-character? (nth name i))))))))
+              
+(defun (rdf-container-element-property? BOOLEAN) ((property RDF-PROPERTY))
+  ;; Return TRUE if `property' adds an element to a container (e.g., "li" or "_nnn").
+  (return (and (eql? (namespace-uri property) *RDF-URI*)
+               (rdf-container-element-property-name? (name property)))))
+
+(defmethod rdf-container-insert ((self RDF-READER)
+                                 (container RDF-CONTAINER)
+                                 (elementProperty RDF-PROPERTY)
+                                 (object RDF-NODE))
+  ;; Add `object' to `container' as dictated by `elementProperty'.
+  (let ((elementPropertyName (name elementProperty)))
+    (cond ((eql? elementPropertyName "li")
+           (insert container object))
+          (otherwise
+           ;; conceivably, with the _nnn notation, elements could be described out of
+           ;; order, so we have to make sure the sequence is big enough when they get added:
+           (let ((index INTEGER (1- (string-to-integer (subsequence elementPropertyName 1 NULL))))
+                 (elements (elements container))
+                 (nElements (length elements)))
+             (when (>= index 0)
+               ;; kludge: this grows and resizes the sequence if necessary:
+               (foreach i in (interval nElements index)
+                   do (ignore i)
+                      (insert elements NULL))
+               (setf (nth elements index) object)))))))
+
+(defmethod (get-container-elements (VECTOR-SEQUENCE OF RDF-NODE)) ((self RDF-CONTAINER))
+  ;; Uniform elements API for containers and lists.
+  (return (elements self)))
+
+(defmethod (get-container-elements (VECTOR-SEQUENCE OF RDF-NODE)) ((self RDF-LIST))
+  ;; Uniform elements API for containers and lists.
+  (let ((elements (new VECTOR-SEQUENCE :array-size 4)))
+    (while (and (defined? self)
+                (not (eql? self *RDF-NIL*)))
+      (insert elements (first-element self))
+      (setq self (rest-elements self)))
+    (return elements)))
+
+
+;;; URI testing, parsing, merging, etc.
+
+;;; The story about xml:base and RDF (from 2.14 in the RDF syntax spec):
+
+;;; RDF/XML allows further abbreviating RDF URI references in XML
+;;; attributes in two ways. The XML Infoset provides a base URI attribute
+;;; xml:base that sets the base URI for resolving relative RDF URI
+;;; references, otherwise the base URI is that of the document. The base
+;;; URI applies to all RDF/XML attributes that deal with RDF URI
+;;; references which are rdf:about, rdf:resource, rdf:ID and rdf:datatype.
+
+;;; The rdf:ID attribute on a node element (not property element, that has
+;;; another meaning) can be used instead of rdf:about and gives a relative
+;;; RDF URI reference equivalent to # concatenated with the rdf:ID
+;;; attribute value. So for example if rdf:ID="name", that would be
+;;; equivalent to rdf:about="#name". rdf:ID provides an additional check
+;;; since the same name can only appear once in the scope of an xml:base
+;;; value (or document, if none is given), so is useful for defining a set
+;;; of distinct, related terms relative to the same RDF URI reference.
+
+;;; Both forms require a base URI to be known, either from an in-scope
+;;; xml:base or from the URI of the RDF/XML document.
+
+;;; Now here is more info on how namespace URLs and names should be combined
+;;; depending on whether there was a trailing slash or not - if we don't
+;;; have a trailing slash in the namespace, we get a sibling - but is that
+;;; also the case for base URIs?:
+
+;;;    Uri uri = new Uri(@"http://www.w3.org/some-namespace/");
+;;;    Console.WriteLine(new Uri(uri, "foo")); // http://www.w3.org/some-namespace/foo
+;;;        uri = new Uri(@"http://www.w3.org/some-namespace");
+;;;    Console.WriteLine(new Uri(uri, "foo")); //http://www.w3.org/foo
+
+(defmethod (parse-resource-name STRING STRING) ((self RDF-READER) (name STRING))
+  ;; Given a resource `name' parse it into its namespace URI and name components.
+  ;; Inspired by `rdfs-string-to-pl-name'.
+  (let ((pos (last-position name #\# NULL)))
+    (when (defined? pos)
+      ;; we have a # character:
+      (if (= pos 0)
+          (return "" (subsequence name (1+ pos) NULL))
+        (return (subsequence name 0 (1+ pos)) (subsequence name (1+ pos) NULL))))
+    ;; Heuristic for last "/" character
+    (setq pos (last-position name #\/ NULL))
+    (when (null? pos)
+      ;; No "/" character, look for protocol/scheme portion only:
+      (setq pos (position name #\: NULL)))
+    (cond ((defined? pos)
+           (return (subsequence name 0 (1+ pos)) (subsequence name (1+ pos) NULL)))
+          (otherwise
+           (return "" name)))))
+
+(defun (absolute-resource-name? BOOLEAN) ((name STRING))
+  ;; Return true if `name' is an absolute URI.
+  ;; Absolute URIs are those that begin with a scheme (or protocol) name.
+  ;; See http://en.wikipedia.org/wiki/URI_scheme for official and semi-official schemes.
+  ;; TO DO: consider a registry scheme for scheme names.
+  (let ((colonPos (position name #\: 0))) ;; for efficiency on relative URIs
+    (when (> colonPos 0)
+      (foreach ch in name
+          as i in (interval 0 (1- colonPos))
+          where (and (not (letter-character? ch))
+                     (not (digit-character? ch)))
+          do (ignore i)
+             (return FALSE))
+      (return TRUE))
+    (return FALSE)))
+
+(defun (relative-resource-name? BOOLEAN) ((name STRING))
+  :globally-inline? TRUE
+  (return (not (absolute-resource-name? name))))
+
+(defun (merge-resource-name-with-base-uri STRING) ((relativeName STRING) (baseUri STRING))
+  ;; Merge `relativeName' with `baseUri' and return the result.
+  ;; This is very simplistic for now and would require full parsing of both URIs to do things right.
+  (let ((lastSlashPos INTEGER NULL))
+    (when (starts-with? relativeName "#" 0)
+      (return (concatenate baseUri relativeName)))
+    (setq lastSlashPos (last-position baseUri #\/ NULL))
+    (if (defined? lastSlashPos)
+        (return (concatenate (subsequence baseUri 0 (1+ lastSlashPos)) relativeName))
+      (return (concatenate baseUri relativeName)))))
+
+(defmethod (read-node-element-subject RDF-RESOURCE) ((self RDF-READER) (element CONS) (resource RDF-RESOURCE))
+  ;; Read the "about"/"ID"/"nodeID" name of an `element' and convert
+  ;; it into an appropriate RDF resource object.
+  ;; Expand with `self's base URI if necessary.
+  ;; Use `resource' if supplied as non-NULL.
+  (let ((attributes (get-xml-attributes element))
+	(name (rdf-lookup-attribute attributes "about"))
+        (localName STRING NULL)
+        (namespaceUri STRING NULL))
+    (unless (defined? name)
+      (setq name (rdf-lookup-attribute attributes "ID"))
+      (when (defined? name)
+        ;; ID is always interpreted as a fragment (which means using an absolute
+        ;; URI or an explicit fragment is illegal - Jena creates warnings for those):
+        (setq name (concatenate "#" name))))
+    (cond ((defined? name)
+           (when (relative-resource-name? name)
+             (setq name (merge-resource-name-with-base-uri name (base-uri self))))
+           (mv-setq (namespaceUri localName)
+             (parse-resource-name self name)))
+          (otherwise
+           (setq name (rdf-lookup-attribute attributes "nodeID"))
+           (unless (defined? name)
+             ;; we have a blank node:
+             (setq name (create-blank-rdf-node-id)))
+           (setq localName name)))
+    (when (blank-string? namespaceUri)
+      (setq namespaceUri NULL))
+    (when (null? resource)
+      (setq resource (new RDF-RESOURCE)))
+    (setf (surface-form resource) name)
+    (setf (name resource) localName)
+    (setf (namespace-name resource) "")
+    (setf (namespace-uri resource) namespaceUri)
+    (return resource)))
+
+
+;;; Core node and property element reading methods:
+
+(defmethod (read-node-element RDF-RESOURCE) ((self RDF-READER) (description CONS))
+  ;; Read all the RDF sentences encoded in a single RDF `description' which
+  ;; can be generic (rdf:Description) or named by its type (e.g., lib:Book).
+  ;; Return the subject resource of the description.
+  (let ((tag (get-xml-tag description))
+        (rdfType (get-rdf-type-of-description self description))
+        (subject (read-node-element-subject self description (create-resource-for-type rdfType)))
+        (start (length (statements self))))
+    (when (and (not (xml-element-match? tag "Description" *RDF-URI*))
+               ;; conditionally suppress implied type triples for anonymous Bag's etc.:
+               (or (and (not (is-container? subject))
+                        (not (is-list? subject)))
+                   (not (is-anonymous? subject))
+                   (not (suppress-implied-statements? self))))
+      ;; we have a named description where the name of the tag indicates the type:
+      (collect-new-statement self subject *RDF-TYPE-PROPERTY* (xml-element-to-rdf-resource tag)))
+    (read-node-element-attributes self subject (get-xml-attributes description))
+    (read-node-element-body self subject (get-xml-content description))
+    (when (is-reified-statement? subject)
+      (handle-reified-statement self subject start))
+    (return subject)))
+
+(defmethod read-node-element-attributes ((self RDF-READER) (subject RDF-RESOURCE) (attributes CONS))
+  ;; Create statements implied by `subject's `attributes'.
+  (let ((attribute XML-ATTRIBUTE NULL)
+        (value STRING NULL))
+    (while (non-empty? attributes)
+      (setq attribute (popq attributes))
+      (setq value (popq attributes))
+      (when (not (or (special-rdf-attribute? attribute)
+                     (and (is-container? subject)
+                          (not (is-anonymous? subject))
+                          (rdf-attribute-match? attribute "type"))))
+        (collect-new-statement
+         self
+         subject
+         (xml-attribute-to-rdf-property attribute)
+         (read-property-value self value NULL))))))
+
+(defmethod read-node-element-body ((self RDF-READER) (subject RDF-RESOURCE) (content CONS))
+  ;; Create statements implied by `subject's `content' elements.
+  (foreach expr in content
+      do (read-property-element self subject expr)))
+
+(defmethod (read-property-value-resource RDF-RESOURCE) ((self RDF-READER) (value STRING))
+  ;; Convert `value' into the appropriate RDF representation (assume it is the value of
+  ;; an rdf:resource attribute which also needs to be merged with the current base URI.
+  (when (relative-resource-name? value)
+    (setq value (merge-resource-name-with-base-uri value (base-uri self))))
+  (mv-bind (namespaceUri localName)
+      (parse-resource-name self value)
+    (if (and (eql? localName "nil")
+             (eql? namespaceUri *RDF-URI*))
+        (return *RDF-NIL*)
+      (return (new RDF-RESOURCE
+                   :surface-form value
+                   :name localName
+                   :namespace-name ""
+                   :namespace-uri namespaceUri)))))
+
+#|
+(defmethod (read-property-value RDF-NODE) ((self RDF-READER) (value STRING) (typeUri STRING))
+  ;; Convert `value' into the appropriate RDF representation.
+  ;; For now we create resources for URI values and literals for everything else (this deviates
+  ;;    from what Jena does which only creates nodes for node elements).
+  (mv-bind (namespaceUri localName)
+      (parse-resource-name self value)
+    (if (blank-string? namespaceUri)
+        (return (new RDF-LITERAL
+                     :surface-form value
+                     :datatype-uri typeUri))
+      (return (new RDF-RESOURCE
+                   :surface-form value
+                   :name localName
+                   :namespace-name ""
+                   :namespace-uri namespaceUri)))))
+|#
+
+(defmethod (read-property-value RDF-NODE) ((self RDF-READER) (value STRING) (typeUri STRING))
+  ;; Convert `value' into the appropriate RDF literal representation.
+  (return (new RDF-LITERAL
+               :surface-form value
+               :datatype-uri typeUri)))
+
+(defmethod read-property-element ((self RDF-READER) (subject RDF-RESOURCE) (property CONS))
+  ;; Create statements implied by `property' on `subject'.
+  (let ((attributes (get-xml-attributes property))
+        (parseType (rdf-lookup-attribute attributes "parseType"))
+        (dataType (rdf-lookup-attribute attributes "datatype"))
+        (content (get-xml-content property))
+        (propName (xml-element-to-rdf-property (get-xml-tag property)))
+        (propValue STRING NULL)
+        (object RDF-NODE NULL))
+    (cond ((empty? content)
+           (setq propValue (rdf-lookup-attribute attributes "resource"))
+           (when (defined? propValue)
+             (setq object (read-property-value-resource self propValue))))
+          ((eql? parseType "Literal")
+           ;; TO DO: maybe create an XML-Literal class
+           (setq object
+             (new RDF-LITERAL
+                  :surface-form (stringify content)
+                  :datatype-uri *XML-LITERAL-TYPE-URI*
+                  :value content)))
+          ((eql? parseType "Collection")
+           ;; TO DO: figure out whether this is ok, in the spec they are creating a list
+           (setq object (new RDF-SEQ))
+           (foreach elt in content
+               do (insert (cast object RDF-SEQ) (read-node-element self elt))))
+          ((eql? parseType "Resource")
+           ;; wrap `content' in an anonymous rdf:Description element:
+           (setq object
+             (read-node-element self (bquote (& (make-xml-element "Description" "rdf" *RDF-URI*) () && content)))))
+          ((defined? parseType)
+           (error "read-property-element: can't yet handle parseType=" parseType))
+          ;; catch CDATA elements first, since they are also conses:
+          ((xml-cdata-form? (first content))
+           (setq object (read-property-value self (get-xml-cdata-content (first content)) dataType)))
+          ((cons? (first content))
+           (setq object (read-node-element self (first content))))
+          (otherwise
+           (setq object (read-property-value self (first content) dataType))))
+    (when (defined? object)
+      (cond ((is-container? subject)
+             (when (rdf-container-element-property? propName)
+               (rdf-container-insert self subject propName object)
+               ;; conditionally suppress element statements for anonymous containers:
+               (when (and (suppress-implied-statements? self)
+                          (is-anonymous? subject))
+                 (return)))
+             ;; conditionally suppress type statements for anonymous containers:
+             (when (and (suppress-implied-statements? self)
+                        (is-anonymous? subject)
+                        (equal? propName *RDF-TYPE-PROPERTY*))
+               (return)))
+            ((is-list? subject)
+             ;; record the list structure on the element:
+             (cond ((equal? propName *RDF-FIRST-PROPERTY*)
+                    (setf (first-element (cast subject RDF-LIST)) object))
+                   ((equal? propName *RDF-REST-PROPERTY*)
+                    (setf (rest-elements (cast subject RDF-LIST)) object)))
+             ;; conditionally suppress element statements for anonymous containers:
+             (when (and (suppress-implied-statements? self)
+                        (is-anonymous? subject))
+               (return))))
+      (collect-new-statement self subject propName object))))
+
+(defmethod handle-reified-statement ((self RDF-READER) (subject RDF-REIFIED-STATEMENT) (start INTEGER))
+  ;; After a description of the reified statement `subject' has been fully parsed
+  ;; (accumulating statements beginning at `start'), collect its arguments and create
+  ;; a plain statement object cross-linked with `subject'.  If necessary, also delete
+  ;; the argument statements of the reified statement.
+  (let ((statements (statements self))
+        (lastStatementIdx (1- (length statements)))
+        (statement RDF-STATEMENT NULL)
+        (subjIdx 0)
+        (predIdx 0)
+        (objIdx 0)
+        (foundArgs 0))
+    ;; first, look for statements that indicate a reified statement:
+    (foreach i in (interval start lastStatementIdx)
+        do (setq statement (nth statements i))
+           (when (and (defined? statement)
+                      (eql? (subject statement) subject))
+             (cond ((equal? (predicate statement) *RDF-SUBJECT-PROPERTY*)
+                    (setq subjIdx i)
+                    (when (= (++ foundArgs) 3)
+                      (break)))
+                   ((equal? (predicate statement) *RDF-PREDICATE-PROPERTY*)
+                    (setq predIdx i)
+                    (when (= (++ foundArgs) 3)
+                      (break)))
+                   ((equal? (predicate statement) *RDF-OBJECT-PROPERTY*)
+                    (setq objIdx i)
+                    (when (= (++ foundArgs) 3)
+                      (break))))))
+    (when (= foundArgs 3)
+      ;; we found all components, create the unreified version
+      ;; and delete any argument statements if necessary:
+      (let ((unreifiedStatement
+             (new RDF-STATEMENT
+                  :id subject
+                  :subject (object (nth statements subjIdx))
+                  :predicate (to-property (cast (object (nth statements predIdx)) RDF-RESOURCE))
+                  :object (object (nth statements objIdx)))))
+        (setf (statement subject) unreifiedStatement)
+        (collect-statement self unreifiedStatement)
+        ;; finally, remove exploded arguments if necessary:
+        (when (suppress-implied-statements? self)
+          (setf (nth statements subjIdx) NULL)
+          (setf (nth statements predIdx) NULL)
+          (setf (nth statements objIdx) NULL))))))
+
+(defmethod substitute-statement-subjects ((self RDF-READER)
+                                          (oldSubject RDF-RESOURCE)
+                                          (newSubject RDF-RESOURCE)
+                                          (start INTEGER))
+  ;; In all of `self's statements starting at `start' change `oldSubject' to `newSubject'.
+  ;; Useful to change an element to the correct type if it wasn't created correctly initially.
+  ;; Since we look ahead now to get object types, this might be obsolete.
+  (let ((statements (statements self))
+        (lastStatementIdx (1- (length statements)))
+        (statement RDF-STATEMENT NULL))
+    (foreach i in (interval start lastStatementIdx)
+        do (setq statement (nth statements i))
+            (when (and (defined? statement)
+                      (eql? (subject statement) oldSubject))
+             (setf (subject statement) newSubject)))))
+
+
+  ;;
+;;;;;; RDF Models
+  ;;
+
+;;; Models represent sets of RDF-STATEMEMT's plus some insertion, removal and indexing
+;;; infrastructure.  Since RDF represents graphs, a KOJAK graph-structure seems appropriate.
+;;; We use either an RDF object or its STELLA translation (a symbol/string/list) as node
+;;; IDs and edge labels.
+
+;;; CONTEMPLATE: should the various RDF-xxx classes defined above all be subclasses of
+;;;              RDF-MODEL-NODE/RDF-MODEL-EDGE instead, since we seem to be duplicating
+;;;              some of the functionality (e.g., type predicates, storing of statement
+;;;              IDs, etc.)?
+
+(defclass RDF-MODEL (GRAPH-STRUCTURE)
+  :documentation "Directed graph class with fully attributed nodes and edges."
+  :public? TRUE
+  :parameters ((any-node :type RDF-MODEL-NODE)
+               (any-edge :type RDF-MODEL-EDGE))
+  :slots ((node-prototype :initially (new RDF-MODEL-NODE))
+          (edge-prototype :initially (new RDF-MODEL-EDGE))
+          (reified-statement-index :type (KEY-VALUE-MAP OF OBJECT RDF-MODEL-EDGE)
+                                   :initially (new KEY-VALUE-MAP :equal-test? TRUE))
+          (base-uri :type STRING :initially NULL)
+          (namespace-map :type NAMESPACE-MAP
+                         :initially (create-default-namespace-map)))
+  :initializer initialize-rdf-model)
+
+(defmethod initialize-rdf-model ((self RDF-MODEL))
+  ;; Use an equal test on node IDs so we can use RDF objects as well as lists
+  ;; (in case of STELLA-translated containers) as IDs.
+  (setf (equal-test? (the-index (cast (node-index self) STANDARD-NODE-INDEX))) TRUE))
+
+(defclass RDF-MODEL-NODE (STANDARD-GRAPH-NODE ATTRIBUTED-ELEMENT-MIXIN)
+  :documentation "RDF MODEL graph nodes that can have attributes.  The node
+ID can be either an RDF-RESOURCE or its STELLA translation."
+  :public? TRUE)
+
+(defmethod (create-graph-node RDF-MODEL-NODE) ((prototype RDF-MODEL-NODE))
+  :documentation "Create a new RDF-MODEL-NODE."
+  :public? TRUE
+  (return (new RDF-MODEL-NODE)))
+
+(defclass RDF-MODEL-EDGE (DIRECTED-STANDARD-GRAPH-EDGE ATTRIBUTED-ELEMENT-MIXIN)
+  :documentation "RDF MODEL graph edges that can have attributes and optionally
+hold an RDF property and a statement ID."
+  :public? TRUE
+  :slots ((id :type OBJECT)
+          (source :type RDF-MODEL-NODE)  ;; strengthen type
+          (subject :renames source)
+          (target :type RDF-MODEL-NODE)  ;; strengthen type
+          (object :renames target)
+          (predicate :type RDF-PROPERTY)))
+
+(defmethod (create-graph-edge RDF-MODEL-EDGE) ((prototype RDF-MODEL-EDGE))
+  :documentation "Create a new RDF-MODEL-EDGE."
+  :public? TRUE
+  (return (new RDF-MODEL-EDGE)))
+
+(defmethod (add-statement (LIKE (any-edge self))) ((self RDF-MODEL) (statement OBJECT))
+  :documentation "Add `statement' to `self' and return the resulting model edge.
+`statement' can be represented either as a proper RDF-STATEMENT object or as
+a STELLA cons representation."
+  :public? TRUE
+  (typecase statement
+    (RDF-STATEMENT
+     (let ((id (id statement))
+           (predicate (predicate statement))
+           (statementEdge RDF-MODEL-EDGE NULL))
+       (setq statementEdge (add-edge self (subject statement) (object statement) (get-uri predicate)))
+       (when (defined? id)
+         (setf (id statementEdge) id)
+         (insert-at (reified-statement-index self) id statementEdge))
+       (setf (predicate statementEdge) predicate)
+       (return statementEdge)))
+    (CONS
+     (return (add-edge self (first statement) (third statement) (second statement))))
+    (KV-CONS
+     (let ((id (key statement))
+           (stmt CONS (value statement))
+           (statementEdge (add-edge self (first stmt) (third stmt) (second stmt))))
+       (when (defined? id)
+         (setf (id statementEdge) id)
+         (insert-at (reified-statement-index self) id statementEdge))
+       (return statementEdge)))))
+
+(defmethod add-statements ((self RDF-MODEL) (statements ITERATOR))
+  :documentation "Add all `statements' to `self'."
+  :public? TRUE
+  (foreach statement in statements
+      do (add-statement self statement)))
+
+(defmethod (all-statements (ITERATOR OF (LIKE (any-edge self)))) ((self RDF-MODEL))
+  :documentation "Return all `statements' in `self'."
+  :public? TRUE
+  (return (all-edges self)))
+
+(defmethod (all-subjects (ITERATOR OF (LIKE (any-node self)))) ((self RDF-MODEL))
+  :documentation "Return all `subjects' in `self'."
+  :public? TRUE
+  (return (new ALL-PURPOSE-ITERATOR
+               :iterator-nested-iterator (all-nodes self)
+               :iterator-next-code (the-code :function filtered-nested-iterator-next?)
+               :iterator-filter-code (the-code :function all-subjects-filter?))))
+
+(defun (all-subjects-filter? BOOLEAN) ((node RDF-MODEL-NODE) (self ALL-PURPOSE-ITERATOR))
+  ;; Return TRUE if we have at least one outgoing edge from `node'.
+  (ignore self)
+  (foreach edge in (edges node)
+      where (eql? (source edge) node)
+      do (return TRUE))
+  (return FALSE))
+
+(defmethod (get-subject-statements (ITERATOR OF (LIKE (any-edge self)))) ((self RDF-MODEL)
+                                                                          (subject RDF-MODEL-NODE)
+                                                                          (reuseIterator ITERATOR))
+  :documentation "Return all statements connected to `subject'.
+If `reuseIterator' is supplied, it must have been created by a call to this method."
+  :public? TRUE
+  (return (get-outgoing-edges self subject reuseIterator)))
+
+(defmethod (get-subject-types (CONS OF (LIKE (any-node self)))) ((self RDF-MODEL) (subject RDF-MODEL-NODE) (reuseIterator ITERATOR))
+  :documentation "Return all types asserted about `subject'."
+  :public? TRUE
+  (let ((types NIL))
+    (foreach stmt in (get-subject-statements self subject reuseIterator)
+        where (eql? (label stmt) (quote /XMLNS/RDF/|type|))
+        collect (target stmt) into types)
+    (return types)))
+
+(defmethod (get-object-statements (ITERATOR OF (LIKE (any-edge self)))) ((self RDF-MODEL)
+                                                                         (object RDF-MODEL-NODE)
+                                                                         (reuseIterator ITERATOR))
+  :documentation "Return all statements connected to `object'.
+If `reuseIterator' is supplied, it must have been created by a call to this method."
+  :public? TRUE
+  (return (get-incoming-edges self object reuseIterator)))
+
+(defmethod (get-reified-statement (LIKE (any-edge self))) ((self RDF-MODEL) (id OBJECT))
+  :documentation "Return the statement reified by `id' which can be a node or node-ID."
+  :public? TRUE
+  (typecase id
+    (RDF-MODEL-NODE
+     (return (lookup (reified-statement-index self) (id id))))
+    (otherwise
+     (return (lookup (reified-statement-index self) id)))))
+
+(defmethod (is-anonymous? BOOLEAN) ((node RDF-MODEL-NODE))
+  :documentation "Return true if `node' represents an anonymous resource."
+  :public? TRUE
+  (let ((id (id node)))
+    (typecase id
+      (RDF-OBJECT
+       (return (is-anonymous? id)))
+      (SYMBOL
+       (return (blank-rdf-node-id? id)))
+      (otherwise
+       (return FALSE)))))
+
+(defmethod (is-resource? BOOLEAN) ((node RDF-MODEL-NODE))
+  :documentation "Return true if `node' represents a resource."
+  :public? TRUE
+  (let ((id (id node)))
+    (typecase id
+      (RDF-OBJECT
+       (return (is-resource? id)))
+      (SYMBOL
+       (return TRUE))
+      (otherwise
+       (return FALSE)))))
+
+(defmethod (is-literal? BOOLEAN) ((node RDF-MODEL-NODE))
+  :documentation "Return true if `node' represents a literal."
+  :public? TRUE
+  (let ((id (id node)))
+    (typecase id
+      (RDF-OBJECT
+       (return (is-literal? id)))
+      (SYMBOL
+       (return FALSE))
+      (otherwise
+       (return TRUE)))))
+
+(defmethod (is-reified-statement? BOOLEAN) ((edge RDF-MODEL-EDGE))
+  :documentation "Return true if `edge' is a reified statement."
+  :public? TRUE
+  (return (defined? (id edge))))
+
+
+  ;;
+;;;;;; RDF to STELLA/PowerLoom translation support
+  ;;
+
+;;; Here is a simple translator that maps RDF resources onto STELLA symbols,
+;;; statements onto lists, literals onto wrappers and containers onto lists.
+;;; Named objects such as reified statements or named containers are represented
+;;; as KV-CONS'es where the key represents the object's ID.
+
+(defun (rdf-resource-to-symbol SYMBOL) ((self RDF-RESOURCE) (map NAMESPACE-MAP))
+  ;; Map `self' onto a STELLA symbol according to `map'.
+  ;; The longest registered prefix in `map' that matches the initial portion
+  ;; of `self's URI will determine its module, the remaining portion becomes
+  ;; its symbol name.  Note that the matching prefix does not necessarily have
+  ;; to match `self's namespace-uri (but there prefixes have to overlap).
+  (return (uri-to-symbol map (get-uri self) NULL)))
+
+(defglobal *xmls-type-to-stella-type-table* (DICTIONARY OF STRING-WRAPPER TYPE)
+           (dictionary @KEY-VALUE-MAP
+                       "string" @STRING
+                       "boolean" @BOOLEAN
+                       "decimal" @FLOAT
+                       "float" @FLOAT
+                       "double" @FLOAT
+                       "integer" @INTEGER
+                       "long" @LONG-INTEGER
+                       "int" @INTEGER
+                       "short" @INTEGER
+                       "nonPositiveInteger" @INTEGER
+                       "negativeInteger" @INTEGER
+                       "nonNegativeInteger" @INTEGER
+                       "positiveInteger" @INTEGER
+                       "unsignedLong" @LONG-INTEGER
+                       "unsignedInt" @INTEGER
+                       "unsignedShort" @INTEGER
+                       "byte" @CHARACTER
+                       "unsignedByte" @CHARACTER))
+
+(defglobal *stella-type-to-xmls-type-table* (DICTIONARY OF TYPE STRING-WRAPPER)
+           (dictionary @KEY-VALUE-MAP
+                       @STRING "string"
+                       @BOOLEAN "boolean"
+                       ;@FLOAT "float"
+                       @FLOAT "double"
+                       @INTEGER "int"
+                       @LONG-INTEGER "long"
+                       @CHARACTER "byte"
+                       ;; mirror for wrapped types:
+                       @STRING-WRAPPER "string"
+                       @STRING-LOGIC-WRAPPER "string"
+                       @BOOLEAN-WRAPPER "boolean"
+                       ;@FLOAT-WRAPPER "float"
+                       @FLOAT-WRAPPER "double"
+                       @FLOAT-LOGIC-WRAPPER "double"
+                       @INTEGER-WRAPPER "int"
+                       @INTEGER-LOGIC-WRAPPER "int"
+                       @LONG-INTEGER-WRAPPER "long"
+                       @LONG-INTEGER-LOGIC-WRAPPER "long"
+                       @CHARACTER-WRAPPER "byte"))
+
+(defglobal *xmls-module* MODULE (get-stella-module "/XMLNS/XMLS" true)
+  :documentation "STELLA module representing the http://www.w3.org/2001/XMLSchema# namespace.")
+
+(defun (xmls-type-name-to-stella-type TYPE) ((typeName STRING))
+  ;; Return the closest STELLA data type corresponding to the XML Schema
+  ;; data type named `typeName' (unqualified).
+  (let ((type (lookup *xmls-type-to-stella-type-table* typeName)))
+    (when (null? type)
+      (setq type @OBJECT))
+    (return type)))
+
+(defun (xmls-type-to-stella-type TYPE) ((datatypeUri STRING))
+  ;; Return the closest STELLA data type corresponding to the XML Schema
+  ;; data type `datatypeUri' (fully qualified).
+  (return
+    (xmls-type-name-to-stella-type
+     (subsequence datatypeUri (length *XMLS-URI*) NULL))))
+
+(defun (stella-type-to-xmls-type-uri STRING) ((type TYPE))
+  ;; Return the XMLS datatype URI corresponding to `type' or NULL
+  ;; if none exists.
+  (let ((xmlsType (lookup *stella-type-to-xmls-type-table* type)))
+    (if (defined? xmlsType)
+        (return (concatenate *XMLS-URI* xmlsType))
+      (return NULL))))
+
+(defun (stella-type-to-xmls-type-symbol SYMBOL) ((type TYPE))
+  ;; Similar to `stella-type-to-xmls-type-uri', but represent the
+  ;; URI as a symbol in the `/XMLNS/XMLS' namespace.
+  (let ((xmlsType (lookup *stella-type-to-xmls-type-table* type)))
+    (if (defined? xmlsType)
+        (return (intern-symbol-in-module xmlsType *xmls-module* TRUE))
+      (return NULL))))
+
+(defun (rdf-literal-datatype-to-stella-type TYPE) ((datatypeUri STRING))
+  (if (and (defined? datatypeUri)
+           (starts-with? datatypeUri *XMLS-URI* NULL))
+      (return (xmls-type-to-stella-type datatypeUri))
+    (return @OBJECT)))
+
+(defun (rdf-literal-to-object OBJECT) ((self RDF-LITERAL))
+  (when (defined? (value self))
+    (return (value self)))
+  (let ((text (surface-form self))
+        (datatypeUri (datatype-uri self)))
+    (case (rdf-literal-datatype-to-stella-type datatypeUri)
+      (@STRING
+       (return text))
+      ((@INTEGER @LONG-INTEGER)
+       (return (wrap-integer-value (string-to-integer text))))
+      (@FLOAT
+       (return (string-to-float text)))
+      (@BOOLEAN
+       (cond ((eql? text "true")
+              (return TRUE))
+             ((eql? text "false")
+              (return FALSE))
+             (otherwise
+              (error "rdf-literal-to-object: illegal boolean literal: " text))))
+      (otherwise
+       ;; try to dwim numbers, this means numbers that are to be interpreted
+       ;; as strings need to be marked with a string datatype URI:
+       (when (forall ch in text
+                 always (or (digit-character? ch)
+                            (member? "+-.eE" ch)))
+         (exception-case
+             (return (unstringify text))
+           (NATIVE-EXCEPTION ())))
+       (return text)))))
+
+(defmethod (rdf-to-stella OBJECT) ((self RDF-OBJECT) (map NAMESPACE-MAP))
+  (ignore map)
+  (return self))
+
+(defmethod (rdf-to-stella OBJECT) ((self RDF-RESOURCE) (map NAMESPACE-MAP))
+  (return (rdf-resource-to-symbol self map)))
+
+(defmethod (rdf-to-stella OBJECT) ((self RDF-CONTAINER) (map NAMESPACE-MAP))
+  (let ((elements NIL))
+    (foreach elt in (allocate-iterator self)
+        collect (rdf-to-stella elt map) into elements)
+    (if (is-anonymous? self)
+        (return elements)
+      (return (kv-cons (rdf-resource-to-symbol self map) elements NULL)))))
+
+(defmethod (rdf-to-stella OBJECT) ((self RDF-LIST) (map NAMESPACE-MAP))
+  (let ((elements NIL))
+    (foreach elt in (get-container-elements self)
+        collect (rdf-to-stella elt map) into elements)
+    (if (is-anonymous? self)
+        (return elements)
+      (return (kv-cons (rdf-resource-to-symbol self map) elements NULL)))))
+
+(defmethod (rdf-to-stella OBJECT) ((self RDF-LITERAL) (map NAMESPACE-MAP))
+  (ignore map)
+  (return (rdf-literal-to-object self)))
+
+(defmethod (rdf-to-stella OBJECT) ((self RDF-STATEMENT) (map NAMESPACE-MAP))
+  (let ((statement
+         (cons (rdf-to-stella (subject self) map)
+               (cons (rdf-to-stella (predicate self) map)
+                     (cons (rdf-to-stella (object self) map) NIL)))))
+    (if (defined? (id self))
+        ;; we represent reified, non-anonymous objects as kv-conses:
+        (return (kv-cons (rdf-to-stella (id self) map) statement NULL))
+      (return statement))))
+
+(defun (rdf-statements-to-stella CONS) ((statements (CONS OF RDF-STATEMENT)) (map NAMESPACE-MAP))
+  :documentation "Translate `statements' into STELLA according to `map'.
+If `map' is NULL, a default semantic web namespace map will be used."
+  :public? TRUE
+  (let ((result NIL))
+    (when (null? map)
+      (setq map (create-default-namespace-map)))
+    (foreach statement in statements
+        collect (rdf-to-stella statement map) into result)
+    (return result)))
+
+(defun (rdf-file-to-stella CONS) ((file STRING) (map NAMESPACE-MAP) (baseURI STRING))
+  :documentation "Convenience method to translate the RDF `file' into a STELLA representation.
+Translation will be done relative to `map' and `baseURI' (both can be NULL)."
+  :public? TRUE
+  (let ((result NIL))
+    (when (null? map)
+      (setq map (create-default-namespace-map)))
+    (with-input-file (in file)
+      (foreach statement in (rdf-statements in baseURI)
+        collect (rdf-to-stella statement map) into result))
+    (return result)))
+
+#|
+STELLA(4): (setq map (create-default-namespace-map))
+|i|/SEMANTIC-WEB/@NAMESPACE-MAP
+STELLA(5): (/semantic-web/map-namespace (clv map)
+               :namespace-uri "http://www.co-ode.org/ontologies/pizza/pizza.owl#"
+               :namespace-module "PL-USER"
+               :mapping-style :BARE-NAME)
+NULL
+STELLA(6): (setq tuples (rdf-file-to-stella "~/Projects/powerloom/sources/translators/semantic-web/tests/pizza.owl" map null-string))
+|#
+
+(defun (load-rdf-stella-model RDF-MODEL) ((file STRING) (map NAMESPACE-MAP) (baseURI STRING))
+  ;; TO DO: proper handling of `baseURI' which should be mapped onto a base mapping in `map'
+  ;;        under appropriate circumstances; but make sure we don't create a base mapping
+  ;;        if `file' didn't really specify a base URI and we just are dealing with our default.
+  (when (null? map)
+    (setq map (create-default-namespace-map)))
+  (with-input-file (in file)
+    (let ((rdfStatements (rdf-statements in baseURI))
+          (model (new RDF-MODEL))
+          (id RDF-REIFIED-STATEMENT NULL)
+          (translatedStatement OBJECT NULL))
+      (foreach statement in rdfStatements
+          do (setq id (id statement))
+             (setq translatedStatement
+               (cons (rdf-to-stella (subject statement) map)
+                     (cons (rdf-to-stella (predicate statement) map)
+                           (cons (rdf-to-stella (object statement) map) NIL))))
+             (when (defined? id)
+               (setq translatedStatement
+                 (kv-cons (rdf-to-stella id map) translatedStatement NULL)))
+             (add-statement model translatedStatement))
+      (setf (base-uri model) (base-uri (reader rdfStatements)))
+      (setf (namespace-map model) map)
+      (return model))))
+
+
+  ;;
+;;;;;; Saving out RDF models
+  ;;
+
+;;; TO DO:
+;;; - collections
+;;; - literal datatypes
+;;; - prettier/less verbose typing of elements
+
+(defglobal *rdf-save-suppress-doctype?* BOOLEAN FALSE
+  :documentation "KLUDGE: supports suppression of DOCTYPE definitions
+which are barfed on by some tools (e.b., ChBE)."
+  :demon-property "semweb.rdfSaveSuppressDoctype"
+  :public? TRUE)
+
+(defglobal *rdf-save-generate-typed-descriptions?* BOOLEAN FALSE
+  :documentation "KLUDGE: supports generation of output that uses <TYPE...>
+elements instead of <rdf:Description ...> with a type property."
+  :demon-property "semweb.rdfSaveGenerateTypedDescriptions"
+  :public? TRUE)
+
+(defspecial *rdf-statement-indent* INTEGER 0
+  :documentation "Number of tab stops to indent the current statement.")
+
+(defspecial *rdf-statement-tab* STRING "    "
+  :documentation "White space representing one tab stop.")
+
+(defun rdf-bump-statement-indent ()
+  (++ *rdf-statement-indent*))
+
+(defun rdf-unbump-statement-indent ()
+  (-- *rdf-statement-indent*))
+
+(defun rdf-indent-statement ((stream OUTPUT-STREAM))
+  (foreach i in (interval 1 *rdf-statement-indent*)
+      do (ignore i)
+         (print-stream stream *rdf-statement-tab*)))
+
+(defmethod (rdf-object-print-name STRING) ((self RDF-MODEL)
+                                           (object OBJECT)
+                                           (usage KEYWORD)
+                                           (relative? BOOLEAN))
+  (typecase object
+    (RDF-MODEL-NODE
+     (return (rdf-object-print-name self (id object) usage relative?)))
+    (RDF-MODEL-EDGE
+     (if (defined? (predicate object))
+         (return (rdf-object-print-name self (predicate object) usage relative?))
+       (return (rdf-object-print-name self (label object) usage relative?))))
+    (RDF-RESOURCE
+     ;; TO DO: generalize this to create abbreviated versions as we do for symbols
+     (case usage
+       (:ID (return (name object)))
+       (otherwise
+        (return (get-uri object)))))
+    (SYMBOL
+     (let ((map (namespace-map self)))
+       (cond ((and (eql? usage :attribute)
+                   *rdf-save-suppress-doctype?*)
+              ;; we don't have ENTITY definitions, use the full URI:
+              (return (symbol-to-uri map object NULL usage)))
+             (relative?
+              (return (symbol-to-relative-uri map object NULL usage)))
+             (otherwise
+              (return (symbol-to-short-uri map object NULL usage))))))
+    (RDF-LITERAL
+     (return (surface-form object)))
+    (STRING-WRAPPER
+     (return (wrapper-value object)))
+    (INTEGER-WRAPPER
+     (return (integer-to-string object)))
+    (FLOAT-WRAPPER
+     (return (float-to-string object)))
+    (BOOLEAN-WRAPPER
+     (return (choose object "true" "false")))
+    (WRAPPER
+     (return (stringify object)))))
+
+(defmethod (save-subject-node STRING) ((self RDF-MODEL)
+                                       (subject RDF-MODEL-NODE)
+                                       (subjectType OBJECT)
+                                       (stream OUTPUT-STREAM))
+  (when (and (null? subjectType)
+             *rdf-save-generate-typed-descriptions?*)
+    (setq subjectType (first (get-subject-types self subject NULL))))
+  (when (null? subjectType)
+    (setq subjectType (quote RDF/|Description|)))
+  (let ((tagName (rdf-object-print-name self subjectType :entity FALSE)))
+    (rdf-indent-statement stream)
+    (print-stream stream "<" tagName)
+    (unless (is-anonymous? subject)
+      (print-stream stream
+                    " "
+                    (rdf-object-print-name self (quote RDF/|about|) :entity FALSE)
+                    "=\""
+                    (rdf-object-print-name self subject :attribute TRUE)
+                    "\""))
+    (print-stream stream ">" EOL)
+    (return tagName)))
+
+(defmethod save-subject ((self RDF-MODEL) (subject RDF-MODEL-NODE) (stream OUTPUT-STREAM))
+  (let ((subjectTag STRING NULL)
+        (reifiedStatement (get-reified-statement self subject)))
+    (when (defined? reifiedStatement)
+      (setq subjectTag (save-subject-node self subject (quote RDF/|Statement|) stream))
+      (rdf-bump-statement-indent)
+      (save-reified-statement-arguments self reifiedStatement stream))
+    (foreach statement in (get-subject-statements self subject NULL)
+        do (unless (is-reified-statement? statement)
+             (when (null? subjectTag)
+               (setq subjectTag (save-subject-node self subject NULL stream))
+               (rdf-bump-statement-indent))
+             (save-statement self statement stream)))
+    (when (defined? subjectTag)
+      ;; we did output at least one statement:
+      (rdf-unbump-statement-indent)
+      (rdf-indent-statement stream)
+      (print-stream stream "</" subjectTag ">" EOL))))
+
+(defmethod save-predicate-and-object-node ((self RDF-MODEL)
+                                           (predicate OBJECT)
+                                           (object RDF-MODEL-NODE)
+                                           (stream OUTPUT-STREAM))
+  (let ((predicateName (rdf-object-print-name self predicate :entity FALSE)))
+    (rdf-indent-statement stream)
+    (print-stream stream "<" predicateName)
+    (cond ((is-anonymous? object)
+           (print-stream stream ">" EOL)
+           (rdf-bump-statement-indent)
+           (save-subject self object stream)
+           (rdf-unbump-statement-indent)
+           (rdf-indent-statement stream)
+           (print-stream stream "</" predicateName ">" EOL))
+          ((is-resource? object)
+           (print-stream stream
+                         " "
+                         (rdf-object-print-name self (quote RDF/|resource|) :entity FALSE)
+                         "=\""
+                         (rdf-object-print-name self object :attribute TRUE)
+                         "\"/>" EOL))
+          ((is-literal? object)
+           (let ((theObject (id object))
+                 (dataType STRING NULL))
+             (typecase theObject
+               (RDF-LITERAL
+                (setq dataType (datatype-uri theObject)))
+               (otherwise
+                (let ((xmlsType (stella-type-to-xmls-type-symbol (primary-type theObject))))
+                  (when (defined? xmlsType)
+                    (setq dataType (rdf-object-print-name self xmlsType :attribute FALSE))))))
+             (when (defined? dataType)
+               (print-stream stream
+                             " "
+                             (rdf-object-print-name self (quote RDF/|datatype|) :entity FALSE)
+                             "=\""
+                             dataType
+                             "\""))
+             (print-stream stream ">")
+             (print-stream stream (rdf-object-print-name self object :literal FALSE))
+             (print-stream stream "</" predicateName ">" EOL))))))
+
+(defmethod save-statement ((self RDF-MODEL) (statement RDF-MODEL-EDGE) (stream OUTPUT-STREAM))
+  (save-predicate-and-object-node self statement (object statement) stream))
+
+(defmethod save-reified-statement-arguments ((self RDF-MODEL)
+                                             (statement RDF-MODEL-EDGE)
+                                             (stream OUTPUT-STREAM))
+  (let ((predicateId (first-defined (label statement) (predicate statement)))
+        (predicateNode (get-node self predicateId)))
+    (save-predicate-and-object-node self (quote RDF/|subject|) (subject statement) stream)
+    ;; we have some problem with typing here, since we need a node object for the predicate;
+    ;; but if there are no statements about it, there won't be a node in the model:
+    (when (null? predicateNode)
+      (setq predicateNode (make RDF-MODEL-NODE))
+      (setf (id predicateNode) predicateId))
+    (save-predicate-and-object-node self (quote RDF/|predicate|) predicateNode stream)
+    (save-predicate-and-object-node self (quote RDF/|object|) (object statement) stream)))
+
+(defmethod save-reified-statement ((self RDF-MODEL) (statement RDF-MODEL-EDGE) (stream OUTPUT-STREAM))
+  ;; Save a single reified `statement' as a set of subject/predicate/object triples.
+  ;; No other triples about the `statement's ID itself will be written out.
+  (let ((subjectTag STRING NULL)
+        (subjectNode (get-node self (id statement))))
+    (when (null? subjectNode)
+      ;; we have some problem with typing here, since we need a node object for the
+      ;; reified statement itself, which only exists if there were statements about it:
+      (setq subjectNode (make RDF-MODEL-NODE))
+      (setf (id subjectNode) (id statement)))
+    (setq subjectTag (save-subject-node self subjectNode (quote RDF/|Statement|) stream))
+    (rdf-bump-statement-indent)
+    (save-reified-statement-arguments self statement stream)
+    (rdf-unbump-statement-indent)
+    (rdf-indent-statement stream)
+    (print-stream stream "</" subjectTag ">" EOL)))
+
+(defmethod save-preamble ((self RDF-MODEL) (stream OUTPUT-STREAM))
+  (let ((map (namespace-map self)))
+    (rdf-indent-statement stream)
+    (print-stream stream "<?xml version=\"1.0\"?>" EOL EOL)
+    (rdf-indent-statement stream)
+    (unless *rdf-save-suppress-doctype?*
+      (print-stream stream
+                    "<!DOCTYPE "
+                    (rdf-object-print-name self (quote RDF/|RDF|) :entity FALSE)
+                    " [" EOL)
+      (rdf-bump-statement-indent)
+      (foreach info in (all-namespace-mappings map)
+          do (rdf-indent-statement stream)
+             (print-stream stream
+                           "<!ENTITY "
+                           (namespace info)
+                           " \""
+                           (namespace-uri-prefix info)
+                           "\" >" EOL))
+      (rdf-unbump-statement-indent)
+      (rdf-indent-statement stream)
+      (print-stream stream "]>" EOL EOL)
+      (rdf-indent-statement stream))
+    (print-stream stream "<" (rdf-object-print-name self (quote RDF/|RDF|) :entity FALSE))
+    (rdf-bump-statement-indent)
+    (when (defined? (base-mapping map))
+      (let ((baseUri (namespace-uri-prefix (base-mapping map))))
+        ;; TO DO: figure out how to properly denormalize the base URI here:
+        (print-stream stream " " "xmlns=\"" baseURI "#\"" EOL)
+        (rdf-indent-statement stream)
+        (print-stream stream "xml:base=\"" baseURI "\"")))
+    (foreach info in (all-namespace-mappings map)
+        do (print-stream stream EOL)
+           (rdf-indent-statement stream)
+           (print-stream stream
+                         "xmlns:"
+                         (namespace info)
+                         "=\""
+                         (namespace-uri-prefix info)
+                         "\""))
+    (print-stream stream ">" EOL EOL)
+    (rdf-unbump-statement-indent)))
+
+(defmethod save-postamble ((self RDF-MODEL) (stream OUTPUT-STREAM))
+  (rdf-indent-statement stream)
+  (print-stream stream "</" (rdf-object-print-name self (quote RDF/|RDF|) :entity FALSE) ">" EOL))
+
+(defmethod save-all-statements ((self RDF-MODEL) (stream OUTPUT-STREAM))
+  (foreach subject in (all-subjects self)
+      where (not (is-anonymous? subject))
+      do (save-subject self subject stream))
+  ;; now save all reified statements whose subject isn't a proper
+  ;; node since there are no other statements about it:
+  (foreach statement in (all-statements self)
+      where (and (is-reified-statement? statement)
+                 (null? (get-node self (id statement))))
+      do (save-reified-statement self statement stream)))
+
+(defmethod save-model ((self RDF-MODEL) (stream OUTPUT-STREAM))
+  (special ((*rdf-statement-indent* *rdf-statement-indent*))
+    (save-preamble self stream)
+    (rdf-bump-statement-indent)
+    (save-all-statements self stream)
+    (rdf-unbump-statement-indent)
+    (save-postamble self stream)))
+
+(defmethod save-flat-quints-model ((self RDF-MODEL) (stream OUTPUT-STREAM))
+  ;; Convenience function for easier inspection of a reified model (as used in MRP).
+  ;; This does not produce legal RDF.
+  (let ((object RDF-MODEL-NODE NULL)
+        (id OBJECT NULL))
+    (special ((*rdf-statement-indent* *rdf-statement-indent*))
+      (save-preamble self stream)
+      (foreach statement in (all-statements self)
+          do (print-stream stream (rdf-object-print-name self (subject statement) :entity FALSE) ", ")
+             (print-stream stream (rdf-object-print-name self (label statement) :entity FALSE) ", ")
+             (setq object (object statement))
+             (cond ((is-resource? object)
+                    (print-stream stream (rdf-object-print-name self object :entity TRUE)))
+                   (otherwise
+                    (let ((string (rdf-object-print-name self object :literal FALSE)))
+                      (write-html-quoting-special-characters stream string))))
+             (when (is-reified-statement? statement)
+               (setq id (id statement))
+               (print-stream stream ", " (rdf-object-print-name self id :entity FALSE))
+               (setq id (get-node self id))
+               (when (defined? id)
+                 (foreach stmt in (get-subject-statements self id NULL)
+                     where (eql? (label stmt) (quote /XMLNS/RDFS/|member|))
+                     do (print-stream stream ", " (rdf-object-print-name self (object stmt) :entity FALSE)))))
+             (print-stream stream EOL))
+      (save-postamble self stream))))

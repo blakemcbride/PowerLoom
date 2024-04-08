@@ -1,0 +1,166 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;; webtools-examples-system-structs.slisp
+
+#|
++---------------------------- BEGIN LICENSE BLOCK ---------------------------+
+|                                                                            |
+| Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          |
+|                                                                            |
+| The contents of this file are subject to the Mozilla Public License        |
+| Version 1.1 (the "License"); you may not use this file except in           |
+| compliance with the License. You may obtain a copy of the License at       |
+| http://www.mozilla.org/MPL/                                                |
+|                                                                            |
+| Software distributed under the License is distributed on an "AS IS" basis, |
+| WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   |
+| for the specific language governing rights and limitations under the       |
+| License.                                                                   |
+|                                                                            |
+| The Original Code is the STELLA Programming Language.                      |
+|                                                                            |
+| The Initial Developer of the Original Code is                              |
+| UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          |
+| 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               |
+|                                                                            |
+| Portions created by the Initial Developer are Copyright (C) 2003-2023      |
+| the Initial Developer. All Rights Reserved.                                |
+|                                                                            |
+| Contributor(s):                                                            |
+|                                                                            |
+| Alternatively, the contents of this file may be used under the terms of    |
+| either the GNU General Public License Version 2 or later (the "GPL"), or   |
+| the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   |
+| in which case the provisions of the GPL or the LGPL are applicable instead |
+| of those above. If you wish to allow use of your version of this file only |
+| under the terms of either the GPL or the LGPL, and not to allow others to  |
+| use your version of this file under the terms of the MPL, indicate your    |
+| decision by deleting the provisions above and replace them with the notice |
+| and other provisions required by the GPL or the LGPL. If you do not delete |
+| the provisions above, a recipient may use your version of this file under  |
+| the terms of any one of the MPL, the GPL or the LGPL.                      |
+|                                                                            |
++---------------------------- END LICENSE BLOCK -----------------------------+
+|#
+
+(CL:IN-PACKAGE "STELLA")
+
+
+(CL:DEFSTRUCT (|runAgentAndWaitForResponseReturn| (:CONC-NAME |%runAgentAndWaitForResponseReturn.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-runAgentAndWaitForResponseReturn| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|runAgentAndWaitForResponseResponse| (:CONC-NAME |%runAgentAndWaitForResponseResponse.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-runAgentAndWaitForResponseResponse| ()) (:COPIER ()) (:PREDICATE ())) (|return| NULL))
+
+(CL:DEFSTRUCT (|runAgentAndWaitForResponse| (:CONC-NAME |%runAgentAndWaitForResponse.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-runAgentAndWaitForResponse| ()) (:COPIER ()) (:PREDICATE ())) (|arg0| NULL)
+  (|arg1| NULL)
+  (|arg2| NULL))
+
+(CL:EVAL-WHEN (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)
+  (CL:UNLESS (CL:FIND-PACKAGE "STELLA")
+     (CL:DEFPACKAGE "STELLA" (:USE))))
+
+(CL:IN-PACKAGE "STELLA")
+
+(CL:DEFSTRUCT
+ (|arg2| (:CONC-NAME |%arg2.|) (:INCLUDE |XMLObject|)
+  (:CONSTRUCTOR |%MAKE-arg2| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT (|value| (:CONC-NAME |%value.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-value| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|key| (:CONC-NAME |%key.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-key| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|item| (:CONC-NAME |%item.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-item| ()) (:COPIER ()) (:PREDICATE ())) (|key| NULL)
+  (|val| NULL))
+
+(CL:DEFSTRUCT (|arg1| (:CONC-NAME |%arg1.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-arg1| ()) (:COPIER ()) (:PREDICATE ())) (|item| NULL))
+
+(CL:DEFSTRUCT (|arg0| (:CONC-NAME |%arg0.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-arg0| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:IN-PACKAGE "STELLA")
+
+(CL:DEFSTRUCT (|number| (:CONC-NAME |%number.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-number| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|exchange| (:CONC-NAME |%exchange.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-exchange| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|areaCode| (:CONC-NAME |%areaCode.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-areaCode| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|phoneNumber| (:CONC-NAME |%phoneNumber.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-phoneNumber| ()) (:COPIER ()) (:PREDICATE ())) (|areaCode| NULL)
+  (|exchange| NULL)
+  (|number| NULL)
+  (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|zip| (:CONC-NAME |%zip.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-zip| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|state| (:CONC-NAME |%state.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-state| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|city| (:CONC-NAME |%city.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-city| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|streetName| (:CONC-NAME |%streetName.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-streetName| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|streetNum| (:CONC-NAME |%streetNum.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-streetNum| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT
+ (|Number| (:CONC-NAME |%Number.|) (:INCLUDE |XMLObject|)
+  (:CONSTRUCTOR |%MAKE-Number| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|Exchange| (:CONC-NAME |%Exchange.|) (:INCLUDE |XMLObject|)
+  (:CONSTRUCTOR |%MAKE-Exchange| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|AreaCode| (:CONC-NAME |%AreaCode.|) (:INCLUDE |XMLObject|)
+  (:CONSTRUCTOR |%MAKE-AreaCode| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT (|PhoneNumber| (:CONC-NAME |%PhoneNumber.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PhoneNumber| ()) (:COPIER ()) (:PREDICATE ())) (|areaCode| NULL)
+  (|exchange| NULL)
+  (|number| NULL))
+
+(CL:DEFSTRUCT
+ (|Zip| (:CONC-NAME |%Zip.|) (:INCLUDE |XMLObject|)
+  (:CONSTRUCTOR |%MAKE-Zip| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|State| (:CONC-NAME |%State.|) (:INCLUDE |XMLObject|)
+  (:CONSTRUCTOR |%MAKE-State| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|City| (:CONC-NAME |%City.|) (:INCLUDE |XMLObject|)
+  (:CONSTRUCTOR |%MAKE-City| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|StreetName| (:CONC-NAME |%StreetName.|) (:INCLUDE |XMLObject|)
+  (:CONSTRUCTOR |%MAKE-StreetName| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|StreetNum| (:CONC-NAME |%StreetNum.|) (:INCLUDE |XMLObject|)
+  (:CONSTRUCTOR |%MAKE-StreetNum| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT (|Address| (:CONC-NAME |%Address.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-Address| ()) (:COPIER ()) (:PREDICATE ())) (|streetNum| NULL)
+  (|streetName| NULL)
+  (|city| NULL)
+  (|state| NULL)
+  (|zip| NULL)
+  (|phone| NULL))
+
+(CL:DEFSTRUCT (|nameToLookup| (:CONC-NAME |%nameToLookup.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-nameToLookup| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|getAddressFromNameResponse| (:CONC-NAME |%getAddressFromNameResponse.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-getAddressFromNameResponse| ()) (:COPIER ()) (:PREDICATE ())) (|return| NULL))
+
+(CL:DEFSTRUCT (|return| (:CONC-NAME |%return.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-return| ()) (:COPIER ()) (:PREDICATE ())) (|streetNum| NULL)
+  (|streetName| NULL)
+  (|city| NULL)
+  (|state| NULL)
+  (|zip| NULL)
+  (|phone| NULL)
+  (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|getAddressFromName| (:CONC-NAME |%getAddressFromName.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-getAddressFromName| ()) (:COPIER ()) (:PREDICATE ())) (|nameElement| NULL))
+
+(CL:IN-PACKAGE "STELLA")
+
+(CL:DEFSTRUCT (|SampleListItem| (:CONC-NAME |%SampleListItem.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-SampleListItem| ()) (:COPIER ()) (:PREDICATE ())) (|itemID| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|SampleNested| (:CONC-NAME |%SampleNested.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-SampleNested| ()) (:COPIER ()) (:PREDICATE ())) (|nestedAttr| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|SampleContents| (:CONC-NAME |%SampleContents.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-SampleContents| ()) (:COPIER ()) (:PREDICATE ())) (|sampleAttr| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|sub| NULL)
+  (|SampleListItem| NULL))

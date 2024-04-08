@@ -1,0 +1,3585 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;; BEGIN LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                            ;
+; Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          ;
+;                                                                            ;
+; The contents of this file are subject to the Mozilla Public License        ;
+; Version 1.1 (the "License"); you may not use this file except in           ;
+; compliance with the License. You may obtain a copy of the License at       ;
+; http://www.mozilla.org/MPL/                                                ;
+;                                                                            ;
+; Software distributed under the License is distributed on an "AS IS" basis, ;
+; WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   ;
+; for the specific language governing rights and limitations under the       ;
+; License.                                                                   ;
+;                                                                            ;
+; The Original Code is the STELLA Programming Language.                      ;
+;                                                                            ;
+; The Initial Developer of the Original Code is                              ;
+; UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          ;
+; 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               ;
+;                                                                            ;
+; Portions created by the Initial Developer are Copyright (C) 1996-2022      ;
+; the Initial Developer. All Rights Reserved.                                ;
+;                                                                            ;
+; Contributor(s):                                                            ;
+;                                                                            ;
+; Alternatively, the contents of this file may be used under the terms of    ;
+; either the GNU General Public License Version 2 or later (the "GPL"), or   ;
+; the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   ;
+; in which case the provisions of the GPL or the LGPL are applicable instead ;
+; of those above. If you wish to allow use of your version of this file only ;
+; under the terms of either the GPL or the LGPL, and not to allow others to  ;
+; use your version of this file under the terms of the MPL, indicate your    ;
+; decision by deleting the provisions above and replace them with the notice ;
+; and other provisions required by the GPL or the LGPL. If you do not delete ;
+; the provisions above, a recipient may use your version of this file under  ;
+; the terms of any one of the MPL, the GPL or the LGPL.                      ;
+;                                                                            ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; END LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; Version: $Id$
+
+;;; Declarations for objects implemented by native constructs.
+
+(in-package "STELLA")
+
+(in-module "/STELLA")
+
+
+;;; Most functions declared in this file must be implemented by directly 
+;;;    calling Common Lisp, C++ or Java functions.  By declaring them here
+;;;    their signatures become available to the STELLA code walker.
+;;;    The implementations can be found in the associated cl-primal.lisp,
+;;;    cpp-primal.cc and Native.java files.
+
+  ;;
+;;;;;; Built-in constants:
+  ;;
+
+(defconstant PI FLOAT
+  (verbatim :common-lisp "(cl:float CL:PI 0.0d0)"  ;; in case it's a long float
+            :cpp "3.141592653589793"
+            :java "java.lang.Math.PI")
+  :public? TRUE
+  :documentation "A float approximation of the mathematical constant pi.")
+
+(startup-time-progn
+ ;; Need a variable object without generating an actual variable:
+ (define-stella-global-variable-from-stringified-source
+    "(defconstant NULL UNKNOWN NULL
+       :public? TRUE
+       :documentation
+       \"Generic undefined value for any STELLA data type.  The STELLA
+translator substitutes specific NULL-values appropriate for a particular data
+type.  For example, NULL-INTEGER represents the undefined INTEGER value.\")"))
+
+(defconstant NULL-INTEGER INTEGER
+  (verbatim :common-lisp CL:MOST-NEGATIVE-FIXNUM
+            :cpp "std::numeric_limits<int>::min()"
+	    :java "Integer.MIN_VALUE")
+    :public? TRUE)
+
+(defconstant NULL-SHORT-INTEGER SHORT-INTEGER
+  (verbatim :common-lisp CL:MOST-NEGATIVE-FIXNUM
+            :cpp "std::numeric_limits<short int>::min()"
+	    :java "Short.MIN_VALUE")
+  :public? TRUE)
+
+(defconstant NULL-LONG-INTEGER LONG-INTEGER
+  (verbatim :common-lisp
+            ;; we restrict Lisp long integers to 63+1 bits to mirror C++ & Java,
+            ;; even though Lisp bignums are (virtually) infinite precision;
+            ;; this also allows us to have a NULL value of the appropriate
+            ;; type instead of the symbol that Bob used in his version:
+            "(CL:- (CL:expt 2 63))"
+            :cpp "std::numeric_limits<long long int>::min()"
+	    :java "Long.MIN_VALUE")
+  :public? TRUE)
+
+(defconstant NULL-UNSIGNED-SHORT-INTEGER UNSIGNED-SHORT-INTEGER
+  (verbatim :common-lisp CL:MOST-NEGATIVE-FIXNUM
+            :cpp "std::numeric_limits<unsigned short int>::min()"
+	    :java "Short.MIN_VALUE"
+	    )
+  :public? TRUE)
+
+(defconstant NULL-UNSIGNED-LONG-INTEGER UNSIGNED-LONG-INTEGER
+  (verbatim :common-lisp "(CL:1- (CL:expt 2 64))"
+            :cpp "std::numeric_limits<unsigned long long int>::min()"
+	    :java "Long.MIN_VALUE")
+  :public? TRUE)
+
+
+;; JAVA NOTE:  Using the NaN value would be a better solution, but it
+;;      requires that the defined? and null? tests be modified to call
+;;      the isNaN static function rather than doing a comparison with
+;;      == or !=, since Java doesn't consider NaNs to be comparable.
+;;     -- TAR 11/12/98
+
+(defconstant NULL-FLOAT FLOAT
+  (verbatim :common-lisp CL:MOST-NEGATIVE-DOUBLE-FLOAT
+            :cpp "std::numeric_limits<double>::infinity() != 0 ?
+                    -std::numeric_limits<double>::infinity() :
+                    // work around a problem in g++ 3.2.2 where infinity()==0:
+                    NULL_INTEGER / (double)ceiling(-0.42)" ; disguise div-by-0
+	    ; :java "Double.NaN; // IEEE Not a Number"
+	    :java "Double.NEGATIVE_INFINITY; /* IEEE Infinity */"
+	    )
+    :public? TRUE)
+
+(defconstant NULL-SINGLE-FLOAT SINGLE-FLOAT
+  (verbatim :common-lisp CL:MOST-NEGATIVE-SINGLE-FLOAT
+            :cpp "-std::numeric_limits<float>::infinity()"
+	    ; :java "Float.NaN; /* IEEE Not a Number */"
+	    :java "Float.NEGATIVE_INFINITY; /* IEEE Infinity */"
+	    )
+    :public? TRUE)
+
+(defconstant NULL-DOUBLE-FLOAT DOUBLE-FLOAT
+  (verbatim :common-lisp CL:MOST-NEGATIVE-DOUBLE-FLOAT
+	    :cpp "-std::numeric_limits<double>::infinity()"
+            ; :java "Double.NaN; /* IEEE Not a Number */"
+	    :java "Double.NEGATIVE_INFINITY; /* IEEE Infinity */"
+	    )
+    :public? TRUE)
+
+(defconstant NULL-CHARACTER CHARACTER
+  (verbatim :common-lisp (CL:code-char 0)
+            :cpp "'\\0'"
+	    :java "Character.MIN_VALUE")
+    :public? TRUE)
+
+(defconstant NULL-BYTE BYTE (verbatim :common-lisp "255"
+				      :cpp "255"
+				      :java "-128")
+    :public? TRUE)
+
+(defconstant NULL-OCTET OCTET (verbatim :common-lisp "255"
+					:cpp "255"
+					:java "-128")
+    :public? TRUE)
+
+(defun (lisp-null-array-symbol-string STRING) ((rank INTEGER))
+  ;; Used in the lisp translation code, inside a verbatim
+  ;; to return Lisp-specific-code.
+  ;; Needs to match with NULL values defined in cl-lib/cl-setup.lisp
+  (CASE rank
+    (1 (return "STELLA::NULL-1D-ARRAY"))
+    (2 (return "STELLA::NULL-2D-ARRAY"))
+    (3 (return "STELLA::NULL-3D-ARRAY"))
+    (4 (return "STELLA::NULL-4D-ARRAY"))
+    (5 (return "STELLA::NULL-5D-ARRAY"))
+    (otherwise (return "STELLA::NULL"))))
+
+;;; Boundary values for the (usable) numeric types:
+
+(defconstant MOST-POSITIVE-INTEGER INTEGER
+  (verbatim :common-lisp CL:MOST-POSITIVE-FIXNUM 
+            :cpp "std::numeric_limits<int>::max()"
+	    :java "Integer.MAX_VALUE")
+  :public? TRUE)
+
+(defconstant MOST-NEGATIVE-INTEGER INTEGER (1+ NULL-INTEGER)
+  :public? TRUE)
+
+(defconstant MOST-POSITIVE-LONG-INTEGER LONG-INTEGER
+  (verbatim :common-lisp
+            "(CL:1- (CL:expt 2 63))"
+            :cpp "std::numeric_limits<long long int>::max()"
+	    :java "Long.MAX_VALUE")
+  :public? TRUE)
+
+(defconstant MOST-NEGATIVE-LONG-INTEGER LONG-INTEGER (1+ NULL-LONG-INTEGER)
+  :public? TRUE)
+
+(defconstant MOST-POSITIVE-FLOAT FLOAT
+  (verbatim :common-lisp CL:MOST-POSITIVE-DOUBLE-FLOAT
+            :cpp "std::numeric_limits<double>::max()"
+	    :java "Double.MAX_VALUE")
+  :public? TRUE)
+
+(defconstant MOST-NEGATIVE-FLOAT FLOAT
+  (verbatim :common-lisp
+            ;; since we don't have a CL-portable infinite value for NULL-FLOAT
+            ;; we have to generate the smallest/most negative number greater than
+            ;; and different from NULL-FLOAT to use for this constant:
+            "(cl:multiple-value-bind (signif expon)
+                (cl:integer-decode-float cl:most-positive-double-float)
+              (cl:- (cl:scale-float (CL:- signif 1.0) expon)))"
+            :otherwise (- MOST-POSITIVE-FLOAT))
+  :public? TRUE)
+
+(defconstant LEAST-POSITIVE-FLOAT FLOAT
+  (verbatim :common-lisp CL:LEAST-POSITIVE-DOUBLE-FLOAT
+            :cpp "std::numeric_limits<double>::min()"
+	    :java "Double.MIN_VALUE")
+  :public? TRUE)
+
+(defconstant LEAST-NEGATIVE-FLOAT FLOAT (- LEAST-POSITIVE-FLOAT)
+  :public? TRUE)
+
+(defun print-numeric-constants ()
+  :command? TRUE
+  ;; for testing only:
+  (print "MOST-POSITIVE-INTEGER:             " MOST-POSITIVE-INTEGER EOL
+         "MOST-NEGATIVE-INTEGER:            "  MOST-NEGATIVE-INTEGER EOL
+         "NULL-INTEGER:                     "  NULL-INTEGER EOL
+         "MOST-POSITIVE-LONG-INTEGER:        " MOST-POSITIVE-LONG-INTEGER EOL
+         "MOST-NEGATIVE-LONG-INTEGER:       "  MOST-NEGATIVE-LONG-INTEGER EOL
+         "NULL-LONG-INTEGER:                "  NULL-LONG-INTEGER EOL
+         "MOST-POSITIVE-FLOAT:               " MOST-POSITIVE-FLOAT EOL
+         "MOST-NEGATIVE-FLOAT:              "  MOST-NEGATIVE-FLOAT EOL
+         "LEAST-POSITIVE-FLOAT:              " LEAST-POSITIVE-FLOAT EOL
+         "LEAST-NEGATIVE-FLOAT:             "  LEAST-NEGATIVE-FLOAT EOL
+         "NULL-FLOAT:                       "  NULL-FLOAT EOL
+         "*INTEGER-MSB-MASK*:                " *integer-msb-mask* EOL
+         "*INTEGER-UNSIGNED-BITS-MASK*:      " *integer-unsigned-bits-mask* EOL
+         "*LONG-INTEGER-MSB-MASK*:           " *long-integer-msb-mask* EOL
+         "*LONG-INTEGER-UNSIGNED-BITS-MASK*: " *long-integer-unsigned-bits-mask* EOL
+         "LONG-INTEGER-BIT-WIDTH:            " LONG-INTEGER-BIT-WIDTH EOL
+         "il(MOST-POSITIVE-INTEGER):         " (integer-length MOST-POSITIVE-INTEGER) EOL
+         "il(MOST-POSITIVE-LONG-INTEGER):    " (integer-length MOST-POSITIVE-LONG-INTEGER) EOL
+         "il(MOST-NEGATIVE-INTEGER):         " (integer-length MOST-NEGATIVE-INTEGER) EOL
+         "il(MOST-NEGATIVE-LONG-INTEGER):    " (integer-length MOST-NEGATIVE-LONG-INTEGER) EOL
+         ))
+
+
+  ;;
+;;;;;; `null?' and `defined?':
+  ;;
+
+(defmethod (null? BOOLEAN) ((x UNKNOWN))
+  :documentation
+  "Return true if `x' is undefined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (null? BOOLEAN) ((x OBJECT))
+  :documentation
+  "Return true if `x' is undefined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (null? BOOLEAN) ((x SECOND-CLASS-OBJECT))
+  :documentation
+  "Return true if `x' is undefined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (null? BOOLEAN) ((x NATIVE-VECTOR))
+  :documentation
+  "Return true if `x' is undefined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (null? BOOLEAN) ((x ARRAY))	; cl-array-null
+  :documentation
+  "Return true if `x' is undefined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (null? BOOLEAN) ((x STRING))
+  :documentation
+  "Return true if `x' is undefined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (null? BOOLEAN) ((x MUTABLE-STRING))
+  :documentation
+  "Return true if `x' is undefined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (null? BOOLEAN) ((x CHARACTER))
+  :documentation
+  "Return true if `x' is undefined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (null? BOOLEAN) ((x CODE))
+  :documentation
+  "Return true if `x' is undefined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (null? BOOLEAN) ((x INTEGER))
+  :documentation
+  "Return true if `x' is undefined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (null? BOOLEAN) ((x LONG-INTEGER))
+  :documentation
+  "Return true if `x' is undefined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (null? BOOLEAN) ((x FLOAT))
+  :documentation
+  "Return true if `x' is undefined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+
+(defmethod (defined? BOOLEAN) ((x UNKNOWN))
+  :documentation
+  "Return true if `x' is defined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (defined? BOOLEAN) ((x OBJECT))
+  :documentation
+  "Return true if `x' is defined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (defined? BOOLEAN) ((x SECOND-CLASS-OBJECT))
+  :documentation
+  "Return true if `x' is defined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (defined? BOOLEAN) ((x NATIVE-VECTOR))
+  :documentation
+  "Return true if `x' is defined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (defined? BOOLEAN) ((x ARRAY)) ; cl-array-null
+  :documentation
+  "Return true if `x' is defined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (defined? BOOLEAN) ((x STRING))
+  :documentation
+  "Return true if `x' is defined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (defined? BOOLEAN) ((x MUTABLE-STRING))
+  :documentation
+  "Return true if `x' is defined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (defined? BOOLEAN) ((x CHARACTER))
+  :documentation
+  "Return true if `x' is defined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (defined? BOOLEAN) ((x CODE))
+  :documentation
+  "Return true if `x' is defined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (defined? BOOLEAN) ((x INTEGER))
+  :documentation
+  "Return true if `x' is defined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (defined? BOOLEAN) ((x LONG-INTEGER))
+  :documentation
+  "Return true if `x' is defined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+(defmethod (defined? BOOLEAN) ((x FLOAT))
+  :documentation
+  "Return true if `x' is defined (handled specially by all translators)."
+  :public? TRUE :native? TRUE)
+
+
+  ;;
+;;;;;; Equality tests:
+  ;;
+
+(defun (eq? BOOLEAN) ((x UNKNOWN) (y UNKNOWN))
+  :documentation "Return true if `x' and `y' are literally the same object (or
+simple number).  Analogue to the Common Lisp EQL and C++ and Java's ==."
+  :public? TRUE :native? TRUE)
+
+(defun (= BOOLEAN) ((x NUMBER) (y NUMBER))
+  :documentation
+  "Return true if `x' and `y' are numbers of exactly the same magnitude."
+  :public? TRUE :native? TRUE)
+
+(defun (eql? BOOLEAN) ((x OBJECT) (y OBJECT))
+  :documentation "Return true if `x' and `y' are `eq?' or equivalent literals
+such as strings that also might be wrapped in non-identical wrappers.  For
+the case where `x' or `y' are plain literals such as strings or integers, the
+STELLA translator substitutes the equality test appropriate for the particular
+target language and does not actually call this function.  For cases where
+`x' or `y' are known to be of type STANDARD-OBJECT, the STELLA translator
+substitutes the faster `eq?' test inline."
+  :public? TRUE
+  (return (choose (null? x) (null? y) (or (eq? x y) (object-eql? x y)))))
+
+(defun (equal? BOOLEAN) ((x OBJECT) (y OBJECT))
+  :documentation "Return true if `x' and `y' are `eql?' or considered equal
+by a user-defined `object-equal?' method.  This implements a fully extensible
+equality test similar to Java's `equals' method.  Note that writers of custom
+`object-equal?' methods must also implement a corresponding `equal-hash-code'
+method."
+  :public? TRUE
+  (return (choose (null? x)
+                  (null? y)
+                  (or (eq? x y)
+                      (object-equal? x y)))))
+
+(defmethod (object-equal? BOOLEAN) ((x OBJECT) (y OBJECT))
+  :documentation "Return true if `x' and `y' are `eq?'."
+  :public? TRUE
+  (return (eq? x y)))
+
+(defmethod (object-equal? BOOLEAN) ((x WRAPPER) (y OBJECT))
+  :documentation "Return true if `x' and `y' are literal wrappers whose
+literals are considered `eql?'."
+  :public? TRUE
+  (return (object-eql? x y)))
+
+
+  ;;
+;;;;;; Arithmetic and math support functions
+  ;;
+
+
+;;; Operators are translated directly.
+
+(defun (> BOOLEAN) ((x NUMBER) (y NUMBER))
+  :documentation "Return true if `x' is greater than `y'."
+  :public? TRUE :native? TRUE)
+(defun (>= BOOLEAN) ((x NUMBER) (y NUMBER))
+  :documentation "Return true if `x' is greater than or equal to `y'."
+  :public? TRUE :native? TRUE)
+(defun (< BOOLEAN) ((x NUMBER) (y NUMBER))
+  :documentation "Return true if `x' is less than `y'."
+  :public? TRUE :native? TRUE)
+(defun (<= BOOLEAN) ((x NUMBER) (y NUMBER))
+  :documentation "Return true if `x' is less than or equal to `y'."
+  :public? TRUE :native? TRUE)
+(defun (+ NUMBER) (&rest (arguments NUMBER))
+  :documentation "Return the sum of all `arguments'."
+  :public? TRUE :native? TRUE)
+(defun (- NUMBER) ((x NUMBER) &rest (arguments NUMBER))
+  :documentation "If only `x' was supplied return the result of 0 - `x'.
+Otherwise, return the result of (...((`x' - arg1) - arg2) - ... - argN)."
+  :public? TRUE :native? TRUE)
+(defun (* NUMBER) (&rest (arguments NUMBER))
+  :documentation "Return the product of all `arguments'."
+  :public? TRUE :native? TRUE)
+(defun (/ NUMBER) ((x NUMBER) &rest (arguments NUMBER))
+  :documentation "If only `x' was supplied return the result of 1 / `x'.
+Otherwise, return the result of (...((`x' / arg1) / arg2 ) / ... / argN)."
+  :public? TRUE :native? TRUE)
+
+(defmethod (zero? BOOLEAN) ((x INTEGER))
+  :documentation "Return true if `x' is 0."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:= x 0)
+              :cpp "(!x)"
+              :java "(x == 0)")))
+
+(defmethod (zero? BOOLEAN) ((x LONG-INTEGER))
+  :documentation "Return true if `x' is 0."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:= x 0)
+              :cpp "(!x)"
+              :java "(x == 0)")))
+
+(defmethod (plus? BOOLEAN) ((x INTEGER))
+  :documentation "Return true if `x' is greater than 0."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:> x 0)
+              :cpp "(x > 0)"
+              :java "(x > 0)")))
+
+(defmethod (plus? BOOLEAN) ((x LONG-INTEGER))
+  :documentation "Return true if `x' is greater than 0."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:> x 0)
+              :cpp "(x > 0)"
+              :java "(x > 0)")))
+  
+(defmethod (even? BOOLEAN) ((x INTEGER))
+  :documentation "Return true if `x' is an even number."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:not (CL:logbitp 0 x))
+              :cpp "!(x % 2)"
+              :java "((x % 2) == 0)")))
+
+(defmethod (even? BOOLEAN) ((x LONG-INTEGER))
+  :documentation "Return true if `x' is an even number."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:not (CL:logbitp 0 x))
+              :cpp "!(x % 2)"
+              :java "((x % 2) == 0)")))
+
+(defmethod (odd? BOOLEAN) ((x INTEGER))
+  :documentation "Return true if `x' is an odd number."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:logbitp 0 x)
+              :cpp "(x % 2)"
+              :java "((x % 2) == 1)")))
+
+(defmethod (odd? BOOLEAN) ((x LONG-INTEGER))
+  :documentation "Return true if `x' is an odd number."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:logbitp 0 x)
+              :cpp "(x % 2)"
+              :java "((x % 2) == 1)")))
+
+(defmethod (div INTEGER) ((x INTEGER) (y INTEGER))
+  :documentation "Return the integer quotient from dividing `x' by `y'."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:VALUES (CL:truncate x y))
+              :cpp "(x / y)"
+              :java "(x / y)")))
+
+(defmethod (div LONG-INTEGER) ((x LONG-INTEGER) (y LONG-INTEGER))
+  :documentation "Return the integer quotient from dividing `x' by `y'."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:VALUES (CL:truncate x y))
+              :cpp "(x / y)"
+              :java "(x / y)")))
+
+(defmethod (rem INTEGER) ((x INTEGER) (y INTEGER))
+  :documentation "Return the remainder from dividing `x' by `y'.  The
+sign of the result is always the same as the sign of `x'.  This has slightly
+different behavior than the `mod' function, and has less overhead in C++ and
+Java, which don't have direct support for a true modulus function."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:rem x y)
+              :cpp "(x % y)"
+              :java "(x % y)")))
+
+(defmethod (rem LONG-INTEGER) ((x LONG-INTEGER) (y LONG-INTEGER))
+  :documentation "Return the remainder from dividing `x' by `y'.  The
+sign of the result is always the same as the sign of `x'.  This has slightly
+different behavior than the `mod' function, and has less overhead in C++ and
+Java, which don't have direct support for a true modulus function."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:rem x y)
+              :cpp "(x % y)"
+              :java "(x % y)")))
+
+(defun (frem FLOAT) ((x FLOAT) (y FLOAT))
+  :documentation "Return the floating point remainder from dividing `x' by `y'.  The
+sign of the result is always the same as the sign of `x'.  This has slightly
+different behavior than the `mod' function, and has less overhead in C++ and
+Java, which don't have direct support for a true modulus function."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:rem x y)
+              :cpp "fmod(x, y)"
+              :java "(x % y)")))
+
+(defmethod (mod INTEGER) ((x INTEGER) (modulus INTEGER))
+  :documentation "True modulus.  Return the result of `x' mod `modulo'.
+Note: In C++ and Java, `mod' has more overhead than the similar
+function `rem'.  The  answers returned by `mod' and `rem' are only
+different when the signs of `x' and `modulo' are different."
+  :public? TRUE
+  (let ((remainder (verbatim :common-lisp (cl:mod x modulus)
+                             :otherwise (rem x modulus))))
+    ;; At this point, remainder is the correct answer in Common Lisp,
+    ;; but needs to be modified if the signs of x and modulus are
+    ;; different for the other languages that do not have a native
+    ;; modulus function.
+    (verbatim :common-lisp NULL
+              :otherwise
+              (cond ((> remainder 0)
+                     (when (< modulus 0)
+                       (setq remainder (+ modulus remainder))))
+                    ((< remainder 0)
+                     (when (> modulus 0)
+                       (setq remainder (+ modulus remainder))))))
+    (return remainder)))
+
+(defmethod (mod LONG-INTEGER) ((x LONG-INTEGER) (modulus LONG-INTEGER))
+  :documentation "True modulus.  Return the result of `x' mod `modulo'.
+Note: In C++ and Java, `mod' has more overhead than the similar
+function `rem'.  The  answers returned by `mod' and `rem' are only
+different when the signs of `x' and `modulo' are different."
+  :public? TRUE
+  (let ((remainder (verbatim :common-lisp (cl:mod x modulus)
+                             :otherwise (rem x modulus))))
+    ;; At this point, remainder is the correct answer in Common Lisp,
+    ;; but needs to be modified if the signs of x and modulus are
+    ;; different for the other languages that do not have a native
+    ;; modulus function.
+    (verbatim :common-lisp NULL
+              :otherwise
+              (cond ((> remainder 0)
+                     (when (< modulus 0)
+                       (setq remainder (+ modulus remainder))))
+                    ((< remainder 0)
+                     (when (> modulus 0)
+                       (setq remainder (+ modulus remainder))))))
+    (return remainder)))
+
+(defun (fmod FLOAT) ((x FLOAT) (modulus FLOAT))
+  :documentation "True modulus for floats.  Return the result of `x' mod `modulo'.
+Note: In C++ and Java, `mod' has more overhead than the similar
+function `rem'.  The  answers returned by `mod' and `rem' are only
+different when the signs of `x' and `modulo' are different."
+  :public? TRUE
+  (let ((remainder (verbatim :common-lisp (cl:mod x modulus)
+                             :otherwise (frem x modulus))))
+    ;; At this point, remainder is the correct answer in Common Lisp,
+    ;; but needs to be modified if the signs of x and modulus are
+    ;; different for the other languages that do not have a native
+    ;; modulus function.
+    (verbatim :common-lisp NULL
+              :otherwise
+              (cond ((> remainder 0.0)
+                     (when (< modulus 0.0)
+                       (setq remainder (+ modulus remainder))))
+                    ((< remainder 0.0)
+                     (when (> modulus 0.0)
+                       (setq remainder (+ modulus remainder))))))
+    (return remainder)))
+
+(defun (gcd LONG-INTEGER) ((x LONG-INTEGER) (y LONG-INTEGER))
+  :documentation "Return the greatest common divisor of `x' and `y'."
+  :public? TRUE
+  (when (< x 0)
+    (setq x (- x)))
+  (when (< y 0)
+    (setq y (- y)))
+  (let ((temp LONG-INTEGER 0))
+    (while (not (= y 0))
+      (setq temp (rem x y))
+      (setq x y)
+      (setq y temp))
+    (return x)))
+
+;;; TO DO: FIGURE OUT WHETHER TO HANDLE LONG INTEGERS HERE
+;;; AND WHETHER THEY ALL SHOULD RETURN LONG INTEGERS...
+(defun (ceiling INTEGER) ((n NUMBER))
+  :documentation "Return the smallest integer >= `n'."
+  :native? TRUE :public? TRUE)
+(defun (floor INTEGER) ((n NUMBER))
+  :documentation "Return the biggest integer <= `n'."
+  :native? TRUE :public? TRUE)
+(defun (round INTEGER) ((n NUMBER))
+  :documentation "Round `n' to the closest integer and return the result."
+  :native? TRUE :public? TRUE)
+(defun (truncate INTEGER) ((n NUMBER))
+  :documentation "Truncate `n' toward zero and return the result."
+  :native? TRUE :public? TRUE)
+
+
+(defun (regular-integer-valued? BOOLEAN) ((x LONG-INTEGER))
+  :documentation "Return `true' if `x' can be represented by a regular integer."
+  :public? TRUE :globally-inline? TRUE
+  (return (and (>= x NULL-INTEGER)
+               (<= x MOST-POSITIVE-INTEGER))))
+    
+(defun (integer-valued? boolean) ((x float)) 
+  :documentation "Returns `true' if `x' is the floating point representation of an integer."
+  :public? TRUE
+  (return (verbatim :common-lisp "(CL:ZEROP (CL:REM X 1.0d0))"
+                    :java "x == Math.floor(x)"
+                    :cpp "x == ::floor(x)"
+                    :otherwise (= x (cast (floor x) FLOAT)))))
+
+(defun (float-to-base60 (CONS OF NUMBER-WRAPPER)) ((x FLOAT) (all-integers? BOOLEAN))
+  :documentation "Returns a cons of `x' in a base-60 form.  That means
+the first value will be the integer part of `x', the next value
+the iteger value of the fraction part of `x' times 60 and the
+third value the fraction part of `x' time 3600.  If `all-integers?'
+is `true', then the last value will be rounded to an integer.
+This can be used to convert from decimal degree values to Degree-Minute-Second
+or from decimal hours to Hour-Minute-Second format."
+  :public? TRUE
+  (let ((degree INTEGER (floor x))
+        (minute INTEGER (floor (* (- x degree) 60.0)))
+        (fsecond FLOAT (- (* x 3600.0) (* degree 3600.0) (* minute 60.0))))
+    (if all-integers?
+      (return (cons-list degree minute (round fsecond)))
+      (return (cons-list degree minute fsecond)))))
+
+(defun (base60-to-float FLOAT) ((l (CONS OF NUMBER-WRAPPER)))
+  :documentation "Converts (x y z) into a float.  The return value
+is x + y/60 + z/3600.
+This can be used to convert from Degree-Minute-Second to decimal degrees
+or from Hour-Minute-Second format to decimal hours."
+  (let ((dvalue (first l))
+        (mvalue (second l))
+        (svalue (third l))
+        (d 0.0))
+    (typecase dvalue
+      ((FLOAT-WRAPPER INTEGER-WRAPPER)
+       (setq d dvalue)))
+    (typecase mvalue
+      ((FLOAT-WRAPPER INTEGER-WRAPPER)
+       (++ d (/ mvalue 60.0))))
+    (typecase svalue
+      ((FLOAT-WRAPPER INTEGER-WRAPPER)
+       (++ d (/ svalue 3600.0))))
+    (return d)))
+
+(defun (random INTEGER) ((n INTEGER))
+  :public? TRUE
+  :documentation "Generate a random integer in the interval [0..n-1].
+The random number generator is seeded based on the current time every
+time STELLA starts up; however, your mileage may vary depending on
+the native language implementation."
+  (let ((rNum INTEGER
+              (verbatim
+                  :common-lisp (CL:random n)
+                  :cpp "::random() % n"
+		  :java "Native.RNG.nextInt(n)"
+		  )))
+    (return rNum)))
+
+(defun seed-random-number-generator ()
+  :documentation "Seeds the random number generator based on the current time."
+  :public? TRUE
+  (verbatim
+      :common-lisp (setq CL:*random-state* (CL:make-random-state CL:t))
+      :cpp "::srandom(time(NULL));" ;; time has 1-second resolution only
+      :java "Native.RNG = new java.util.Random(System.currentTimeMillis() ^ System.nanoTime())"))
+
+(defun seed-random-number-generator2 ()
+  :documentation "Seeds the random number generator based on the current time and /dev/urandom if it is available."
+  :public? TRUE
+  ;; This is an attempt to be more "random' in case programs are called in close succession (within the same second).
+  ;; This caused a problem with occasional overlapping temporary file names in multi-processing environments.
+  ;; This kludge plus some changes to `make-temporary-file' seems to have fixed it, but a proper fix needs file locking.
+  ;; TO DO: add an option for deterministic seeding for repeatability of results.
+  (let ((seed LONG-INTEGER
+              (verbatim :common-lisp 1
+                        :cpp "time(NULL)" ;; time has 1-second resolution only
+                        :java "(System.currentTimeMillis() ^ System.nanoTime())"))
+        (mask LONG-INTEGER 281474976710655)) ;; #xffffffffffff (6 bytes)
+    ;; consider using this instead for C++: getrandom(*buf, buflen, flags)
+    (with-input-file (in "/dev/urandom" :if-not-exists :abort)
+      (when (defined? in)
+        (foreach i in (interval 1 8)
+            do (ignore i)
+               (setq seed (shift-left (logxor seed (character-code (read-character in))) 8)))
+        (setq seed (logand seed mask))))
+    (verbatim
+        :common-lisp (CL:when seed ;; just to use the variable
+                       (setq CL:*random-state* (CL:make-random-state CL:t)))
+        :cpp "::srandom((unsigned int)seed);" ;; time has 1-second resolution only
+        :java "Native.RNG = new java.util.Random(seed)")))
+
+(startup-time-progn
+  ;; for now use this, but we might revert to the old ways:
+  (seed-random-number-generator2))
+
+;; Some useful math library functions
+
+(defun (sqrt FLOAT) ((n FLOAT))
+  :public? TRUE :globally-inline? TRUE
+  :documentation "Return the square root of `n'."
+  (return
+    (verbatim
+	:common-lisp (CL:sqrt n)
+	:cpp "::sqrt(n)"
+        :java "Math.sqrt(n)")))
+
+(defun (cos FLOAT) ((n FLOAT))
+  :public? TRUE :globally-inline? TRUE
+  :documentation "Return the cosine of `n' radians."
+  (return
+    (verbatim
+	:common-lisp (CL:cos n)
+	:cpp "::cos(n)"
+        :java "Math.cos(n)")))
+
+(defun (sin FLOAT) ((n FLOAT))
+  :public? TRUE :globally-inline? TRUE
+  :documentation "Return the sine of `n' radians."
+  (return
+    (verbatim
+	:common-lisp (CL:sin n)
+	:cpp "::sin(n)"
+        :java "Math.sin(n)")))
+
+(defun (tan FLOAT) ((n FLOAT))
+  :public? TRUE :globally-inline? TRUE
+  :documentation "Return the tangent of `n' radians."
+  (return
+    (verbatim
+	:common-lisp (CL:tan n)
+	:cpp "::tan(n)"
+        :java "Math.tan(n)")))
+
+(defun (acos FLOAT) ((n FLOAT))
+  :public? TRUE :globally-inline? TRUE
+  :documentation "Return the arccosine of `n' in radians."
+  (return
+    (verbatim
+	:common-lisp (CL:acos n)
+	:cpp "::acos(n)"
+        :java "Math.acos(n)")))
+
+(defun (asin FLOAT) ((n FLOAT))
+  :public? TRUE :globally-inline? TRUE
+  :documentation "Return the arcsine of `n' in radians."
+  (return
+    (verbatim
+	:common-lisp (CL:asin n)
+	:cpp "::asin(n)"
+        :java "Math.asin(n)")))
+
+(defun (atan FLOAT) ((n FLOAT))
+  :public? TRUE :globally-inline? TRUE
+  :documentation "Return the arc tangent of `n' in radians."
+  (return
+    (verbatim
+	:common-lisp (CL:atan n)
+	:cpp "::atan(n)"
+        :java "Math.atan(n)")))
+
+(defun (atan2 FLOAT) ((x FLOAT) (y FLOAT))
+  :public? TRUE :globally-inline? TRUE
+  :documentation "Return the arc tangent of `x' / `y' in radians."
+  (return
+    (verbatim
+	:common-lisp (CL:atan x y)
+	:cpp "::atan2(x,y)"
+        :java "Math.atan2(x,y)")))
+
+(defconstant RECIPROCAL-NL2 FLOAT (/ 1.0 (log 2.0))
+  :documentation "1 / (log 2) Reciprocal of the Log base e of 2.
+Used for log 2 conversions.")
+
+(defconstant RECIPROCAL-NL10 FLOAT (/ 1.0 (log 10.0))
+  :documentation "1 / (log 10) Reciprocal of the Log base e of 10.
+Used for log 10 conversions.")
+
+(defun (log FLOAT) ((n FLOAT))
+  :public? TRUE :globally-inline? TRUE
+  :documentation "Return the natural logarithm (base e) of `n'."
+  (return
+    (verbatim
+	:common-lisp (CL:log n)
+	:cpp "::log(n)"
+        :java "Math.log(n)")))
+
+(defun (log2 FLOAT) ((n FLOAT))
+  :public? TRUE :globally-inline? TRUE
+  :documentation "Return the logarithm (base 2) of `n'."
+  (return
+    (verbatim
+	:common-lisp "(CL:LOG n 2.0d0)"
+	:otherwise (* (log n) RECIPROCAL-NL2))))
+
+(defun (log10 FLOAT) ((n FLOAT))
+  :public? TRUE :globally-inline? TRUE
+  :documentation "Return the logarithm (base 10) of `n'."
+  (return
+    (verbatim
+	:common-lisp "(CL:LOG n 10.0d0)"
+	:otherwise (* (log n) RECIPROCAL-NL10))))
+
+(defun (exp FLOAT) ((n FLOAT))
+  :public? TRUE :globally-inline? TRUE
+  :documentation "Return the e to the power `n'."
+  (return
+    (verbatim
+	:common-lisp (CL:exp n)
+	:cpp "::exp(n)"
+        :java "Math.exp(n)")))
+
+(defun (expt FLOAT) ((x FLOAT) (y FLOAT))
+  :public? TRUE :globally-inline? TRUE
+  :documentation "Return `x' ^ `y'."
+  (return
+    (verbatim
+	:common-lisp (CL:expt x y)
+	:cpp "::pow(x,y)"
+        :java "Math.pow(x,y)")))
+
+(defmethod (min INTEGER) ((x INTEGER) (y INTEGER))
+  :documentation
+  "Return the minimum of `x' and `y'.  If either is NULL, return the other."
+  :public? TRUE
+  ;; slightly tricky, if > condition is true, x can't be NULL:
+  (return (choose (> x y) 
+                  (choose (null? y) x y)
+                  (choose (null? x) y x))))
+
+(defmethod (min LONG-INTEGER) ((x LONG-INTEGER) (y LONG-INTEGER))
+  :documentation
+  "Return the minimum of `x' and `y'.  If either is NULL, return the other."
+  :public? TRUE
+  ;; slightly tricky, if > condition is true, x can't be NULL:
+  (return (choose (> x y) 
+                  (choose (null? y) x y)
+                  (choose (null? x) y x))))
+
+(defmethod (min FLOAT) ((x FLOAT) (y FLOAT))
+  :documentation
+  "Return the minimum of `x' and `y'.  If either is NULL, return the other."
+  :public? TRUE
+  ;; slightly tricky, if > condition is true, x can't be NULL:
+  (return (choose (> x y) 
+                  (choose (null? y) x y)
+                  (choose (null? x) y x))))
+
+(defmethod (min NUMBER-WRAPPER) ((x NUMBER-WRAPPER) (y NUMBER-WRAPPER))
+  :documentation
+  "Return the minimum of `x' and `y'.  If `y' is NULL, return `x'."
+  :public? TRUE
+  (typecase x
+    ((INTEGER-WRAPPER LONG-INTEGER-WRAPPER FLOAT-WRAPPER)
+     ;; we could have separate methods for the various wrapper types:
+     (typecase y
+       ((INTEGER-WRAPPER LONG-INTEGER-WRAPPER FLOAT-WRAPPER)
+        (if (or (null? y)
+                (<= (wrapper-value x) (wrapper-value y)))
+            (return x)
+          (return y)))
+       (otherwise ;; y is NULL
+        (return x))))))
+
+(defmethod (max INTEGER) ((x INTEGER) (y INTEGER))
+  :documentation
+  "Return the maximum of `x' and `y'.  If either is NULL, return the other."
+  :public? TRUE
+  ;; slightly tricky, if > condition is true, x can't be NULL:
+  (return (choose (> x y) x y)))
+
+(defmethod (max LONG-INTEGER) ((x LONG-INTEGER) (y LONG-INTEGER))
+  :documentation
+  "Return the maximum of `x' and `y'.  If either is NULL, return the other."
+  :public? TRUE
+  ;; slightly tricky, if > condition is true, x can't be NULL:
+  (return (choose (> x y) x y)))
+
+(defmethod (max FLOAT) ((x FLOAT) (y FLOAT))
+  :documentation
+  "Return the maximum of `x' and `y'.  If either is NULL, return the other."
+  :public? TRUE
+  ;; slightly tricky, if > condition is true, x can't be NULL:
+  (return (choose (> x y) x y)))
+
+(defmethod (max NUMBER-WRAPPER) ((x NUMBER-WRAPPER) (y NUMBER-WRAPPER))
+  :documentation
+  "Return the maximum of `x' and `y'.  If `y' is NULL, return `x'."
+  :public? TRUE
+  (typecase x
+    ((INTEGER-WRAPPER LONG-INTEGER-WRAPPER FLOAT-WRAPPER)
+     ;; we could have separate methods for the various wrapper types:
+     (typecase y
+       ((INTEGER-WRAPPER LONG-INTEGER-WRAPPER FLOAT-WRAPPER)
+        (if (or (null? y)
+                (>= (wrapper-value x) (wrapper-value y)))
+            (return x)
+          (return y)))
+       (otherwise ;; y is NULL
+        (return x))))))
+
+(defmethod (abs INTEGER) ((x INTEGER))
+  :documentation "Return the absolute value of `x'."
+  :globally-inline? TRUE :public? TRUE
+  (return (choose (< x 0) (- 0 x) x)))
+
+(defmethod (abs LONG-INTEGER) ((x LONG-INTEGER))
+  :documentation "Return the absolute value of `x'."
+  :globally-inline? TRUE :public? TRUE
+  (return (choose (< x 0) (- 0 x) x)))
+
+(defmethod (abs FLOAT) ((x FLOAT))
+  :documentation "Return the absolute value of `x'."
+  :globally-inline? TRUE :public? TRUE 
+  (return (choose (< x 0.0) (- 0.0 x) x)))
+
+;; Avoiding name clashes or ambiguity:
+(startup-time-progn
+  ;; The version defined in `math.h' returns a double float (eventually,
+  ;;    we'll have to prefix all C++ translations of STELLA functions
+  ;;    with `stella_' which will solve this problem as a side-effect):
+  (register-native-name (quote floor) :cpp :function)
+  (register-native-name (quote round) :cpp :function)
+  (register-native-name (quote fmod) :cpp :function)
+  ;; Once we translate literal methods to overloaded functions we'll need this:
+  ;(register-native-name (quote abs) :cpp :function)
+  ;; Some Unix'es have `random' as part of the standard C library:
+  (register-native-name (quote random) :cpp :function)
+  (register-native-name (quote sqrt) :cpp :function)
+  (register-native-name (quote cos) :cpp :function)
+  (register-native-name (quote sin) :cpp :function)
+  (register-native-name (quote tan) :cpp :function)
+  (register-native-name (quote acos) :cpp :function)
+  (register-native-name (quote asin) :cpp :function)
+  (register-native-name (quote atan) :cpp :function)
+  (register-native-name (quote atan2) :cpp :function)
+  (register-native-name (quote exp) :cpp :function)
+  (register-native-name (quote log) :cpp :function)
+  ;; handle conflict with STL functions:
+  (register-native-name (quote min) :cpp :function)
+  (register-native-name (quote max) :cpp :function))
+
+
+  ;;
+;;;;;; Character library functions
+  ;;
+
+(defun (character-code INTEGER) ((ch CHARACTER))
+  :documentation "Return the 8-bit ASCII code of `ch' as an integer."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    ;; NOTE: Common Lisp is not required by the standard to use ASCII
+    ;; character codes, although in practice the existing
+    ;; implementations do.
+    (verbatim :common-lisp (CL:char-code ch)
+              :cpp "(int)(unsigned char) ch"
+	      ;; NOTE: Java natively uses UNICODE characters, but the
+	      ;; ASCII characters are a subset, so this should work as
+	      ;; expected for them.
+	      :java "(int) ch")))
+
+(defun (code-character CHARACTER) ((code INTEGER))
+  :documentation "Return the character encoded by `code' (0 <= `code' <= 255)."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:code-char code)
+              :cpp "(char) code"
+	      :java "(char) code")))
+
+(defun (character-downcase CHARACTER) ((ch CHARACTER))
+  :documentation "If `ch' is lowercase, return its uppercase version,
+otherwise, return 'ch' unmodified."
+  :public? TRUE :globally-inline? TRUE
+  (return (downcase-character ch)))
+
+(defun (character-upcase CHARACTER) ((ch CHARACTER))
+  :documentation "If `ch' is uppercase, return its lowercase version,
+otherwise, return 'ch' unmodified.  If only the first character of
+a sequence of characters is to be capitalized, `character-capitalize'
+should be used instead."
+  :public? TRUE :globally-inline? TRUE
+  (return (upcase-character ch)))
+
+(defun (character-capitalize CHARACTER) ((ch CHARACTER))
+  :documentation "Return the capitalized character for `ch'.  This is generally the same
+as the uppercase character, except for obscure non-English characters in Java.  It should
+be used if only the first character of a sequence of characters is to be capitalized."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :java "Character.toTitleCase(ch)"
+              :otherwise (character-upcase ch))))
+
+  ;;
+;;;;;; String library functions
+  ;;
+
+;;; Special variable that guides transient or permanent storage allocation
+;;;    USE WITH GREAT CAUTION (see `with-transient-objects' and
+;;;    `with-permanent-objects' macros).
+(defspecial *transientObjects?* BOOLEAN FALSE :public? TRUE)
+
+(defun (string-eql? BOOLEAN) ((x STRING) (y STRING))
+  :documentation
+  "Return true if `x' and `y' are equal strings or are both undefined.  This
+test is substituted automatically by the STELLA translator if `eql?' is applied
+to strings."
+  :public? TRUE
+  (if (null? x)
+      (return (null? y))
+    (return (and (defined? y)
+                 (verbatim :common-lisp "(CL:string= x y)"
+                           :cpp "!strcmp(x, y)"
+                           :java "x.equals(y)")))))
+
+(defun (string-equal? BOOLEAN) ((x STRING) (y STRING))
+  :documentation
+  "Return true if `x' and `y' are equal strings ignoring character case or
+are both undefined."
+  :public? TRUE
+  (if (null? x)
+      (return (null? y))
+    (return (and (defined? y)
+                 (verbatim :common-lisp "(CL:string-equal x y)"
+			   :cpp "(strcasecmp(x, y) == 0)"
+                           :java "x.equalsIgnoreCase(y)")))))
+
+(defun (string-compare INTEGER) ((x STRING) (y STRING) (case-sensitive? BOOLEAN))
+  :public? TRUE
+  :documentation "Compare `x' and `y' lexicographically, and return -1, 0, 
+or 1, depending on whether `x' is less than, equal, or greater than `y'.
+If `case-sensitive?' is true, then case does matter for the comparison"
+  (if case-sensitive?
+      (return (verbatim :common-lisp (cl:cond ((cl:string< x y) -1)
+					      ((cl:string> x y) 1)
+					      (cl:t 0))
+			:cpp "strcmp(x, y)"
+			:java "x.compareTo(y)"))
+    (return (verbatim :common-lisp (cl:cond ((cl:string-lessp x y) -1)
+					    ((cl:string-greaterp x y) 1)
+					    (cl:t 0))
+		      :cpp "strcasecmp(x, y)"
+		      :java "x.compareToIgnoreCase(y)"))))
+
+(defmethod (empty? BOOLEAN) ((x STRING))
+  :documentation "Return true if `x' is the empty string \"\""
+  :public? TRUE :globally-inline? TRUE
+  (return (string-eql? x "")))
+
+(defmethod (non-empty? BOOLEAN) ((x STRING))
+  :documentation "Return true if `x' is not the empty string \"\""
+  :public? TRUE :globally-inline? TRUE
+  (return (not (empty? x))))
+
+;;;;; THESE SHOULD BECOME OBSOLETE BY UPGRADING THE METHOD CALL WALKER A BIT:
+(defmethod (empty? BOOLEAN) ((x STRING-WRAPPER))
+  :documentation "Return true if `x' is the wrapped empty string \"\""
+  :public? TRUE :globally-inline? TRUE
+  (return (string-eql? (wrapper-value x) "")))
+
+(defmethod (non-empty? BOOLEAN) ((x STRING-WRAPPER))
+  :documentation "Return true if `x' is not the wrapped empty string \"\""
+  :public? TRUE :globally-inline? TRUE
+  (return (not (empty? x))))
+
+(defun (blank-string? BOOLEAN) ((string STRING))
+  :documentation "Return true if `string' is either NULL, empty, or only
+contains white space characters."
+  :public? TRUE
+  (return (or (null? string)
+              (eql? string "")
+              (forall char in string
+                always (white-space-character? char)))))
+
+;;
+;; The Common Lisp verbatim does null tests on all of these in order
+;;   to handle true values other than T, which some Lisps (i.e., ACL 5.0.1)
+;;   return at high compiler optimization levels.
+
+(defun (string< BOOLEAN) ((x STRING) (y STRING))
+  :public? TRUE
+  :documentation "Return true if `x' is lexicographically < `y', considering case."
+  (return (verbatim :common-lisp (cl:null (cl:string>= x y))
+		    :otherwise (< (string-compare x y true) 0))))
+
+(defun (string<= BOOLEAN) ((x STRING) (y STRING))
+  :public? TRUE
+  :documentation "Return true if `x' is lexicographically <= `y', considering case."
+  (return (verbatim :common-lisp (cl:null (cl:string> x y))
+		    :otherwise (<= (string-compare x y true) 0))))
+
+(defun (string>= BOOLEAN) ((x STRING) (y STRING))
+  :public? TRUE
+  :documentation "Return true if `x' is lexicographically >= `y', considering case."
+  (return (verbatim :common-lisp (cl:null (cl:string< x y))
+		    :otherwise (>= (string-compare x y true) 0))))
+
+(defun (string> BOOLEAN) ((x STRING) (y STRING))
+  :public? TRUE
+  :documentation "Return true if `x' is lexicographically > `y', considering case."
+  (return (verbatim :common-lisp (cl:null (cl:string<= x y))
+		    :otherwise (> (string-compare x y true) 0))))
+
+(defun (string-less? BOOLEAN) ((x STRING) (y STRING))
+  :public? TRUE
+  :documentation "Return true if `x' is lexicographically < `y', ignoring case."
+  (return (verbatim :common-lisp (cl:null (cl:string-not-lessp x y))
+		    :otherwise (< (string-compare x y false) 0))))
+
+(defun (string-less-equal? BOOLEAN) ((x STRING) (y STRING))
+  :public? TRUE
+  :documentation "Return true if `x' is lexicographically <= `y', ignoring case."
+  (return (verbatim :common-lisp (cl:null (cl:string-greaterp x y))
+		    :otherwise (<= (string-compare x y false) 0))))
+
+(defun (string-greater-equal? BOOLEAN) ((x STRING) (y STRING))
+  :public? TRUE
+  :documentation "Return true if `x' is lexicographically >= `y', ignoring case."
+  (return (verbatim :common-lisp (cl:null (cl:string-lessp x y))
+		    :otherwise (>= (string-compare x y false) 0))))
+
+(defun (string-greater? BOOLEAN) ((x STRING) (y STRING))
+  :public? TRUE
+  :documentation "Return true if `x' is lexicographically > `y', ignoring case."
+  (return (verbatim :common-lisp (cl:null (cl:string-not-greaterp x y))
+		    :otherwise (> (string-compare x y false) 0))))
+
+#|
+(defun test-string-comparisons ()
+  ;; Tester for the string comparison functions.
+  (let ((strings (quote ("abc" "def" "ABC" "DEF"))))
+    (print " x    y   =   equal?  <    >    <=   >=   lt   gt  leq  geq  cnorm" EOL)
+    (foreach x in strings
+        do (foreach y in strings
+               do (print (unwrap-string x) "  "
+                         (unwrap-string y) "  "
+                         (choose (string-eql? x y) "T" "F") "    "
+                         (choose (string-equal? x y) "T" "F") "      "
+                         (choose (string< x y) "T" "F") "    "
+                         (choose (string> x y) "T" "F") "    "
+                         (choose (string<= x y) "T" "F") "    "
+                         (choose (string>= x y) "T" "F") "    "
+                         (choose (string-less? x y) "T" "F") "    "
+                         (choose (string-greater? x y) "T" "F") "    "
+                         (choose (string-less-equal? x y) "T" "F") "    "
+                         (choose (string-greater-equal? x y) "T" "F") "    "
+                         (string-compare-case-normalized x y)
+                         EOL)))))
+
+;; Should produce the following output:
+
+ x    y   =   equal?  <    >    <=   >=   lt   gt  leq  geq  cnorm
+abc  abc  T    T      F    F    T    T    F    F    T    T    0
+abc  def  F    F      T    F    T    F    T    F    T    F    -1
+abc  ABC  F    T      F    T    F    T    F    F    T    T    -1
+abc  DEF  F    F      F    T    F    T    T    F    T    F    -1
+def  abc  F    F      F    T    F    T    F    T    F    T    1
+def  def  T    T      F    F    T    T    F    F    T    T    0
+def  ABC  F    F      F    T    F    T    F    T    F    T    1
+def  DEF  F    T      F    T    F    T    F    F    T    T    -1
+ABC  abc  F    T      T    F    T    F    F    F    T    T    1
+ABC  def  F    F      T    F    T    F    T    F    T    F    -1
+ABC  ABC  T    T      F    F    T    T    F    F    T    T    0
+ABC  DEF  F    F      T    F    T    F    T    F    T    F    -1
+DEF  abc  F    F      T    F    T    F    F    T    F    T    1
+DEF  def  F    T      T    F    T    F    F    F    T    T    1
+DEF  ABC  F    F      F    T    F    T    F    T    F    T    1
+DEF  DEF  T    T      F    F    T    T    F    F    T    T    0
+|#
+
+(defun (string-compare-case-normalized INTEGER) ((x STRING) (y STRING))
+  :documentation "Compare `x' and `y' and return -1, 0, or 1, depending on whether
+`x' is less than, equal, or greater than `y' relative to the :ascii-case-normalized
+collation.  In this collation `a < A < b' which gives strings that only differ in case a
+definite order while otherwise behaving identically to :ascii-case-insensitive.  This is
+similar to using a Java Collator for Locale.US with strength set to TERTIARY (which see)."
+  :public? TRUE
+  (let ((xLength (length x))
+        (yLength (length y))
+        (xCh CHARACTER NULL)
+        (yCh CHARACTER NULL))
+    (foreach i in (interval 0 (1- (min xLength yLength)))
+        do (setq xCh (nth x i))
+           (setq yCh (nth y i))
+           (when (not (eql? xCh yCh))
+             (let ((xChDown (downcase-character xCh))
+                   (yChDown (downcase-character yCh)))
+               (if (eql? xChDown yChDown)
+                   ;; two letter characters only differing in case:
+                   (if (< (character-code xCh) (character-code yCh))
+                       (return 1) ;; a < A but charCode('a') > charCode('A')
+                     (return -1))
+                 (if (< (character-code xChDown) (character-code yChDown))
+                     (return -1)
+                   (return 1))))))
+    (cond ((= xLength yLength)
+           (return 0))
+          ((< xLength yLength)
+           (return -1))
+          (otherwise
+           (return 1)))))
+
+(defun (compare-strings INTEGER) ((x STRING) (y STRING) (collation KEYWORD))
+  :documentation "Compare `x' and `y' and return -1, 0, or 1, depending on whether
+`x' is less than, equal, or greater than `y' relative to `collation'.  Currently
+supported values for `collation' are :ascii-case-sensitive, :ascii-case-insensitive
+:ascii-case-normalized.  The first two correspond to `string-compare' called with
+the appropriate third argument.  :ascii-case-normalized calls the function
+`string-compare-case-normalized' (which see)."
+  :public? TRUE
+  (case collation
+    (:ascii-case-sensitive
+     (return (string-compare x y TRUE)))
+    (:ascii-case-insensitive
+     (return (string-compare x y FALSE)))
+    (:ascii-case-normalized
+     (return (string-compare-case-normalized x y)))
+    (otherwise
+     (error "compare-strings: unsupported collation: " collation))))
+
+(defun (safe-compare-strings INTEGER) ((x STRING) (y STRING) (collation KEYWORD))
+  :documentation "Variant of `compare-strings' that also tolerates NULL values.
+NULL sorts after everything else in any collation."
+  :public? TRUE
+  (cond ((null? x)
+         (if (null? y)
+             (return 0)
+           (return 1)))
+        ((null? y)
+         (return -1))
+        (otherwise
+         (return (compare-strings x y collation)))))
+
+
+(defun (make-string STRING) ((size INTEGER) (initchar CHARACTER))
+  :documentation "Return a new string filled with `size' `initchar's."
+  :public? TRUE :native? TRUE)
+
+(defun (make-mutable-string MUTABLE-STRING) ((size INTEGER) (initchar CHARACTER))
+  :documentation
+  "Return a new mutable string filled with `size' `initchar's."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:make-string size :initial-element initchar)
+              :cpp "native_make_mutable_string(size, initchar)"
+              :java "#$(STELLAROOT).javalib.Native.makeMutableString(size, initchar)")))
+
+(defun (make-raw-mutable-string MUTABLE-STRING) ((size INTEGER))
+  :documentation "Return a new uninitialized mutable string of `size'."
+  ;; Since for characters we can't distinguish between a NULL init character
+  ;;    and the NULL character as an initializer, we need a separate function
+  ;;    to generate uninitialized strings.
+  ;; NOTE: A similar function for non-mutable strings doesn't make sense,
+  ;;    since we could never initialize the content of the resulting string.
+  ;; TO DO: FIX THE PERFORMANCE PENALTY WE ARE INHERITING DUE TO THE JAVA LOGIC:
+  :public? TRUE :globally-inline? TRUE
+  (let ((s MUTABLE-STRING NULL))
+    (verbatim :common-lisp (setq s (CL:make-string size))
+              :cpp "s = new (PointerFreeGC) char[size+1]; s[size]='\\0'"
+              ;; annoying that we have to explicitly set the length:
+              :java "s = new StringBuffer(size); s.setLength(size)")
+    (return s)))
+
+(defun (string-concatenate STRING) ((string1 STRING) (string2 STRING))
+  :documentation "Return a new string representing the concatenation of
+`string1' and `string2'."
+  :native? TRUE)
+
+(defmethod (concatenate STRING)
+    ((string1 STRING) (string2 STRING) &rest (otherStrings STRING))
+  :public? TRUE
+  :documentation "Return a new string representing the concatenation
+of `string1', `string2', and `otherStrings'.  The two mandatory parameters
+allow us to optimize the common binary case by not relying on the somewhat
+less efficient variable arguments mechanism."
+  ;; NOTE: To make this a method we need at least one mandatory parameter,
+  ;;    thus, we could never completely emulate `CL:concatenate'.
+  (when (= (length otherStrings) 0)
+    (return (string-concatenate string1 string2)))
+  (let ((result MUTABLE-STRING NULL)
+        (length (+ (length string1) (length string2)))
+        (index 0))
+    (foreach string in otherStrings
+        do (setq length (+ length (length string))))
+    (setq result (make-raw-mutable-string length))
+    (foreach ch in string1
+        do (setf (nth result index) ch)
+           (++ index))
+    (foreach ch in string2
+        do (setf (nth result index) ch)
+           (++ index))
+    (foreach string in otherStrings
+        do (foreach ch in string
+               do (setf (nth result index) ch)
+                  (++ index)))
+    (return result) ))
+
+(defun (string-upcase STRING) ((string STRING))
+  :documentation "Return an upper-case copy of `string'."
+  :native? TRUE
+  :public? TRUE)
+
+(defun (string-downcase STRING) ((string STRING))
+  :documentation "Return a lower-case copy of `string'."
+  :native? TRUE
+  :public? TRUE)
+
+(defun (string-capitalize STRING) ((string STRING))
+  :documentation "Return a capitalized version of `string'."
+  :native? TRUE :public? TRUE)
+
+(defmethod (copy STRING) ((string STRING))
+  :documentation "Return a copy of `string'."
+  :native? TRUE :c-callable? TRUE)
+
+(defmethod (copy MUTABLE-STRING) ((string MUTABLE-STRING))
+  :documentation "Return a copy of `string'."
+  :native? TRUE :c-callable? TRUE)
+
+(defmethod (substitute STRING)
+    ((self STRING) (new-char CHARACTER) (old-char CHARACTER))
+  :documentation "Substitute all occurences of `old-char' with `new-char'
+in the string `self'."
+  :native? TRUE :public? TRUE)
+
+(defmethod (substitute MUTABLE-STRING)
+    ((self MUTABLE-STRING) (new-char CHARACTER) (old-char CHARACTER))
+  :documentation "Substitute all occurences of `old-char' with `new-char'
+in the string `self'."
+  :native? TRUE :public? TRUE)
+
+(defun (help-substitute-characters MUTABLE-STRING)
+    ((self MUTABLE-STRING) (new-chars STRING) (old-chars STRING))
+  :public? FALSE
+  :globally-inline? TRUE
+  (let ((pos INTEGER NULL))
+    (foreach i in (interval 0 (1- (length self)))
+	do (setq pos (position old-chars (nth self i) 0))
+	   (when (defined? pos)
+	     (setf (nth self i) (nth new-chars pos))))
+    (return self)))
+
+;; NOTE:
+;; The following two methods need to be in this order so that they will
+;; be properly handled in Common Lisp.  The second definition must take
+;; precedence
+
+(defmethod (substitute-characters MUTABLE-STRING)
+    ((self MUTABLE-STRING) (new-chars STRING) (old-chars STRING))
+  :documentation "Substitute all occurences of of a member of `old-chars' with the 
+corresponding member of `new-chars' in the string `self'.  IMPORTANT:  The return
+value should be used instead of relying on destructive substitution, since the
+substitution will not be destructive in all translated languages."
+  :public? TRUE
+  (return (help-substitute-characters self new-chars old-chars)))
+
+(defmethod (substitute-characters STRING)
+    ((self STRING) (new-chars STRING) (old-chars STRING))
+  :documentation "Substitute all occurences of of a member of `old-chars' with the 
+corresponding member of `new-chars' in the string `self'.  Returns a new string."
+  :public? TRUE
+  (return 
+    (help-substitute-characters self new-chars old-chars)))
+
+(defun (replace-substrings STRING) ((string STRING) (new STRING) (old STRING))
+  :documentation "Replace all occurrences of `old' in `string' with `new'."
+  :public? TRUE
+  (let ((stringLength (length string))
+        (oldLength (length old))
+        (newLength (length new))
+        (nofOccurrences 0)
+	(oldStart 0)
+        (cursor 0)
+        (resultCursor 0)
+        (result MUTABLE-STRING NULL))
+    ;; we scan `string' twice to minimize intermediate memory consumption:
+    (while (defined? (setq oldStart (string-search string old cursor)))
+      (++ nofOccurrences)
+      (setq cursor (+ oldStart oldLength)))
+    (when (= nofOccurrences 0)
+      (return string))
+    (setq result
+      (make-raw-mutable-string
+       (+ stringLength (* nofOccurrences (- newLength oldLength)))))
+    (setq cursor 0)
+    (while (defined? (setq oldStart (string-search string old cursor)))
+      (foreach i in (interval cursor (1- oldStart))
+          do (setf (nth result resultCursor) (nth string i))
+             (++ resultCursor))
+      (foreach char in new
+          do (setf (nth result resultCursor) char)
+             (++ resultCursor))
+      (setq cursor (+ oldStart oldLength)))
+    (foreach i in (interval cursor (1- stringLength))
+        do (setf (nth result resultCursor) (nth string i))
+           (++ resultCursor))
+    (return result)))
+
+(defun (instantiate-string-template STRING) ((template STRING) &rest (vars&values STRING))
+  :documentation
+  "For each occurrence of a <var> string from `vars&values' in `template' replace it
+with its corresponding <value> string.  Replacement is done in sequence which
+means (part of) a value might be replaced further with a later <var> and <value>."
+  :public? TRUE
+  ;; TO DO: MAKE THIS MORE EFFICIENT.
+  (let ((var STRING NULL))
+    (foreach item in vars&values
+        do (cond ((defined? var)
+                  (setq template (replace-substrings template item var))
+                  (setq var NULL))
+                 (otherwise
+                  (setq var item))))
+    (return template)))
+
+(defun (insert-string INTEGER) ((source STRING)
+				(start INTEGER)
+				(end INTEGER)
+				(target MUTABLE-STRING)
+				(target-index INTEGER)
+				(case-conversion KEYWORD))
+  :documentation "Inserts characters from `source' begining at `start' and
+ending at `end' into `target' starting at `target-index'.  If `end' is `null',
+then the entire length of the string is used. The copy of characters is affected
+by the `case-conversion' keyword which should be one of
+   :UPCASE :DOWNCASE :CAPITALIZE :PRESERVE.
+
+The final value of target-index is returned."
+  ;; FIXME: this has the wrong closed-interval `end' pointer semantics, the only
+  ;; place where that is actually used is in `compose-namestring-full'.
+  ;; TO DO: this is a poor-man's string buffer, replace with the real thing
+  (when (null? end) (setq end (1- (length source))))
+  (when (< end start) (return target-index))
+  (safety 2 (< (+ target-index (- end start)) (length target))
+	  "Target String not long enough in INSERT-STRING.")
+  (case case-conversion
+    (:UPCASE
+     (foreach j in (interval start end)
+	 do (setf (nth target target-index) 
+	      (upcase-character (nth source j)))
+	    (++ target-index)))
+    (:DOWNCASE
+     (foreach j in (interval start end)
+	 do (setf (nth target target-index) 
+	      (downcase-character (nth source j)))
+	    (++ target-index)))
+    (:CAPITALIZE
+     (setf (nth target target-index) 
+       (upcase-character (nth source start)))
+     (++ target-index)
+     (foreach j in (interval (1+ start) end)
+	 do (setf (nth target target-index) 
+	      (downcase-character (nth source j)))
+	    (++ target-index)))
+    (:preserve
+     (foreach j in (interval start end)
+	 do (setf (nth target target-index) (nth source j))
+	    (++ target-index))))
+  (return target-index))
+
+(defun (string-trim STRING) ((string STRING))
+  :documentation "Remove any leading and trailing white space from `string'
+and return a copy of the trimmed substring (which might be empty if we had
+all white space).  If no white space was removed, `string' is returned
+unmodified and uncopied."
+  :public? TRUE
+  ;; There are native CL and Java implementations available, but the Java
+  ;; semantics are somewhat involved, so we punted and wrote this ourselves:
+  (let ((start 0)
+        (last (1- (length string)))
+        (end last))
+    (while (and (<= start end)
+                (white-space-character? (nth string start)))
+      (++ start))
+    (while (and (> end start)
+                (white-space-character? (nth string end)))
+      (-- end))
+    (if (or (> start 0)
+            (< end last))
+        (return (subsequence string start (1+ end)))
+      (return string))))
+
+(defun (integer-to-string STRING) ((i LONG-INTEGER))
+  :documentation "Convert `i' to its string representation and return the result.
+ This is more efficient than using a string stream."
+  :native? TRUE :public? TRUE)
+
+(defun (int-to-string STRING) ((i INTEGER))
+  :documentation "Convert `i' to its string representation and return the result.
+This is a convenience function that expects regular integers as opposed to longs
+which is useful in contexts where we do automatic unwrapping based on the target."
+  :public? TRUE :globally-inline? TRUE
+  (return (integer-to-string i)))
+
+(defun (integer-to-hex-string STRING) ((i LONG-INTEGER))
+  :documentation "Convert `i' to a string representation in hexadecimal notation and return the result."
+  :native? TRUE :public? TRUE)
+
+(defun (integer-to-string-in-base STRING) ((i LONG-INTEGER) (base INTEGER))
+  :documentation "Convert `i' to a string representation in `base' and return the
+result.  `base' must be positive and not more than 36.
+
+Note that in the C++ version, only 8, 10 and 16 will work as `base' arguments,
+since that is all the underlying implementation supports.  Other argument
+values will be treated as `10'."
+  :native? TRUE :public? TRUE)
+
+(defun (float-to-string STRING)   ((f FLOAT))
+  :documentation "Convert `f' to its string representation and return the result.  This is more
+efficient than using a string stream."
+  :native? TRUE :public? TRUE)
+
+(defun (character-to-string STRING) ((c CHARACTER))
+  :documentation "Convert `c' into a one-element string and return the result."
+  :public? TRUE :globally-inline? TRUE
+  (return (make-string 1 c)))
+
+(defun (stella-integer-to-string-in-base STRING) ((integer LONG-INTEGER) (base INTEGER))
+  :documentation "STELLA version of `integer-to-string-in-base' which is faster than
+the C++ version we have but slower than the native Java version."
+  :public? TRUE
+  (safety 1 (and (>= base 2) (<= base 36))
+          "integer-to-string-in-base: illegal base: " base)
+  (when (= integer 0)
+    (return "0"))
+  (let ((offset (choose (< integer 0) 1 0)))
+    (when (= offset 1)
+      (setq integer (- integer)))
+    (let ((integerBits (integer-length integer))
+          (baseBits (integer-length base))
+          ;; compute a close buffer length without using fp ops:
+          (bufferLength
+           (+ offset (div integerBits (1- baseBits)) 1))
+          (buffer (make-raw-mutable-string bufferLength))
+          (index bufferLength)
+          (table "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+          (remainder LONG-INTEGER 0)
+          (digit 0)
+          (base-1 (1- base)))
+      (cond ((= (logand base base-1) 0)
+             ;; we have a power-of-2 base
+             (-- baseBits)
+             (while (> integer 0)
+               (-- index)
+               (setq digit (logand integer base-1))
+               (setq integer (shift-right integer baseBits))
+               (setf (nth buffer index) (nth table digit))))
+            (otherwise
+             ;; we have to use regular division:
+             (while (> integer 0)
+               (-- index)
+               (setq remainder (div integer base))
+               (setq digit (- integer (* remainder base)))
+               (setq integer remainder)
+               (setf (nth buffer index) (nth table digit)))))
+      (when (= offset 1)
+        (-- index)
+        (setf (nth buffer index) #\-))
+      (if (= index 0)
+          ;; avoid copying if native language permits:
+          (return (verbatim :common-lisp buffer
+                            :cpp "buffer"
+                            :otherwise buffer))
+        (return (subsequence buffer index bufferLength))))))
+
+(defun (string-to-integer LONG-INTEGER) ((string STRING))
+  :documentation "Convert a `string' representation of an integer into an integer.
+Use `parse-long-integer' if the syntax of `string' needs to be checked for errors."
+  :native? TRUE :public? TRUE)
+
+(defun (string-to-int INTEGER) ((string STRING))
+  :documentation "Convert a `string' representation of an integer into an integer.
+This is a convenience function that ensures a regular integer return value.  If
+`string' represents a long integer, the behavior is undefined.  Use `parse-integer'
+if the syntax of `string' needs to be checked for errors."
+  :globally-inline? TRUE :public? TRUE
+  (return (string-to-integer string)))
+
+(defun (string-to-float FLOAT) ((string STRING))
+  :documentation "Convert a `string' representation of a float into a float.
+Use `parse-float' if the syntax of `string' needs to be checked for errors."
+  :native? TRUE :public? TRUE)
+
+(defun (format-float STRING) ((f FLOAT) (nDecimals INTEGER))
+  :documentation
+  "Print `f' in fixed-point format with `nDecimals' behind the decimal point
+and return the result as a string."
+  :native? TRUE :public? TRUE)
+
+(defun (format-with-padding STRING) ((input STRING)
+				     (length INTEGER) 
+				     (padchar CHARACTER)
+				     (align KEYWORD)
+				     (truncate? BOOLEAN))
+  :public? TRUE
+  :documentation "Formats `input' to be (at least) `length' long, using `padchar' to
+fill if necessary.  `align' must be one of :LEFT, :RIGHT, :CENTER and will control
+how `input' will be justified in the resulting string.  If `truncate?' is true, then
+then an overlength string will be truncated, using the opposite of `align' to pick
+the truncation direction."
+  (let ((len (length input)))
+    (cond ((= len length)
+	   (return input))
+	  ((> len length)
+	   (if truncate?
+	     (case align
+	       (:LEFT  
+		(return (subsequence input (- len length) len)))
+	       (:RIGHT
+		(return (subsequence input 0 (- len length))))
+	       (:CENTER
+		(let ((left INTEGER (/ (- len length) 2)))
+		  (return (subsequence input left (+ left length))))))
+	     (return input)))
+	  (otherwise
+	   (case align
+	     (:LEFT 
+	      (return 
+		(concatenate input (make-string (- length len) padchar))))
+	     (:RIGHT 
+	      (return 
+		(concatenate (make-string (- length len) padchar) input)))
+	     (:CENTER 
+	      (let ((left INTEGER (/ (- length len) 2)))
+		(return 
+		  (concatenate (make-string left padchar)
+			       input
+			       (make-string (- length len left) padchar)))))))) ))
+
+(defun (zero-pad-integer STRING) ((value INTEGER) (size INTEGER))
+  :public? TRUE
+  :documentation "Returns a string representing `value' of at least length
+'size', padded if necessary with 0 characters."
+  (return (verbatim :common-lisp "(cl:format cl:nil \"~v,'0D\" size value)"
+                    :otherwise 
+                    (choose (< value 0)
+                            (concatenate "-" (format-with-padding (integer-to-string (- value))
+                                                                  (1- size) #\0 :RIGHT FALSE))
+                             (format-with-padding (integer-to-string value)
+                                                  size #\0 :RIGHT FALSE)))))
+
+(defun (zero-pad-string STRING) ((input STRING) (size INTEGER))
+  :public? FALSE
+  ;; helping function for `generate-uuid'.
+  (return (format-with-padding input size #\0 :RIGHT FALSE)))
+
+
+(defmethod (member? BOOLEAN) ((self STRING) (char CHARACTER)) :native? TRUE :public? TRUE)
+
+(defmethod (first CHARACTER) ((self STRING))
+  :documentation "Return the first character of `self'."
+  :globally-inline? TRUE :public? TRUE
+  (return (nth self 0)))
+
+(defmethod (first CHARACTER) ((self MUTABLE-STRING))
+  :documentation "Return the first character of `self' (settable via `setf')."
+  :globally-inline? TRUE :public? TRUE
+  (return (nth self 0)))
+
+(defmethod (first-setter CHARACTER) ((self MUTABLE-STRING) (ch CHARACTER))
+  :documentation "Set the first character of `self' to `ch' and return `ch'."
+  :globally-inline? TRUE :public? TRUE
+  (return (setf (nth self 0) ch)))
+
+(defmethod (second CHARACTER) ((self STRING))
+  :documentation "Return the second character of `self'."
+  :globally-inline? TRUE :public? TRUE
+  (return (nth self 1)))
+
+(defmethod (second CHARACTER) ((self MUTABLE-STRING))
+  :documentation "Return the second character of `self' (settable via `setf')."
+  :globally-inline? TRUE :public? TRUE
+  (return (nth self 1)))
+
+(defmethod (second-setter CHARACTER) ((self MUTABLE-STRING) (ch CHARACTER))
+  :documentation "Set the second character of `self' to `ch' and return `ch'."
+  :globally-inline? TRUE :public? TRUE
+  (return (setf (nth self 1) ch)))
+
+(defmethod (third CHARACTER) ((self STRING))
+  :documentation "Return the third character of `self'."
+  :globally-inline? TRUE :public? TRUE
+  (return (nth self 2)))
+
+(defmethod (third CHARACTER) ((self MUTABLE-STRING))
+  :documentation "Return the third character of `self' (settable via `setf')."
+  :globally-inline? TRUE :public? TRUE
+  (return (nth self 2)))
+
+(defmethod (third-setter CHARACTER) ((self MUTABLE-STRING) (ch CHARACTER))
+  :documentation "Set the third character of `self' to `ch' and return `ch'."
+  :globally-inline? TRUE :public? TRUE
+  (return (setf (nth self 2) ch)))
+
+(defmethod (fourth CHARACTER) ((self STRING))
+  :documentation "Return the fourth character of `self'."
+  :globally-inline? TRUE :public? TRUE
+  (return (nth self 3)))
+
+(defmethod (fourth CHARACTER) ((self MUTABLE-STRING))
+  :documentation "Return the fourth character of `self' (settable via `setf')."
+  :globally-inline? TRUE :public? TRUE
+  (return (nth self 3)))
+
+(defmethod (fourth-setter CHARACTER) ((self MUTABLE-STRING) (ch CHARACTER))
+  :documentation "Set the fourth character of `self' to `ch' and return `ch'."
+  :globally-inline? TRUE :public? TRUE
+  (return (setf (nth self 3) ch)))
+
+(defmethod (fifth CHARACTER) ((self STRING))
+  :documentation "Return the fifth character of `self'."
+  :globally-inline? TRUE :public? TRUE
+  (return (nth self 4)))
+
+(defmethod (fifth CHARACTER) ((self MUTABLE-STRING))
+  :documentation "Return the fifth character of `self' (settable via `setf')."
+  :globally-inline? TRUE :public? TRUE
+  (return (nth self 4)))
+
+(defmethod (fifth-setter CHARACTER) ((self MUTABLE-STRING) (ch CHARACTER))
+  :documentation "Set the fifth character of `self' to `ch' and return `ch'."
+  :globally-inline? TRUE :public? TRUE
+  (return (setf (nth self 4) ch)))
+
+(defmethod (nth CHARACTER) ((self STRING) (position INTEGER))
+  :documentation "Return the character in `self' at `position'."
+  :globally-inline? TRUE :public? TRUE
+  (return
+    (verbatim :common-lisp (cl:schar (CL:the CL:simple-string self)
+                                     (CL:the CL:fixnum position))
+              :cpp "self[position]"
+              :java "self.charAt(position)")))
+
+(defmethod (nth CHARACTER) ((self MUTABLE-STRING) (position INTEGER))
+  :documentation "Return the character in `self' at `position'."
+  :globally-inline? TRUE :public? TRUE
+  (return
+    (verbatim :common-lisp (cl:schar (CL:the CL:simple-string self)
+                                     (CL:the CL:fixnum position))
+              :cpp "self[position]"
+              :java "self.charAt(position)")))
+
+(defmethod (nth-setter CHARACTER)
+    ((self MUTABLE-STRING) (ch CHARACTER) (position INTEGER))
+  :documentation "Set the character in `self' at `position' to `ch'."
+  :globally-inline? TRUE :public? TRUE
+  (return
+    (verbatim :common-lisp (setf (cl:schar (CL:the CL:simple-string self)
+                                           (CL:the CL:fixnum position))
+                                 (CL:the CL:character ch))
+              :cpp "self[position] = ch"
+              ;; Unfortunately, we need another function call here, since the
+              ;;    native Java setter method doesn't return a result:
+              :java "#$(STELLAROOT).javalib.Native.mutableString_nthSetter(self, ch, position)")))
+
+(defmethod (rest STRING) ((self STRING)) :native? TRUE :public? TRUE)
+
+(defmethod (length INTEGER) ((self STRING))
+  :documentation "Return the length of the string `self'."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:length self)
+              :cpp "strlen(self)"
+	      :java "self.length()")))
+
+(defmethod (length INTEGER) ((self MUTABLE-STRING))
+  :documentation "Return the length of the string `self'."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:length self)
+              :cpp "strlen(self)"
+	      :java "self.length()")))
+
+(defmethod (position INTEGER)
+    ((string STRING) (character CHARACTER) (start INTEGER))
+  :documentation "Return the position of `character' within `string' (counting
+from zero); or return NULL if `character' does not occur within `string'.
+If `start' was supplied as non-NULL, only consider the substring starting
+at `start', however, the returned position will always be relative to the
+entire string."
+  :native? TRUE
+  :public? TRUE)
+
+(defmethod (last-position INTEGER)
+    ((string STRING) (character CHARACTER) (end INTEGER))
+  :documentation "Return the last position of `character' within `string'
+(counting from zero); or return NULL if `character' does not occur 
+within `string'.  If `end' was supplied as non-NULL, only consider
+the substring ending at `end', however, the returned position will
+always be relative to the entire string."
+  :native? TRUE
+  :public? TRUE)
+
+;(defmethod (search INTEGER)
+;    ((string STRING) (substring STRING) (start INTEGER))
+;  :documentation "Return start position of the left-most occurrence of
+;`substring' in `string', beginning from `start'.  Return NULL if it is not
+;a substring."
+;  :native? TRUE)
+
+(defun (string-search INTEGER)
+    ((string STRING) (substring STRING) (start INTEGER))
+  :documentation "Return start position of the left-most occurrence of
+`substring' in `string', beginning from `start'.  Return NULL if it is not
+a substring.  The comparison is exact."
+  :native? TRUE :public? TRUE)
+
+(defun (string-search-ignore-case INTEGER)
+    ((string STRING) (substring STRING) (start INTEGER))
+  :documentation "Return start position of the left-most occurrence of
+`substring' in `string', beginning from `start'.  Return NULL if it is not
+a substring.  The comparison ignores differences in letter case."
+  :public? TRUE
+  (when (null? start)
+    (setq start 0))
+  (return
+    (verbatim :common-lisp
+	      "(CL:or (CL:search substring string :start2 start :test #'CL:string-equal)
+		      NULL-INTEGER)"
+	      :otherwise
+	      (string-search (string-downcase string) (string-downcase substring) start))))
+
+
+(defun (starts-with? BOOLEAN) ((string STRING) (prefix STRING) (start INTEGER))
+  :documentation "Return TRUE if `string' starts with `prefix' starting from
+`start' (which defaults to 0 if it is supplied as NULL)."
+  :public? TRUE
+  ;; For C++ it would pay to implement this natively, since we could
+  ;; avoid iterating over the whole `string' to determine its length.
+  (when (null? start) (setq start 0))
+  (let ((prefixLength (length prefix)))
+    (if (> (+ start prefixLength) (length string))
+        (return false)
+      (return
+        (forall i in (interval 0 (1- prefixLength))
+          as j in (interval start NULL)
+          always (eql? (nth prefix i) (nth string j)))))))
+
+(defun (ends-with? BOOLEAN) ((string STRING) (suffix STRING) (end INTEGER))
+  :documentation "Return TRUE if the substring of `string' ending at `end'
+ends with `suffix'.  If `end' is NULL it defaults to the length of `string'."
+  :public? TRUE
+  ;; For C++ it would pay to implement this natively, since we could
+  ;; avoid iterating over the whole `string' to determine its length.
+  (when (null? end) (setq end (length string)))
+  (let ((suffixLength (length suffix))
+        (start (- end suffixLength)))
+    (if (< start 0)
+        (return false)
+      (return
+        (forall i in (interval 0 (1- suffixLength))
+          as j in (interval start NULL)
+          always (eql? (nth suffix i) (nth string j)))))))
+
+(defun (help-find-matching-prefix-length INTEGER) ((string1 STRING) (start1 INTEGER) (end1 INTEGER)
+                                                   (string2 STRING) (start2 INTEGER) (end2 INTEGER))
+  :public? FALSE  :globally-inline? TRUE
+  :documentation "Helping function for `find-matching-prefix' that requires `end1' and `end2'
+to be properly set up."
+  (let ((i1 start1)
+        (i2 start2))
+    (while (and (< i1 end1)
+                (< i2 end2)
+                (eql? (nth string1 i1) (nth string2 i2)))
+      (++ i1)
+      (++ i2))
+    (return (- i1 start1))))
+  
+(defun (find-matching-prefix-length INTEGER) ((string1 STRING) (start1 INTEGER) (end1 INTEGER)
+                                              (string2 STRING) (start2 INTEGER) (end2 INTEGER))
+  :public? TRUE
+  :documentation "Finds the length of the matching prefix strings of `string1' and
+`string2', starting at position `start1' and `start2' respectively.
+The search will end when `end1' or `end2' is reached.  If either `end1'
+or `end2' is null, then they will be set to the length of their respective
+strings."
+  (when (null? end1)
+    (setq end1 (length string1)))
+  (when (null? end2)
+    (setq end2 (length string2)))
+  (return (help-find-matching-prefix-length string1 start1 end1 string2 start2 end2)))
+
+(defun (find-mismatch INTEGER INTEGER) ((string1 STRING) (start1 INTEGER) (end1 INTEGER)
+                                        (string2 STRING) (start2 INTEGER) (end2 INTEGER))
+  :public? TRUE
+  :documentation "Finds the first position in each of `string1' and `string2' where
+they mismatch, starting at position `start1' and `start2' respectively.
+The search will end when `end1' or `end2' is reached.  If either `end1'
+or `end2' is null, then they will be set to the length of their respective
+strings.  If there is no mismatch, then `null' values are returned."
+  (when (null? end1)
+    (setq end1 (length string1)))
+  (when (null? end2)
+    (setq end2 (length string2)))
+  (let ((len (help-find-matching-prefix-length string1 start1 end1 string2 start2 end2)))
+    (setq start1 (+ start1 len))
+    (setq start2 (+ start2 len))
+    (if (and (= start1 end1) (= start2 end2))
+      (return NULL NULL)
+      (return start1 start2))))
+
+(defun (non-matching-position-helper INTEGER) 
+       ((source STRING) (start INTEGER) (end INTEGER) (match STRING))
+  :public? FALSE :globally-inline? TRUE
+  :documentation "Helper for `non-matching-position' that requires `end' to not be `null'."
+  (while (and (< start end)
+              (member? match (nth source start)))
+    (++ start))
+  (return start))
+
+(defun (non-matching-position INTEGER) ((source STRING) (start INTEGER) (match STRING))
+  :public? TRUE
+  :documentation "Returns the index into `source', starting from `start', of the first
+character that is not included in `match'."
+  (return (non-matching-position-helper source start (length source) match)))
+
+(defun (help-advance-past-whitespace INTEGER) ((source STRING) (start INTEGER) (end INTEGER))
+  :public? FALSE :globally-inline? TRUE
+  :documentation "Helper for `advance-past-whitespace' that requires `end' to be properly set."
+  (while (and (< start end)
+              (white-space-character? (nth source start)))
+    (++ start))
+  (return start))
+
+(defun (advance-past-whitespace INTEGER) ((source STRING) (start INTEGER))
+  :public? TRUE
+  :documentation "Returns the first index into `source', starting from `start', of
+the first character that is not white space."
+  (return (help-advance-past-whitespace source start (length source))))
+
+(defun (eql-except-in-whitespace? BOOLEAN) ((s1 STRING) (s2 STRING))
+  :public? TRUE
+  :documentation "Return `true' if the strings `s1' and `s2' are the same
+except for the amounts of whitespace separating words.  Leading or
+trailing whitespace is also not considered."
+  (cond ((null? s1)
+         (return (null? s2)))
+        ((null? s2)
+         (return FALSE))
+        ;; Optimization, since this test is 10x faster (in MCL)
+        ;; than doing this full routine.
+        ((string-eql? s1 s2)
+         (return TRUE)))
+  (let ((len1 (length s1))
+        (len2 (length s2))
+        (i1 0)
+        (i2 0))
+    ;; i1 and i2 are at non-whitespace characters
+    (while (and (< i1 len1)
+                (< i2 len2))
+      (cond ((white-space-character? (nth s1 i1))
+             (if (white-space-character? (nth s2 i2))
+               (progn
+                 ;; inline by hand:
+                 ;(setq i1 (help-advance-past-whitespace s1 i1 len1))
+                 ;(setq i2 (help-advance-past-whitespace s2 i2 len2))
+                 (while (and (< i1 len1) (white-space-character? (nth s1 i1)))
+                   (++ i1))
+                 (while (and (< i2 len2) (white-space-character? (nth s2 i2)))
+                   (++ i2)))
+               (return FALSE)))
+            ((eql? (nth s1 i1) (nth s2 i2))
+             (++ i1) 
+             (++ i2))
+            (otherwise
+             (return FALSE))))
+
+    ;; inline by hand:
+    ;(setq i1 (help-advance-past-whitespace s1 i1 len1))
+    ;(setq i2 (help-advance-past-whitespace s2 i2 len2))
+    (while (and (< i1 len1) (white-space-character? (nth s1 i1)))
+      (++ i1))
+    (while (and (< i2 len2) (white-space-character? (nth s2 i2)))
+      (++ i2))
+    (return (and (= i1 len1) (= i2 len2)))))
+
+
+(defmethod (subsequence STRING)
+    ((string STRING) (start INTEGER) (end INTEGER))
+  :documentation "Return a substring of `string' beginning at position `start'
+and ending up to but not including position `end', counting from zero.  An
+`end' value of NULL stands for the rest of the string."
+  :native? TRUE :public? TRUE)
+
+(defmethod (subsequence STRING)
+    ((string MUTABLE-STRING) (start INTEGER) (end INTEGER))
+  :documentation "Return a substring of `string' beginning at position `start'
+and ending up to but not including position `end', counting from zero.  An
+`end' value of NULL stands for the rest of the string."
+  :native? TRUE :public? TRUE)
+
+(defun (split-string (CONS OF STRING-WRAPPER)) ((input STRING) (separator CHARACTER))
+  :documentation "Split `input' into separate strings based on the `separator' character."
+  :public? TRUE
+  (let ((length (length input))
+        (start 0)
+        (end 0)
+        (strings NIL))
+    (loop
+      (setq end (position input separator start))
+      (pushq strings (subsequence input start end))
+      (if (and (defined? end)
+               (< end (1- length)))
+          (setq start (1+ end))
+        (break)))
+    (return (reverse strings))))
+
+(defun (stringify STRING) ((expression OBJECT))
+  :documentation "Print `expression' onto a string and return the result.
+Printing is done with `*printReadably?*' set to true and with `*printPretty?*'
+set to false."
+  :native? TRUE :public? TRUE)
+
+(defun (unstringify OBJECT) ((string STRING))
+  :documentation "Read a STELLA expression from `string' and return the result.
+This is identical to `read-s-expression-from-string'."
+  :public? TRUE :globally-inline? TRUE
+  (return (read-s-expression-from-string string)))
+
+  ;;
+;;;;;; Hash tables
+  ;;
+
+(verbatim
+    :cpp "# include \"stella/cpp-lib/cpp-hashtable.hh\"
+"
+    :otherwise NULL)
+
+(defmethod free-hash-table-values ((self ABSTRACT-HASH-TABLE))
+  :documentation "Call free on each value in the hash table `self'."
+  (when *use-stella-hash-tables?*
+    (return))
+  (let ((native-table (the-hash-table self)))
+    (verbatim
+	:common-lisp "(CL:maphash #'(CL:lambda (key value)
+				     (CL:declare (CL:ignore key))
+				     (free value))
+				 native-table)"
+	:cpp "std::cout << \"WARNING: freeHashTableValues not yet implemented\" << std::endl;"
+	:java "java.util.Iterator iter = nativeTable.values().iterator();
+      while (iter.hasNext()) {
+         ((Stella_Object) iter.next()).free();
+      }")))
+
+(defmethod initialize-hash-table ((self ABSTRACT-HASH-TABLE))
+  :documentation "Insert a newly-created native hash table into `self'."
+  (when *use-stella-hash-tables?*
+    (setf (the-stella-hash-table self) (new STELLA-HASH-TABLE))
+    (return))
+  (setf (the-hash-table self)
+    (verbatim
+	:common-lisp "(CL:make-hash-table :test #'CL:eql)"
+	:cpp "(cpp_hash_table*)(new Native_EQL_Hash_Table<Object*, Object*>)"
+	:java "new java.util.HashMap()")))
+
+;;; --------- Objects to Objects ------------
+
+;; These used to be defined as methods with :NATIVE? TRUE, but since our
+;; Java translation can't handle native METHODS on Stella-defined
+;; classes we have to write these with verbatim statements.
+
+(defmethod (lookup (LIKE (any-value self)))
+    ((self HASH-TABLE) (key (LIKE (any-key self))))
+  :public? TRUE
+  (when *use-stella-hash-tables?*
+    (return (stella-hash-table-lookup (the-stella-hash-table self) key)))
+  (let ((native-table (the-hash-table self)))
+    (return
+      (verbatim
+          :common-lisp (CL:or (CL:gethash key native-table) NULL)
+          :cpp "((Native_EQL_Hash_Table<Object*, Object*>*)nativeTable)->get(key)"
+	  :java "(Stella_Object) nativeTable.get(key)"
+          ))))
+
+(defmethod insert-at ((self HASH-TABLE) (key (LIKE (any-key self)))
+                      (value (LIKE (any-value self))))
+  :public? TRUE
+  (when *use-stella-hash-tables?*
+    (stella-hash-table-insert-at (the-stella-hash-table self) key value)
+    (return))
+  (let ((native-table (the-hash-table self)))
+    (verbatim
+	:common-lisp (CL:setf (CL:gethash key native-table) value)
+	:cpp "(*((Native_EQL_Hash_Table<Object*, Object*>*)nativeTable))[key] = value;"
+	:java "nativeTable.put(key, value)")))
+
+(defmethod remove-at ((self HASH-TABLE) (key (LIKE (any-key self))))
+  :public? TRUE
+  (when *use-stella-hash-tables?*
+    (stella-hash-table-remove-at (the-stella-hash-table self) key)
+    (return))
+  (let ((native-table (the-hash-table self)))
+    (verbatim
+	:common-lisp (CL:remhash key native-table)
+	:cpp "((Native_EQL_Hash_Table<Object*, Object*>*)nativeTable)->erase(key);"
+	:java "nativeTable.remove(key);")))
+
+;;; --------- Integers to Objects ------------
+
+(defmethod initialize-hash-table ((self INTEGER-HASH-TABLE))
+  :documentation "Insert a newly-created native hash table into `self'."
+  (when *use-stella-hash-tables?*
+    (setf (the-stella-hash-table self) (new STELLA-HASH-TABLE))
+    (return))
+  (setf (the-hash-table self)
+    (verbatim
+	:common-lisp "(CL:make-hash-table :test #'CL:eql)"
+	:cpp "((cpp_hash_table*)(new Native_EQL_Hash_Table<int, Object*>))"
+	:java "new java.util.HashMap()")))
+
+(defmethod (lookup (LIKE (any-value self)))
+    ((self INTEGER-HASH-TABLE) (key INTEGER))
+  :public? TRUE
+  (when *use-stella-hash-tables?*
+    (return (stella-hash-table-lookup (the-stella-hash-table self) key)))
+  (let ((native-table (the-hash-table self)))
+    (return 
+      (verbatim
+	  :common-lisp (CL:or (CL:gethash key native-table) NULL)
+	  :cpp "((Native_EQL_Hash_Table<int, Object*>*)nativeTable)->get(key)"
+	  :java "(Stella_Object) nativeTable.get(new Integer(key))"))))
+
+(defmethod insert-at ((self INTEGER-HASH-TABLE) (key INTEGER) (value OBJECT))
+  :public? TRUE
+  (when *use-stella-hash-tables?*
+    (stella-hash-table-insert-at (the-stella-hash-table self) key value)
+    (return))
+  (let ((native-table (the-hash-table self)))
+    (verbatim :common-lisp (CL:declare (CL:fixnum key))
+	      :otherwise NULL)
+    (verbatim
+	:common-lisp (CL:setf (CL:gethash key native-table) value)
+	:cpp "(*((Native_EQL_Hash_Table<int, Object*>*)nativeTable))[key] = value;"
+	:java "nativeTable.put(new Integer(key), value);")))
+
+(defmethod remove-at ((self INTEGER-HASH-TABLE) (key (LIKE (any-key self))))
+  (when *use-stella-hash-tables?*
+    (stella-hash-table-remove-at (the-stella-hash-table self) key)
+    (return))
+  (let ((native-table (the-hash-table self)))
+    (verbatim
+	:common-lisp (CL:remhash key native-table)
+	:cpp "((Native_EQL_Hash_Table<int, Object*>*)nativeTable)->erase(key);"
+	:java "nativeTable.remove(new Integer(key));")))
+
+;;; --------- Floats to Objects ------------
+
+(defmethod initialize-hash-table ((self FLOAT-HASH-TABLE))
+  :documentation "Insert a newly-created native hash table into `self'."
+  (when *use-stella-hash-tables?*
+    (setf (the-stella-hash-table self) (new STELLA-HASH-TABLE))
+    (return))
+  (setf (the-hash-table self)
+    (verbatim
+	:common-lisp "(CL:make-hash-table :test #'CL:eql)"
+	:cpp "(cpp_hash_table*)(new Native_EQL_Hash_Table<double, Object*>)"
+	:java "new java.util.HashMap()")))
+
+(defmethod (lookup (LIKE (any-value self)))
+    ((self FLOAT-HASH-TABLE) (key FLOAT))
+  :public? TRUE
+  (when *use-stella-hash-tables?*
+    (return (stella-hash-table-lookup (the-stella-hash-table self) key)))
+  (let ((native-table (the-hash-table self)))
+    (return 
+      (verbatim
+	  :common-lisp (CL:or (CL:gethash key native-table) NULL)
+	  :cpp "((Native_EQL_Hash_Table<double, Object*>*)nativeTable)->get(key)"
+	  :java "(Stella_Object) nativeTable.get(new Double(key))"))))
+
+(defmethod insert-at ((self FLOAT-HASH-TABLE) (key FLOAT) (value OBJECT))
+  :public? TRUE
+  (when *use-stella-hash-tables?*
+    (stella-hash-table-insert-at (the-stella-hash-table self) key value)
+    (return))
+  (let ((native-table (the-hash-table self)))
+    (verbatim
+	:common-lisp (CL:setf (CL:gethash key native-table) value)
+	:cpp "(*((Native_EQL_Hash_Table<double, Object*>*)nativeTable))[key] = value;"
+	:java "nativeTable.put(new Double(key), value);")))
+
+(defmethod remove-at ((self FLOAT-HASH-TABLE) (key (LIKE (any-key self))))
+  (when *use-stella-hash-tables?*
+    (stella-hash-table-remove-at (the-stella-hash-table self) key)
+    (return))
+  (let ((native-table (the-hash-table self)))
+    (verbatim
+	:common-lisp (CL:remhash key native-table)
+	:cpp "((Native_EQL_Hash_Table<double, Object*>*)nativeTable)->erase(key);"
+	:java "nativeTable.remove(new Double(key));")))
+
+;;; --------- Strings to Objects ------------
+
+(defmethod initialize-hash-table ((self STRING-HASH-TABLE))
+  :documentation "Insert a newly-created native hash table into `self'."
+  (when *use-stella-hash-tables?*
+    (setf (the-stella-hash-table self) (new STELLA-HASH-TABLE))
+    (return))
+  (setf (the-hash-table self)
+    (verbatim
+	:common-lisp "(CL:make-hash-table :test #'CL:equal)"
+	:cpp "(cpp_hash_table*)(new Native_EQL_Hash_Table<const char*, Object*>)"
+	:java "new java.util.HashMap()")))
+
+(defmethod (lookup (LIKE (any-value self)))
+    ((self STRING-HASH-TABLE) (key STRING))
+  :public? TRUE
+  (when *use-stella-hash-tables?*
+    (return
+      (stella-string-hash-table-lookup (the-stella-hash-table self) key)))
+  (let ((native-table (the-hash-table self)))
+    (return (verbatim
+		:common-lisp (CL:or (CL:gethash key native-table) NULL)
+		:cpp "((Native_EQL_Hash_Table<const char*, Object*>*)nativeTable)->get(key)"
+		:java "((Stella_Object) nativeTable.get(key))"
+		))))
+
+(defmethod insert-at ((self STRING-HASH-TABLE) (key STRING) (value OBJECT))
+  :public? TRUE
+  (when *use-stella-hash-tables?*
+    (stella-hash-table-insert-at (the-stella-hash-table self) key value)
+    (return))
+  (let ((native-table (the-hash-table self)))
+    (verbatim
+	:common-lisp (CL:setf (CL:gethash key native-table) value)
+	:cpp "(*((Native_EQL_Hash_Table<const char*, Object*>*)nativeTable))[key] = value;"
+	:java "nativeTable.put(key, value);")))
+
+(defmethod remove-at ((self STRING-HASH-TABLE) (key STRING))
+  :public? TRUE
+  (when *use-stella-hash-tables?*
+    (stella-hash-table-remove-at (the-stella-hash-table self) key)
+    (return))
+  (let ((native-table (the-hash-table self)))
+    (verbatim
+	:common-lisp (CL:remhash key native-table)
+	:cpp "((Native_EQL_Hash_Table<const char*, Object*>*)nativeTable)->erase(key);"
+	:java "nativeTable.remove(key);")))
+
+;;; --------- Strings to Integers ------------
+
+(defmethod initialize-hash-table ((self STRING-TO-INTEGER-HASH-TABLE))
+  :documentation "Insert a newly-created native hash table into `self'."
+  (when *use-stella-hash-tables?*
+    (setf (the-stella-hash-table self) (new STELLA-HASH-TABLE))
+    (return))
+  (setf (the-hash-table self)
+    (verbatim
+	:common-lisp "(CL:make-hash-table :test #'CL:equal)"
+	:cpp "(cpp_hash_table*)(new Native_EQL_Hash_Table<const char*, int>(NULL_INTEGER))"
+	:java "new java.util.HashMap()")))
+
+(defmethod (lookup INTEGER) ((self STRING-TO-INTEGER-HASH-TABLE) (key STRING))
+  :public? TRUE
+  (when *use-stella-hash-tables?*
+    (return
+      (unwrap-integer
+       (stella-string-hash-table-lookup (the-stella-hash-table self) key))))
+  (let ((native-table (the-hash-table self))
+	(result INTEGER NULL))
+    (verbatim :common-lisp (CL:setq result (CL:or (CL:gethash key native-table) NULL-INTEGER))
+	      :cpp "result = ((Native_EQL_Hash_Table<const char*, int>*)nativeTable)->get(key)"
+	      :java "Integer rawResult = (Integer) nativeTable.get(key);
+      if (rawResult != null) result = rawResult.intValue()")
+    (return result) ))
+
+(defmethod insert-at ((self STRING-TO-INTEGER-HASH-TABLE) (key STRING) (value INTEGER))
+  :public? TRUE
+  (when *use-stella-hash-tables?*
+    (stella-hash-table-insert-at (the-stella-hash-table self) key value)
+    (return))
+  (let ((native-table (the-hash-table self)))
+    (verbatim
+	:common-lisp (CL:setf (CL:gethash key native-table) value)
+	:cpp "(*((Native_EQL_Hash_Table<const char*, int>*)nativeTable))[key] = value;"
+	:java "nativeTable.put(key, new Integer(value));")))
+
+(defmethod remove-at ((self STRING-TO-INTEGER-HASH-TABLE) (key STRING))
+  :public? TRUE
+  (when *use-stella-hash-tables?*
+    (stella-hash-table-remove-at (the-stella-hash-table self) key)
+    (return))
+  (let ((native-table (the-hash-table self)))
+    (verbatim
+	:common-lisp (CL:remhash key native-table)
+	:cpp "((Native_EQL_Hash_Table<const char*, int>*)nativeTable)->erase(key);"
+	:java "nativeTable.remove(key);")))
+
+;;; --------- User-level hash functions ------------
+
+;; Avoiding name clashes:
+(startup-time-progn
+    (register-native-name (quote hash-code) :java :function))
+
+(defglobal *hash-byte-random-table* (ARRAY (256) OF INTEGER) NULL
+  :documentation "A table of 256 N-bit random numbers that can be used to
+hash sequences of bytes.  Each bit-column in the table has an approximately
+even number of 0's and 1's.")
+
+(startup-time-progn :early-inits
+  (setq *hash-byte-random-table* (new (ARRAY (256) OF INTEGER)))
+  (foreach i in (interval 0 255)
+      do (setf (aref *hash-byte-random-table* i) 0))
+  ;; generate N-bit random numbers based on (CL:FIXNUM restriction) 
+  ;; in Common Lisp that have an approximately even number of 0's
+  ;; and 1's in each bit column:
+  (foreach bit in (interval 0 (verbatim 
+				:common-lisp "#.(cl:1- (cl:integer-length cl:most-positive-fixnum))"
+				:otherwise 31))
+      do (foreach i in (interval 0 255)
+             do (setf (aref *hash-byte-random-table* i)
+                  (logor (aref *hash-byte-random-table* i)
+                         ;; depends somewhat on an unbiased coin:
+                         (shift-left (random 2) bit))))))
+
+(defconstant *integer-msb-mask* INTEGER
+   ;; Since this is initialized via a `verbatim' expression this will
+   ;; be initialized immediately (i.e., before `main' is run).
+   (verbatim
+     :common-lisp
+     ;; this restricts us to positive fixnums, since shifting
+     ;;    the mask by one more position gets us into bignums:
+     "#.(cl:abs (cl:ash cl:most-negative-fixnum -1))"
+     ;; identical to `(lognot MOST-POSITIVE-INTEGER)', but we
+     ;;    are hoping for some constant evaluation here:
+     :cpp "1 << (sizeof (int) / sizeof (char) * 8 - 1)"
+     ;; Java guarantees 32-bit integers:
+     :java "0x80000000")
+   :documentation "The most significant bit of a regular integer (FIXNUM
+in Common-Lisp).  In C++ and Java this corresponds to the sign bit, in
+Lisp this corresponds to the left-most bit of `CL:most-positive-fixnum'."
+   :public? TRUE)
+
+(defconstant *integer-unsigned-bits-mask* INTEGER
+  (verbatim :otherwise MOST-POSITIVE-INTEGER)
+  :documentation "Mask that covers all the unsigned bits of an integer."
+  :public? TRUE)
+
+(defconstant *long-integer-msb-mask* LONG-INTEGER
+  (verbatim :otherwise NULL-LONG-INTEGER)
+  :documentation "The sign bit of a long integer."
+  :public? TRUE)
+
+(defconstant *long-integer-unsigned-bits-mask* LONG-INTEGER
+  (verbatim :otherwise MOST-POSITIVE-LONG-INTEGER)
+  :documentation "Mask that covers all the unsigned bits of a long integer."
+  :public? TRUE)
+
+(defun (hashmod INTEGER) ((code INTEGER) (size INTEGER))
+  :documentation "Map the hash code `code' onto a bucket index for a hash table
+of `size' (i.e., onto the interval [0..size-1].  This is just like `rem' for
+positive hash codes but also works for negative hash codes by mapping those
+onto a positive number first.  Note, that the sign conversion mapping is not
+equivalent to calling the `abs' function (it simply masks the sign bit for
+speed) and therefore really only makes sense for hash codes."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim
+      :common-lisp
+      (CL:rem (CL:the CL:FIXNUM
+                (CL:logand code *integer-unsigned-bits-mask*))
+              size)
+      :cpp "(((unsigned int) code) % size)"
+      :java "((code & 0x7FFFFFFF) % size)")))
+
+(defun (rotate-hash-code INTEGER) ((arg INTEGER))
+  :documentation
+  "Rotate `arg' to the right by 1 position.  This means shift `arg' to the right
+by one and feed in `arg's bit zero from the left.  In Lisp the result will stay
+in positive FIXNUM range.  In C++ and Java this might return a negative
+value which might be equal to NULL-INTEGER.  Important: to make this inlinable,
+it must be called with an atom (i.e., constant or variable) as its argument.
+This function is primarily useful for hashing sequences of items where the hash
+code should take the sequential order of elements into account (e.g., lists)."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (choose (= (logand arg 1) 0)
+            (unsigned-shift-right-by-1 arg)
+            (logor (shift-right arg 1) *integer-msb-mask*))))
+
+(defun (object-hash-code INTEGER) ((self OBJECT))
+  :documentation
+  "Return a hash code for `self' (can be negative).  Two objects that are `eq?'
+are guaranteed to generate the same hash code.  Two objects that are not `eq?'
+do not necessarily generate different hash codes.  Similar to `hash-code' but
+always hashes on the address of `self' even if it is a wrapper."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp "(STELLA::%%OBJECT-HASH-CODE SELF)"
+              :cpp "(size_t)self" ;; assumes a non-copying gc
+              :java "self.hashCode()")))
+
+(defmethod (hash-code INTEGER) ((self OBJECT))
+  :documentation
+  "Return a hash code for `self' (can be negative).  Two objects that are `eql?'
+are guaranteed to generate the same hash code.  Two objects that are not `eql?'
+do not necessarily generate different hash codes."
+  :public? TRUE
+  (return (object-hash-code self)))
+
+(defun (safe-hash-code INTEGER) ((self OBJECT))
+  :documentation "Return a hash code for `self'.  Just like `hash-code'
+- which see, but also works for NULL."
+  :public? TRUE
+  (if (null? self)
+      (return 63842277) ;; (hash-string "NULL" 0)
+    (return (hash-code self))))
+
+;; duplicated to allow inlining on STANDARD-OBJECTs:
+(defmethod (hash-code INTEGER) ((self STANDARD-OBJECT))
+  :public? TRUE :globally-inline? TRUE
+  (return (object-hash-code self)))
+
+(defmethod (hash-code INTEGER) ((self WRAPPER))
+  :public? TRUE
+  (error "WRAPPER.hash-code: Don't know how to hash on " self))
+
+(defmethod (hash-code INTEGER) ((self STRING-WRAPPER))
+  :public? TRUE :globally-inline? TRUE
+  (return (hash-code (wrapper-value self))))
+
+(defmethod (hash-code INTEGER) ((self INTEGER-WRAPPER))
+  :public? TRUE :globally-inline? TRUE
+  (return (hash-code (wrapper-value self))))
+
+(defmethod (hash-code INTEGER) ((self LONG-INTEGER-WRAPPER))
+  :public? TRUE :globally-inline? TRUE
+  (return (hash-code (wrapper-value self))))
+
+(defmethod (hash-code INTEGER) ((self FLOAT-WRAPPER))
+  :public? TRUE :globally-inline? TRUE
+  (return (hash-code (wrapper-value self))))
+
+(defmethod (hash-code INTEGER) ((self CHARACTER-WRAPPER))
+  :public? TRUE :globally-inline? TRUE
+  (return (hash-code (wrapper-value self))))
+
+(defmethod (hash-code INTEGER) ((self BOOLEAN-WRAPPER))
+  :public? TRUE :globally-inline? TRUE
+  (return (choose (wrapper-value self) 7333705 1891526))) ;; random #'s
+
+(defmethod (hash-code INTEGER) ((self STRING))
+  :public? TRUE :globally-inline? TRUE
+  (return
+    ;; RETHINK THE USE OF `CL:sxhash' SINCE (AT LEAST IN ALLEGRO) IT SEEMS TO
+    ;;    BE RESTRICTED TO 16-BIT CODES WHICH IS PROBLEMATIC FOR LARGE TABLES:
+    (verbatim :common-lisp (CL:sxhash self)
+              :java "self.hashCode()"
+              :cpp "native_hash_string(self)"
+              :otherwise (hash-string self 0))))
+
+(defmethod (hash-code INTEGER) ((self INTEGER))
+  :public? TRUE :globally-inline? TRUE
+  ;; should we use byte-sequence hashing similar to `hash-string' instead?
+  (return self))
+
+(defmethod (hash-code INTEGER) ((self LONG-INTEGER))
+  :public? TRUE :globally-inline? TRUE
+  (return (cast (logand (logxor self (shift-right self 32)) MOST-POSITIVE-INTEGER) INTEGER)))
+
+(defmethod (hash-code INTEGER) ((self FLOAT))
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:sxhash self)
+              :cpp "(size_t)self"                    ;; assumes a non-copying gc
+              :java "(int)(Double.doubleToLongBits(self)^(Double.doubleToLongBits(self)>>>32))"
+	      ;; Java code is inline version of "new Double(self).hashCode()"
+	      ;; One could use only half of the inline, but that could lead to
+	      ;; too many collisions for either integer floats or else very small ones.
+	      )))
+
+(defmethod (hash-code INTEGER) ((self CHARACTER))
+  :public? TRUE :globally-inline? TRUE
+  (return (logxor (aref *hash-byte-random-table* (character-code self))
+                  ;; some random number to differentiate character hash
+                  ;;    codes from those of single-element strings:
+                  15119378)))
+
+(defmethod (equal-hash-code INTEGER) ((self OBJECT))
+  :documentation
+  "Return a hash code for `self' (can be negative).  Two objects that are `equal?'
+are guaranteed to generate the same hash code (provided, that writers of
+`object-equal?' methods also implemented the appropriate `equal-hash-code'
+method).  Two objects that are not `equal?'do not necessarily generate different
+hash codes."
+  :public? TRUE
+  (return (hash-code self)))
+
+(defun (safe-equal-hash-code INTEGER) ((self OBJECT))
+  :documentation "Return a hash code for `self'.  Just like `equal-hash-code'
+- which see, but also works for NULL.  `equal-hash-code' methods that expect to
+handle NULL components should use this function for recursive calls."
+  :public? TRUE
+  (if (null? self)
+      (return 16569644) ;; (hash-string "NULL" 0)
+    (return (equal-hash-code self))))
+
+(defun (hash-string INTEGER) ((string STRING) (seedCode INTEGER))
+  :globally-inline? TRUE :public? TRUE
+  :documentation "Generate a hash-code for `string' and return it.
+Two strings that are equal but not eq will generate the same code.
+The hash-code is based on `seedCode' which usually will be 0.  However,
+`seedCode' can also be used to supply the result of a previous hash
+operation to achieve hashing on sequences of strings without actually
+having to concatenate them."
+  ;; This hashes better than the Allegro-CL `sxhash' but is significantly
+  ;;    slower (factor 2-10) for long strings.  The problem with `CL:sxhash'
+  ;;    is that it only produces 16-bit hash codes which causes collision
+  ;;    problems if we have large symbol tables, for example.
+  (let ((code seedCode)
+        (cursor (length string)))
+    (if (= cursor 0)
+        (return 4303803) ;; some random #
+      (-- cursor))
+    (loop
+      (setq code (logxor code (aref *hash-byte-random-table*
+                                    (character-code (nth string cursor)))))
+      (if (= cursor 0)
+          (break)
+        (-- cursor))
+      ;; rotate to take sequence ordering into account:
+      (setq code (rotate-hash-code code)))
+    (return code)))
+
+;;  NOTE:  The size of integer values in the following variables can
+;;  exceed the size of Lisp fixnums (used by Stella to implement fast integers)
+;;  Therefore, we have to go the route via strings, because otherwise
+;;  the translation of Java or C++ translators using the Lisp version
+;;  of Stella will fail.  By deferring the reading of the large integer
+;;  values until runtime, we are assured that Stella code never sees
+;;  BIGNUMs in Lisp.
+;;  Also note that we need to use VECTOR structures here, because the
+;;  infrastructure for CONS is not setup until after :early-inits.  But
+;;  the hash table support needs to be done very early.
+
+(defglobal *hash-table-size-prime-strings* (VECTOR OF STRING-WRAPPER) NULL
+  :documentation "List of prime numbers approximately growing by a factor of 2
+that are suitable to be used as hash table sizes.  This is in string
+format to enable processing by Lisps with different fixnum sizes."
+  :public? TRUE)
+
+(defglobal *hash-table-size-primes* (VECTOR OF INTEGER-WRAPPER) NULL
+  :documentation "List of prime numbers approximately growing by a factor of 2
+that are suitable to be used as hash table sizes."
+  :public? TRUE)
+
+(startup-time-progn :early-inits
+  (setq *hash-table-size-prime-strings* 
+        (vector      "29"      "53"      "97"      "193"    "389"   "769"
+                   "1543"    "3079"    "6151"    "12289"  "24593"
+                  "49157"   "98317"  "196613"   "393241" "786433"
+                "1572869" "3145739" "6291469" "12582917"
+                ;; 24 bit limit here
+                "25165843" "50331653" "100663319"
+                ;; 27 bit limit here
+                "201326611" "402653189"
+                ;; 29 bit limit here
+                "805306457" "1610612741"
+                ;; 31 bit limit here.  That means 32 bit signed can't use these:
+                #|"3221225473" "4294967291"|#
+                ))
+  (setq *hash-table-size-primes*
+        (verbatim :common-lisp "(cl:apply #'vector 
+                 (cl:loop for index below (length *hash-table-size-prime-strings*)
+                          as i = (cl:parse-integer
+                                    (unwrap-string (nth *hash-table-size-prime-strings*
+                                                        index)))
+                          when (cl:typep i 'CL:FIXNUM)
+                          collect (wrap-integer i)))"
+                  :otherwise (new VECTOR :array-size (length *hash-table-size-prime-strings*))))
+  (verbatim :common-lisp NULL
+            :otherwise (foreach s in *hash-table-size-prime-strings*
+                         as i in (interval 0 NULL)
+                         do (setf (nth *hash-table-size-primes* i)
+                              (cast (string-to-integer s) INTEGER))))
+  )
+
+(defun (pick-hash-table-size-prime INTEGER) ((minSize INTEGER))
+  :documentation "Return a hash table prime of at least `minSize'."
+  :public? TRUE
+  (foreach prime in *hash-table-size-primes*
+      where (>= prime minSize)
+      do (return prime))
+  (error "pick-hash-table-size-prime: minimum size is too large"))
+
+
+  ;;
+;;;;;; Low-level support for VECTORs:
+  ;;
+
+(defmethod initialize-vector ((self VECTOR))
+  (let ((size (array-size self)))
+    (setf (the-array self)
+      (verbatim 
+          :common-lisp (CL:make-array size :initial-element NULL)
+          :cpp  "new (GC) Object*[size]"
+          :java "new #$(STELLAROOT).Stella_Object[size]"))
+    ;; initialize array elements (only needed in C++):
+    (verbatim
+        :common-lisp "(setq size size)"
+        :java "size = size"
+        :otherwise
+        (let ((array (the-array self)))
+          (foreach i in (interval 0 (1- size))
+              do (setf (nth array i) NULL))))))
+
+(defun resize-vector ((self VECTOR) (size INTEGER))
+  :documentation "Change the size of `self' to `size'.  If `size' is smaller
+than the current size of `self' the vector will be truncated.  Otherwise, 
+the internal array of `self' will be grown to `size' and unused elements
+will be initialized to NULL."
+  :public? TRUE
+  ;; This duplicates some of the functionality of `VECTOR.initialize-vector'
+  ;;    for efficiency.
+  (let ((old_size (array-size self))
+        (i old_size)
+        (old_array (the-array self))
+        (new_array old_array))
+    (when (= size old_size)
+      (return))
+    (setq new_array
+      (verbatim 
+          :common-lisp (CL:make-array size :initial-element NULL)
+          :cpp  "new (GC) Object*[size]"
+          :java "new #$(STELLAROOT).Stella_Object[size]"))
+    (when (< size old_size)
+      (setq old_size size)
+      (setq i old_size))
+    ;; copy elements of the old array:
+    (while (>= (-- i) 0)
+      (setf (nth new_array i) (nth old_array i)))
+    ;; initialize unused elements of new array (only needed in C++):
+    (verbatim
+        :common-lisp "(setq i i)"
+        :java "i = i"
+        :otherwise
+        (foreach i in (interval old_size (1- size))
+            do (setf (nth new_array i) NULL)))
+    ;; update the vector:
+    (setf (the-array self) new_array)
+    (setf (array-size self) size)))
+
+(defmethod (nth (LIKE (any-value self))) ((self NATIVE-VECTOR) (position INTEGER))
+  :documentation "Return the element in `self' at `position'."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    (verbatim :common-lisp (CL:aref self position)
+              :cpp "self[position]"
+              :java "self[position]")))
+
+(defmethod (nth-setter (LIKE (any-value self)))
+    ((self NATIVE-VECTOR) (value (LIKE (any-value self))) (position INTEGER))
+  :documentation "Set the element in `self' at `position' to `value'."
+  :public? TRUE :globally-inline? TRUE
+  (return
+    ;; TO DO: IMPROVE LISP INLINING TO AVOID THE AUXILIARY `CL:LET' HERE:
+    (verbatim :common-lisp (CL:setf (CL:aref self position) value)
+              :cpp "self[position] = value"
+              :java "self[position] = value")))
+
+  ;;
+;;;;;; Object Destruction
+  ;;
+
+;;; ELIMINATE THIS, SINCE IT DOESN'T DO ANYTHING USEFUL:
+(defun unmake ((self OBJECT))
+  (ignore self)
+  NULL)
+
+  ;;
+;;;;;; File operations
+  ;;
+
+;;; See http://www.informit.com/guides/content.aspx?g=cplusplus&seqNum=245 which
+;;; states that most implementations today support <dir.h> or <dirent.h> for
+;;; directory manipulation (but it is not part of the C++ standard):
+(verbatim
+    ;; we might need to conditionalize this:
+    :cpp "# include <dirent.h>
+"
+    :otherwise NULL)
+
+(defun (native-probe-file? BOOLEAN) ((fileName FILE-NAME))
+  :documentation "Return true if file `fileName' exists.  Note that this does
+not necessarily mean that the file can also be read.  This does not handle any
+necessary pathname translations or error conditions."
+  :native? TRUE :public? TRUE)
+
+(defun (native-probe-directory? BOOLEAN) ((fileName FILE-NAME))
+  :documentation "Return true if file `fileName' exists and is a directory.
+Note that this does not necessarily mean that the directory can also be read.
+This does not handle any necessary pathname translations or error conditions."
+  :public? TRUE
+  (let ((result FALSE))
+    (verbatim
+        :cpp
+        "DIR *dirptr;
+         dirptr = opendir(filename);
+         if (dirptr != NULL) {
+            result=true;
+            closedir(dirptr);
+         }"
+        :java "result = (new java.io.File(filename)).isDirectory()"
+        :otherwise
+        ;; there doesn't seem to be a good Lisp-specific test, this works:
+        (setq result (probe-file? (file-name-as-directory fileName))))
+    (return result)))
+
+(defun (probe-file? BOOLEAN) ((fileName FILE-NAME))
+  :documentation "Return true if file `fileName' exists.  Note that this does
+not necessarily mean that the file can also be read.
+IMPORTANT Java idiosyncrasy: if file `foo/bar' exists and is not a directory,
+Java will also say `foo/bar/' exists, which is different behavior than in Lisp
+and C++.  For this reason, make sure to always use `probe-directory?' to test
+whether a directory exists."
+  :public? TRUE
+  (return (native-probe-file? (translate-logical-pathname fileName))))
+
+(defun (probe-directory? BOOLEAN) ((fileName FILE-NAME))
+  :documentation "Return true if file `fileName' exists and is a directory.
+Note that this does not necessarily mean that the directory can also be read."
+  :public? TRUE
+  (return (native-probe-directory? (translate-logical-pathname fileName))))
+
+(defun (native-file-write-date CALENDAR-DATE) ((fileName FILE-NAME))
+  :documentation "Return the time at which file `fileName' was last modified or
+NULL if that cannot be determined.  This does not handle any necessary pathname
+translations or error conditions."
+  :native? TRUE :public? TRUE)
+
+(defun (file-write-date CALENDAR-DATE) ((fileName FILE-NAME))
+  :documentation "Return the time at which file `fileName' was last modified or
+NULL if that cannot be determined."
+  :public? TRUE
+  (let ((truefile (translate-logical-pathname fileName)))
+    (unless (native-probe-file? truefile)
+      ;; this will test again which is ok and then throw the exception:
+      (ensure-file-exists fileName "file-write-date"))
+    (return (native-file-write-date truefile))))
+
+(defun (native-file-length LONG-INTEGER) ((fileName FILE-NAME))
+  :documentation "Return the length of file `fileName' in bytes or NULL if that
+cannot be determined.  This does not handle any necessary pathname translations
+or error conditions."
+  :native? TRUE :public? TRUE)
+
+(defun (file-length LONG-INTEGER) ((fileName FILE-NAME))
+  :documentation "Return the length of file `fileName' in bytes or NULL if that
+cannot be determined."
+  :public? TRUE
+  ;; TO DO: maybe also check that we are dealing with a plain file, not a directory:
+  (let ((truefile (translate-logical-pathname fileName)))
+    (unless (native-probe-file? truefile)
+      ;; this will test again which is ok and then throw the exception:
+      (ensure-file-exists fileName "file-length"))
+    (return (native-file-length truefile))))
+
+;;; TO DO: the native versions of delete-file and rename-file use a mixture of
+;;; methods to signal success or failure, e.g., C++ always returns a success or
+;;; error code, Lisp and Java sometimes return a success code and for certain
+;;; cases return an exception.  We could make this more uniform by always
+;;; signalling a file-operation exception in case something went wrong; however,
+;;; for now this is a bit too much effort for what it's worth.
+
+(defun native-delete-file ((fileName FILE-NAME))
+  :documentation "Delete the file `fileName'.  This does not handle any necessary
+pathname translations or error conditions."
+  :native? TRUE :public? TRUE)
+
+(defun delete-file ((fileName FILE-NAME))
+  :documentation "Delete the file `fileName'."
+  :public? TRUE
+  (let ((truefile (translate-logical-pathname fileName)))
+    (unless (native-probe-file? truefile)
+      ;; this will test again which is ok and then throw the exception:
+      (ensure-file-exists fileName "delete-file"))
+    (native-delete-file truefile)))
+
+(defun native-rename-file ((fromFile FILE-NAME) (toFile FILE-NAME))
+  :documentation "Rename the file `fromFile' to `toFile'.  This does not handle
+any necessary pathname translations or error conditions."
+  :native? TRUE :public? TRUE)
+
+(defun rename-file ((fromFile FILE-NAME) (toFile FILE-NAME))
+  :documentation "Rename the file `fromFile' to `toFile'."
+  :public? TRUE
+  (let ((truefrom (translate-logical-pathname fromFile))
+        (trueto (translate-logical-pathname toFile)))
+    (unless (native-probe-file? truefrom)
+      ;; this will test again which is ok and then throw the exception:
+      (ensure-file-exists fromFile "rename-file"))
+    (when (native-probe-file? trueto)
+      (ensure-file-does-not-exist toFile "rename-file"))
+    (native-rename-file truefrom trueto)))
+
+(defun copy-stream-to-stream ((in INPUT-STREAM) (out OUTPUT-STREAM))
+  :documentation "Copy `in' verbatimely to `out'.  Does the right thing for binary data."
+  :public? TRUE
+  (let ((buffer (make-tokenizer-byte-array *tokenizer-initial-buffer-size*))
+        (bytesRead 0))
+    (loop
+      (setq bytesRead
+        (native-byte-array-read-sequence buffer in 0 *tokenizer-initial-buffer-size*))
+      (cond ((> bytesRead 0)
+             (native-byte-array-write-sequence buffer out 0 bytesRead))
+            (otherwise
+             (flush-output out)
+             (break))))))
+
+(defun copy-file ((fromFile FILE-NAME) (toFile FILE-NAME))
+  :documentation "Copy file `fromFile' to file `toFile', clobbering
+any data already in `toFile'."
+  :public? TRUE
+  (ensure-file-exists fromFile "copy-file")
+  (with-input-file (from fromFile)
+    (with-output-file (to toFile)
+      (copy-stream-to-stream from to))))
+
+(defun (get-temp-directory STRING) ()
+  :documentation "Return a suitable directory for temporary files.
+Uses the value of `stella.tempDirectory' if defined; otherwise, it
+will use a suitable OS-specific default.  The returned directory will
+end in a separator for immediate concatenation with a physical filename."
+  :public? TRUE
+  (let ((dir (get-property "stella.tempDirectory")))
+    (cond ((null? dir)
+           (case (operating-system)
+             ((:UNIX :MAC)
+              (setq dir "/tmp/"))
+             (:WINDOWS
+              ;; to do this right, we should look at the TEMP environment var:
+              (setq dir "C:\\WINDOWS\\TEMP\\"))))
+          (otherwise
+           ;; make sure it ends in a separator in case it was user-supplied:
+           (setq dir (file-name-as-directory dir))))
+    (return dir)))
+
+(defun (make-temporary-file-name STRING) ((prefix STRING) (suffix STRING))
+  :documentation "Return a file name of the form `<prefix>NNNNNN<suffix>'
+which is guaranteed to not refer to any existing file.  A null `prefix'
+defaults to `tmpfile', a null `suffix' defaults to the empty string.
+The number portion NNNNNN will correpond to a random number between 0
+and 999999.  If no qualifying filename can be found after 100 attempts,
+NULL will be returned.  Note that it is possible due to multi-threading
+or processing that the generated filename becomes used by another thread
+or OS process.  If necessary, this case can be handled by the caller."
+  :public? TRUE
+  (when (null? prefix)
+    (setq prefix "tmpfile"))
+  (when (null? suffix)
+    (setq suffix ""))
+  (foreach i in (interval 0 100)
+      do (ignore i)
+         (let ((uniquifier (format-with-padding
+                            (integer-to-string (random 1000000))
+                            6 #\0 :right FALSE))
+               (tempFileName
+                (concatenate prefix uniquifier suffix)))
+           (when (not (probe-file? tempFileName))
+             (return tempFileName))))
+  (return NULL))
+
+(defun (make-temporary-file STRING) ((prefix STRING) (suffix STRING))
+  :documentation "Variant of `make-temporary-file-name' that actually
+allocates the file to prevent other processes from using that name.
+This is still not fully thread safe - for that we would need a file lock -
+but maybe a bit better in avoiding collisions."
+  :public? TRUE
+  (foreach i in (interval 0 100)
+      do (ignore i)
+         (exception-case
+             (let ((tempFileName (make-temporary-file-name prefix suffix)))
+               (with-output-file (temp tempFileName :if-exists :error)
+                 (close-stream temp))
+               (return tempFileName))
+           (NATIVE-EXCEPTION ())))
+  (return NULL))
+
+(defun (cl-list-directory-files (CONS OF STRING-WRAPPER)) ((directory STRING))
+  ;; Lisp support for `list-directory-files'.
+  ;; This is complicated by the fact that different Lisps expect different
+  ;; wildcarding to get files with or without extensions and/or directories,
+  ;; and that they generate different output for different kinds of files.
+  (let ((files (CONS OF STRING-WRAPPER) NULL)
+        (dirsep (directory-separator-string))
+        (checkDuplicates? FALSE)
+        (normFile STRING NULL)
+        (normalizedFiles NIL))
+    (verbatim :common-lisp
+      "#+allegro (setq files (cl:directory directory))
+       #+cmu (setq files (cl:directory directory))
+       #+lispworks (setq files (cl:directory (string-concatenate directory \"*\")))
+       #+mcl (setq files (cl:directory (string-concatenate directory \"*.*\")))
+       #+clisp (setq files (cl:append (cl:directory (string-concatenate directory \"*\"))
+                                      (cl:directory (string-concatenate directory \"*/\"))))"
+      :otherwise NULL)
+    ;; for all Lisps not special-cased above, we use * and *.* wild cards which
+    ;; might lead to duplicate entries:
+    (when (null? files)
+      (setq checkDuplicates? TRUE)
+      (verbatim :common-lisp
+        "(setq files (cl:append (cl:directory (string-concatenate directory \"*\"))
+                                (cl:directory (string-concatenate directory \"*.*\"))))"
+        :otherwise NULL))
+    (verbatim :common-lisp
+      "(setq files (stellify (cl:mapcar #'cl:namestring files)))"
+      :otherwise (setq files NIL))
+    (when checkDuplicates?
+      (setq normalizedFiles (remove-duplicates-equal normalizedFiles)))
+    ;; normalize different Lisps to have bare filenames without trailing directory separators:
+    (foreach file in files
+        do (setq normFile file)
+           (when (ends-with? normFile dirsep NULL)
+             ;; this is wrong for files that have a directory separator in their name:
+             (setq normFile (subsequence normFile 0 (- (length normFile) (length dirsep)))))
+           ;; this should be safe, given we removed a trailing directory separator:
+           (setq normFile (file-name-without-directory normFile))
+           (when (or (eql? normFile ".")
+                     (eql? normFile ".."))
+             (continue))
+        collect normFile into normalizedFiles)
+    (return normalizedFiles)))
+
+(verbatim
+    ;; we will need to conditionalize this:
+    :cpp "# include <dirent.h>
+"
+    :otherwise NULL)
+
+(defun (cpp-list-directory-files (CONS OF STRING-WRAPPER)) ((directory STRING))
+  ;; C++ support for `list-directory-files'.
+  ;; TO DO: maybe (optionally) use the Boost.Filesystem library to implement this
+  ;;    more portably (http://www.boost.org/).
+  (let ((files (CONS OF STRING-WRAPPER) NIL))
+    (verbatim :cpp
+      "DIR *dirptr;
+       struct dirent *entry;
+       dirptr = opendir(directory);
+       if (dirptr != NULL) {
+          while (entry = readdir(dirptr)) {
+            const char* filename = entry->d_name;
+            // skip . and ..:
+            if (!strcmp(filename, \".\") || !strcmp(filename, \"..\"))
+               continue;
+            // do this to copy out the string:
+            filename = stringConcatenate(filename, \"\");
+            files = cons(wrapString(filename), files);
+          }
+          closedir(dirptr);
+         }
+         else
+            files = NULL"
+      :otherwise NULL)
+    (when (null? files)
+      (error "list-directory-files: error reading " directory))
+    (return files)))
+
+(defun (java-list-directory-files (CONS OF STRING-WRAPPER)) ((directory STRING))
+  ;; Java support for `list-directory-files'.
+  ;; As usual, Java would have all the necessary accessors to do more sophisticated
+  ;; normalization, but we don't use that for now given the problems with Lisp and C++.
+  (let ((files NIL))
+    (verbatim :java
+      "  java.io.File[] dirfiles = new java.io.File(directory).listFiles();
+         String filename = null;
+         String dirsep = Stella.directorySeparatorString();
+         for (int i = dirfiles.length-1; i >= 0; i--) {
+             filename = dirfiles[i].getName();
+             files = Cons.cons(StringWrapper.wrapString(filename), files);
+         }"
+      :otherwise NULL)
+    (return files)))
+
+(defun (list-directory-files (CONS OF STRING-WRAPPER)) ((directory STRING))
+  :documentation "Return all the files and sub-directories in `directory' sorted by name.
+Each returned file is a bare file name without a `directory' component.  If a file is
+a directory, it will look just like a plain file.  This means consumers might have to
+explicitly test whether a file is a directory depending on what they do. Excludes . and ..
+directories.  Handles logical pathnames but resulting files will always use physical pathname
+syntax.  This is mostly consistent across native languages, but some differences still exist -
+e.g., Lisp will convert . or .. into absolute pathnames."
+  :public? TRUE :command? TRUE
+  (setq directory (translate-logical-pathname (file-name-as-directory directory)))
+  (ensure-file-exists directory "list-directory-files")
+  (let ((files
+         (if-output-language :common-lisp
+             (cl-list-directory-files directory)
+             (if-output-language :java
+                 (java-list-directory-files directory)
+                 (cpp-list-directory-files directory)))))
+    (return (sort files NULL))))
+
+(defun (list-directory-files-recursively (CONS OF STRING-WRAPPER)) ((directory STRING))
+  :documentation "Just like `list-directory-files' (which see) but also recurses into
+subdirectories.  Files at the top level of `directory' will be bare file names without
+a `directory' component.  Files in subdirectories will be prefixed with the relative
+subdirectory path starting right below `directory'.  The sort order is lexicographic
+within directories which results in a depth-first presentation order of files."
+  :public? TRUE :command? TRUE
+  (setq directory (translate-logical-pathname (file-name-as-directory directory)))
+  (ensure-file-exists directory "list-directory-files")
+  (let ((files NIL))
+    (foreach file in (list-directory-files directory)
+        do (cond ((probe-directory? (concatenate directory file))
+                  (setq file (file-name-as-directory file))
+                  (foreach subfile in (list-directory-files-recursively (concatenate directory file))
+                      do (pushq files (concatenate (unwrap-string file) subfile))))
+                 (otherwise
+                  (pushq files file))))
+    (return (reverse files))))
+
+(defun cpp-create-directory ((directory STRING))
+  ;; C++ support for `create-directories'.
+  ;; TO DO: until we can use std::filesystem::create_directories, this might have to be OS-conditionalized
+  (setq directory (translate-logical-pathname (file-name-as-directory directory)))
+  (unless (probe-directory? directory)
+    (unless (zero? (cast (verbatim :cpp "mkdir(directory, 0777)" :otherwise 0) INTEGER))
+      (signal-exception
+       (new INPUT-OUTPUT-EXCEPTION :message (concatenate "failed to create directory: " directory))))))
+
+(defun create-directories ((directory STRING))
+  :documentation "If `directory' does not yet exist, create it and any of its parents
+that do not yet exist.  If `directory' already does exist, this simply is a no-op."
+  :public? TRUE :command? TRUE
+  (setq directory (translate-logical-pathname (file-name-as-directory directory)))
+  (unless (probe-directory? directory)
+    (exception-case
+        (verbatim
+            :common-lisp (CL:ensure-directories-exist directory)
+            ;; this is supported since C++ 2017, but not yet as universally as we'd like:
+            ;:cpp "std::filesystem::create_directories(directory)"
+            :java "if (!new java.io.File(directory).mkdirs())
+                      throw InputOutputException.newInputOutputException(\"failed to create directory: \" + directory)"
+            :otherwise
+            ;; for now for C++ do it the hard way:
+            (let ((parent (directory-parent-directory directory 1)))
+              (unless (probe-directory? parent)
+                (create-directories parent))
+              (cpp-create-directory directory)))
+      (INPUT-OUTPUT-EXCEPTION (e)
+        (signal-exception e))
+      (NATIVE-EXCEPTION (e)
+        (signal-exception
+         (new INPUT-OUTPUT-EXCEPTION :message (concatenate "create-directories: " (exception-message e))))))))
+
+(defun ensure-directories-exist ((fileName FILE-NAME))
+  :documentation "Ensure all physical directories in the directory portion of `fileName' exist."
+  :public? TRUE :command? TRUE
+  (let ((directory (file-name-directory (translate-logical-pathname fileName))))
+    (unless (blank-string? directory)
+      (create-directories directory))))
+
+
+  ;;
+;;;;;; Bit operations
+  ;;
+
+(defmethod (lognot INTEGER) ((arg INTEGER))
+  :globally-inline? TRUE
+  :public? TRUE
+  (return
+    (verbatim
+        :common-lisp (CL:lognot arg)
+        :cpp "(~ arg)"
+	:java "(~ arg)")))
+
+(defmethod (lognot LONG-INTEGER) ((arg LONG-INTEGER))
+  :globally-inline? TRUE
+  :public? TRUE
+  (return
+    (verbatim
+        :common-lisp (CL:lognot arg)
+        :cpp "(~ arg)"
+	:java "(~ arg)")))
+
+(defmethod (logand INTEGER) ((arg1 INTEGER) (arg2 INTEGER))
+  :globally-inline? TRUE
+  :public? TRUE
+  (return
+    (verbatim
+        :common-lisp (CL:logand arg1 arg2)
+        :cpp "(arg1 & arg2)"
+	:java "(arg1 & arg2)")))
+
+(defmethod (logand LONG-INTEGER) ((arg1 LONG-INTEGER) (arg2 LONG-INTEGER))
+  :globally-inline? TRUE
+  :public? TRUE
+  (return
+    (verbatim
+        :common-lisp (CL:logand arg1 arg2)
+        :cpp "(arg1 & arg2)"
+	:java "(arg1 & arg2)")))
+
+(defmethod (logor INTEGER) ((arg1 INTEGER) (arg2 INTEGER))
+  :globally-inline? TRUE
+  :public? TRUE
+  (return
+    (verbatim
+        :common-lisp (CL:logior arg1 arg2)
+        :cpp "(arg1 | arg2)"
+	:java "(arg1 | arg2)")))
+
+(defmethod (logor LONG-INTEGER) ((arg1 LONG-INTEGER) (arg2 LONG-INTEGER))
+  :globally-inline? TRUE
+  :public? TRUE
+  (return
+    (verbatim
+        :common-lisp (CL:logior arg1 arg2)
+        :cpp "(arg1 | arg2)"
+	:java "(arg1 | arg2)")))
+
+(defmethod (logxor INTEGER) ((arg1 INTEGER) (arg2 INTEGER))
+  :globally-inline? TRUE
+  :public? TRUE
+  (return
+    (verbatim
+        :common-lisp (CL:logxor arg1 arg2)
+        :cpp "(arg1 ^ arg2)"
+	:java "(arg1 ^ arg2)")))
+
+(defmethod (logxor LONG-INTEGER) ((arg1 LONG-INTEGER) (arg2 LONG-INTEGER))
+  :globally-inline? TRUE
+  :public? TRUE
+  (return
+    (verbatim
+        :common-lisp (CL:logxor arg1 arg2)
+        :cpp "(arg1 ^ arg2)"
+	:java "(arg1 ^ arg2)")))
+
+(defconstant LONG-INTEGER-BIT-WIDTH INTEGER
+             (round (/ (log (* MOST-POSITIVE-LONG-INTEGER 2.0)) (log 2)))
+  :documentation "The number of bits in a long integer.")
+
+(defun (integer-length INTEGER) ((x LONG-INTEGER))
+  :documentation "Return the 1-based position of the left-most bit in `x'.
+If `x' is negative, we only count the value bits, not the sign."
+  :public? TRUE
+  (when (< x 0)
+    (setq x (- -1 x)))
+  (when (= x 0)
+    (return 0))
+  (let ((bot 0)
+        (top (1- LONG-INTEGER-BIT-WIDTH))
+        (split 0)
+        (rem LONG-INTEGER 0))
+    ;; run a binary search:
+    (loop
+      (setq split (shift-right (+ bot top) 1))
+      (setq rem (shift-right x split))
+      (when (= rem 1)
+        (return (1+ split)))
+      (if (= rem 0)
+          (setq top (1- split))
+        (setq bot (1+ split))))))
+
+(defun (integer-length10 INTEGER) ((x LONG-INTEGER))
+  :documentation "Return the 1-based position of the left-most non-zero digit
+in the base-10 representation of `x'.  If `x' is negative, we only consider
+its absolute value, not the sign.  This effectively computes the minimum number
+of base-10 digits to represent `x', with the exception of x=0."
+  :public? TRUE
+  (when (< x 0)
+    (setq x (abs x)))
+  (let ((len 0)
+        (comp 1))
+    ;; we use a division/multiplication approach that performs at most
+    ;; 3 integer divisions and 2 integer multiplications, since our initial
+    ;; `(1+ (floor (log10 (+ x 0.5))))' solution ran into precision issues:
+    (loop
+      (cond ((>= x 1000000000)
+             (setq x (div x 1000000000))
+             (++ len 9))
+            ((>= x 10000)
+             (setq x (div x 10000))
+             (++ len 4))
+            ((>= x 100)
+             (setq x (div x 100))
+             (++ len 2))
+            (otherwise
+             (break))))
+    (while (<= comp x)
+      (setq comp (* comp 10))
+      (++ len))
+    (return len)))
+
+(defmethod (shift-left INTEGER) ((arg INTEGER) (count INTEGER))
+  :globally-inline? TRUE
+  :public? TRUE
+  (return
+    (verbatim
+        :common-lisp (CL:ash arg count)
+        :cpp "(arg << count)"
+	:java "(arg << count)")))
+
+(defmethod (shift-left LONG-INTEGER) ((arg LONG-INTEGER) (count INTEGER))
+  :globally-inline? TRUE
+  :public? TRUE
+  (return
+    (verbatim
+        :common-lisp (CL:ash arg count)
+        :cpp "(arg << count)"
+	:java "(arg << count)")))
+
+(defmethod (shift-right INTEGER) ((arg INTEGER) (count INTEGER))
+  :documentation "Shift `arg' to the right by `count' positions and
+0-extend from the left if `arg' is positive or 1-extend if it is
+negative.  This is an arithmetic shift that preserve the sign of `arg'
+and is equivalent to dividing `arg' by 2** `count'."
+  :globally-inline? TRUE :public? TRUE
+  (return
+    (verbatim
+        :common-lisp (CL:ash arg (CL:the CL:FIXNUM (CL:- count)))
+        :cpp "(arg >> count)"
+	:java "(arg >> count)")))
+
+(defmethod (shift-right LONG-INTEGER) ((arg LONG-INTEGER) (count INTEGER))
+  :documentation "Shift `arg' to the right by `count' positions and
+0-extend from the left if `arg' is positive or 1-extend if it is
+negative.  This is an arithmetic shift that preserve the sign of `arg'
+and is equivalent to dividing `arg' by 2** `count'."
+  :globally-inline? TRUE :public? TRUE
+  (return
+    (verbatim
+        :common-lisp (CL:ash arg (CL:the CL:FIXNUM (CL:- count)))
+        :cpp "(arg >> count)"
+	:java "(arg >> count)")))
+
+(defmethod (unsigned-shift-right-by-1 INTEGER) ((arg INTEGER))
+  :documentation "Shift `arg' to the right by 1 position and 0-extend
+from the left.  This does not preserve the sign of `arg' and shifts
+the sign-bit just like a regular bit.  In Common-Lisp we can't do that
+directly and need to do some extra masking."
+  :globally-inline? TRUE :public? TRUE
+  (return
+    (verbatim
+      ;; If `arg' is positive, this works just like a regular `shift-right';
+      ;; if it is negative, this shifts in the sign bit and then masks it
+      ;; emulating a 0 shifted in from the left:
+      :common-lisp (CL:logand (CL:the CL:FIXNUM (CL:ash arg -1))
+                              *integer-unsigned-bits-mask*)
+      :cpp "((unsigned int)arg >> 1)"
+      :java "(arg >>> 1)")))
+
+(defmethod (unsigned-shift-right-by-1 LONG-INTEGER) ((arg LONG-INTEGER))
+  :documentation "Shift `arg' to the right by 1 position and 0-extend
+from the left.  This does not preserve the sign of `arg' and shifts
+the sign-bit just like a regular bit.  In Common-Lisp we can't do that
+directly and need to do some extra masking."
+  :globally-inline? TRUE :public? TRUE
+  (return
+    (verbatim
+      ;; If `arg' is positive, this works just like a regular `shift-right';
+      ;; if it is negative, this shifts in the sign bit and then masks it
+      ;; emulating a 0 shifted in from the left:
+      :common-lisp (CL:logand (CL:ash arg -1)
+                              *long-integer-unsigned-bits-mask*)
+      :cpp "((unsigned long long int)arg >> 1)"
+      :java "(arg >>> 1)")))
+
+#|
+(defun (unsigned-shift-right INTEGER) ((arg INTEGER) (count INTEGER))
+  :documentation "Shift `arg' to the right by `count' positions and
+0-extend from the left.  This does not preserve the sign of `arg' and
+shifts the sign-bit just like a regular bit.  In Common-Lisp we can't
+do that directly..."
+  :globally-inline? TRUE :public? TRUE
+  (return
+    (verbatim
+      :common-lisp "...hairy, since once we've shifted in the sign bit
+                    we want to do a regular shift for count-1 positions.
+                    Not that this is hard but it is unfortunately complex
+                    for a bit operation."
+      :cpp "((unsigned int)arg >> count)"
+      :java "(arg >>> count)")))
+|#
+
+  ;;
+;;;;;;  UUID generation.
+  ;;
+
+(defun (generate-uuid STRING) ((uuid-type KEYWORD))
+  :public? TRUE
+  :documentation "Generates a UUID of the specified type.  Legal types are
+a subset of the IETF RFC 4122 (see http://www.ietf.org/rfc/rfc4122.txt )
+UUID types.  Currently supported are:
+    :TYPE-4  :RANDOM       A type-4 (random) UUID.  These are synonyms."
+  (case uuid-type
+    ((:TYPE-4 :RANDOM)
+     (return (generate-random-uuid)))
+    (otherwise
+     (error "UUIDs of type " uuid-type " are not supported."))))
+
+(defun (generate-random-uuid STRING) ()
+  :public? TRUE
+  :documentation "Generates a random UUID (Type 4), according to the guidelines
+of IETF RFC 4122 (see http://www.ietf.org/rfc/rfc4122.txt )
+
+Take 16 random bytes (octets), put them all behind each other, for the description
+the numbering starts with byte 1 (most significant, first) to byte 16 
+   (least significant, last). Then put in the version and variant.
+To put in the version, take the 7th byte and perform an and operation using 0x0f,
+   followed by an or operation with 0x40. 
+To put in the variant, take the 9th byte and perform an and operation using 0x3f,
+   followed by an or operation with 0x80.
+To make the string representation, take the hexadecimal presentation of bytes 1-4
+   (without 0x in front of it) let them follow by a -, then take bytes 5 and 6, - 
+bytes 7 and 8, - bytes 9 and 10, - then followed by bytes 11-16."
+
+  (return (concatenate 
+           (zero-pad-string (integer-to-hex-string (random 65536)) 4)
+           (zero-pad-string (integer-to-hex-string (random 65536)) 4)
+           "-"
+           (zero-pad-string (integer-to-hex-string (random 65536)) 4)
+           "-"
+           (integer-to-hex-string (+ 16384 (random 4096)))
+           "-"
+           (integer-to-hex-string (+ 32768 (random 16384)))
+           "-"
+           (zero-pad-string (integer-to-hex-string (random 16777216)) 6)
+           (zero-pad-string (integer-to-hex-string (random 16777216)) 6))))
+
+
+  ;;
+;;;;;; Lisp support functions -- converting Lisp object to Stella objectsn
+  ;;
+
+;; These need to be here, because they are called from
+;; general (non-Lisp specific) code.  They are no-ops
+;; except in Lisp.
+
+(defun (stellify OBJECT) ((self OBJECT))
+  :documentation "Convert a Lisp object into a STELLA object."
+  :public? TRUE
+  ;; Note: This resembles `stellafy', but it decides on its own what
+  ;;    Stella type `object' should be converted to.
+  (let ((result self))
+    (verbatim
+      :common-lisp
+      "(CL:typecase self
+        (CL:NULL (cl:setq result STELLA::NIL))
+        (CL:CONS
+          (CL:setq result STELLA::NIL)
+          (CL:dolist (x self)
+            (CL:setq result (STELLA::cons (stellify x) result)))
+          (CL:setq result (STELLA::reverse result)))
+        (CL:KEYWORD
+          (CL:setq result (intern-keyword (CL:symbol-name self))))
+        (CL:SYMBOL
+         (CL:if (cl:eq self CL:t)
+           (cl:setq result TRUE-WRAPPER)
+           (cl:setq result (intern-symbol (CL:symbol-name self)))))
+        ((CL:or CL:NUMBER CL:STRING) (cl:setq result (wrap-literal self)))
+        (STELLA::OBJECT (cl:setq result self))
+        (CL:t (CL:error \"Can't stellify: ~s\" self)))"
+      :otherwise NULL)
+    (return result) ))
+
+(defun (stella-object? BOOLEAN) ((self OBJECT))
+  :documentation "Return true if `self' is a member of the STELLA class `OBJECT'."
+  (let ((result? TRUE))
+    (verbatim
+      :common-lisp
+      "(CL:setq result? (CL:or (CL:typep self 'STELLA::OBJECT)
+                               (CL:listp self)))"
+      :otherwise NULL)
+    (return result?) ))
+
+
+  ;;
+;;;;;; OS and environment inquiry
+  ;;
+
+(defun (running-as-lisp? BOOLEAN) ()
+  :documentation "Return true if the executable code is a Common Lisp application."
+  :public? TRUE
+  (let ((result? FALSE))
+    (verbatim :common-lisp "(cl:setq result? TRUE)"
+              :otherwise NULL)
+    (return result?)) )
+
+(defun (running-in-language KEYWORD) ()
+  :documentation
+  "Returns the keyword for the language the current implementation is running in."
+  :public? TRUE
+  (return (verbatim :common-lisp (intern-keyword "COMMON-LISP")
+                    :cpp "internKeyword(\"CPP\")"
+                    :java "Stella.internKeyword(\"JAVA\")"
+                    :otherwise (intern-keyword "UNKNOWN"))))
+
+(defun (running-system-information STRING) ()
+  :documentation "Returns an information string about the current running system environment."
+  (let ((info ""))
+    (verbatim :common-lisp "(cl:setq info (cl:format cl:nil \"~%    Lisp: ~@[~A~] ~@[~A~]~%      OS: ~@[~A~] ~@[~A~]~%Hardware: ~@[~A~] ~@[~A~]\"
+             (cl:lisp-implementation-type)
+             (cl:lisp-implementation-version)
+             (cl:software-type)
+             (cl:software-version)
+             (cl:machine-type)
+             (cl:machine-version)))"
+              :java "      StringBuffer infoBuffer = new StringBuffer();
+      String[] infoKeys = new String [] {\"java.vendor\", \"java.version\", \"os.arch\", \"os.name\", \"os.version\"};
+      for (int i = 0; i < infoKeys.length; i++) {
+	infoBuffer.append(System.getProperty(\"line.separator\"));
+	try {
+	  infoBuffer.append(infoKeys[i]);
+	  infoBuffer.append(\" = \");
+	  infoBuffer.append(System.getProperty(infoKeys[i]));
+	    } catch (SecurityException se) {
+	  infoBuffer.append(\"??\");
+	}
+      }
+      info = infoBuffer.toString()"
+              :otherwise NULL)
+    (return info)))
+
+(defun (getenv STRING) ((varname STRING) &rest (deflt STRING))
+  :documentation "Return the value of the OS environment variable `varname'.  If it is not defined
+or if its value is the empty string and a `deflt' is provided, return the default value instead."
+  :public? TRUE :command? TRUE
+  (let ((undefined STRING NULL)
+        (value STRING
+         (verbatim
+           :common-lisp
+           "(CL:or #+allegro (sys:getenv varname)
+                   #+cmu (CL:cdr (CL:assoc varname ext:*environment-list* :test #'CL:string=))
+                   #+lispworks (lispworks:environment-variable varname)
+                   #+clisp (ext:getenv varname)
+                   #-(or allegro cmu lispworks clisp) (CL:error \"getenv not implemented\")
+                   undefined)"
+           :cpp "::getenv(varname)"
+           :java "System.getenv(varname)")))
+    (when (or (null? value)
+              (eql? value ""))
+      (foreach def in deflt
+          do (return def)))
+    (return value)))
+
+
+  ;;
+;;;;;; Internal timer class and functions.  Sleep.
+  ;;
+
+(defun (get-ticktock TICKTOCK) ()
+  :documentation "Return the current CPU time.  If the current OS/Language
+combination does not support measuring of CPU time, return real time instead.
+Use `ticktock-difference' to measure the time difference between values
+returned by this function.  This is an attempt to provide some platform
+independent support to measure (at least approximately) consumed CPU time."
+  :public? TRUE
+  :native? TRUE)
+
+(defun (ticktock-difference FLOAT) ((t1 TICKTOCK) (t2 TICKTOCK))
+  :documentation "The difference in two TICKTOCK time values in seconds where
+`t1' is the earlier time.  The resolution is implementation dependent but will
+normally be some fractional value of a second."
+  :public? TRUE
+  :native? TRUE)
+
+(defun (ticktock-resolution FLOAT) ()
+  :documentation "The minimum theoretically detectable resolution of the
+difference in two TICKTOCK time values in seconds.  This
+resolution is implementation dependent.  It may also not
+be realizable in practice, since the timing grain size may
+be larger than this resolution."
+  :public? TRUE
+  :native? TRUE)
+
+(startup-time-progn
+  (register-native-name (quote sleep) :cpp :function))
+  
+(defun sleep ((seconds FLOAT))
+  :documentation "The program will sleep for the indicated number of seconds.
+Fractional values are allowed, but the results are implementation dependent:
+Common Lisp uses the fractions natively, Java with a resolution of 0.001,
+and C++ can only use integral values."
+  (verbatim
+      :common-lisp "(cl:sleep seconds)"
+      :java "try {
+      Thread.sleep((long)(seconds * 1000.0));
+    } catch (InterruptedException e) {
+    }
+"
+      ;; Do we need to do something to include the header file unistd.h ?
+      :cpp "sleep((unsigned int)seconds)"))
+
+  ;;
+;;;;;; Exception support functions
+  ;;
+
+(defun (exception-message STRING) ((e NATIVE-EXCEPTION))
+  :documentation "Accesses the error message of the exception `e'."
+  :public? TRUE
+  (return (verbatim :java "e.getMessage()"
+		    :common-lisp (%%get-exception-message e)
+		    :cpp "(const char*)e->what()")))
+
+(defun print-exception-context ((e NATIVE-EXCEPTION) (stream OUTPUT-STREAM))
+  :documentation "Prints system dependent information about the context of the specified
+exception `e'.  For example, in Java it prints a stack trace.  In Lisp, it is vendor dependent."
+  :public? TRUE
+  (let ((s (native-stream stream)))
+    (verbatim
+      :java "e.printStackTrace(s);"
+      :common-lisp (%%print-exception-context e s)
+      :otherwise (print-stream stream "No exception context available" EOL))))
+
+(defun (exception-context STRING) ((e NATIVE-EXCEPTION))
+  :documentation "Print the exception context of `e' to a string and return the result."
+  :public? TRUE
+  (let ((out (new STRING-OUTPUT-STREAM)))
+    (print-exception-context e out)
+    (return (the-string out))))
+
+
+  ;;
+;;;;;; Process synchronization support functions
+  ;;
+
+(defun (make-process-lock PROCESS-LOCK-OBJECT) ()
+  :public? TRUE
+  (return (verbatim 
+	      :common-lisp "(%make-process-lock)"
+	    :java "new java.lang.Object()"
+	    :cpp "NULL")))
+
+
+;;; Note:  The following variable needs to use a verbatim initial value
+;;;        instead of calling (make-process-lock) because the value
+;;;        needs to be available before any initialization code runs.
+;;;        That lets us use it to synchronize initialization code.
+(defglobal *bootstrap-lock* PROCESS-LOCK-OBJECT
+  (verbatim 
+    :common-lisp "(%make-process-lock)"
+    :java "new java.lang.Object()"
+    :cpp "NULL")
+  :public? TRUE
+  :documentation "Process lock object for bootstrap use."
+  )

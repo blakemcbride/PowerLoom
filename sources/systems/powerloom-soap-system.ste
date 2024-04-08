@@ -1,0 +1,63 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                          ;
+;  COPYRIGHT (C) UNIVERSITY OF SOUTHERN CALIFORNIA, 2004                   ; 
+;  University of Southern California, Information Sciences Institute       ;
+;  4676 Admiralty Way                                                      ;
+;  Marina Del Rey, California 90292                                        ;
+;  All rights reserved.                                                                        ;                                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;; Version: $Id$
+
+(in-package "STELLA")
+
+(in-module "STELLA")
+
+  ;;
+;;;;;; PowerLoom SOAP defsystem
+  ;;
+
+
+(defsystem POWERLOOM-SOAP
+  :directory ("logic" "soap")
+  :required-systems ("stella" "logic" "webservices")
+  :cardinal-module "LOGIC/PLSOAP"
+  :production-settings (1 0 3 3)
+  :development-settings (3 2 3 3)
+  :lisp-only-files ("plsoap.wsdl"
+		    "plsoap-readonly.wsdl"
+		    "usage.text")
+  :java-only-files ("plsoap.wsdl"
+		    "plsoap-readonly.wsdl"
+		    "usage.text")
+  :cpp-only-files ("plsoap.wsdl"
+		    "plsoap-readonly.wsdl"
+		    "usage.text")
+  :files ("soap-server")
+  :copyright-header
+  " +--------------------------------------------------------------------------+
+ |                                                                          |
+ |  COPYRIGHT (C) UNIVERSITY OF SOUTHERN CALIFORNIA, 2004-#$(YEAR)              |
+ |  University of Southern California, Information Sciences Institute       |
+ |  4676 Admiralty Way                                                      |
+ |  Marina Del Rey, California 90292                                        |
+ |  All rights reserved.                                                    |
+ |                                                                          |
+ +--------------------------------------------------------------------------+"
+  )                                     ; end of PowerLoom SOAP defsystem
+
+
+  ;;
+;;;;;; POWERLOOM-SOAP modules
+  ;;
+
+
+(defmodule "LOGIC/PLSOAP"
+    :lisp-package "PLSOAP"
+    :java-package "edu.isi.powerloom.soap"
+    :java-catchall-class "PLSOAP"
+    :clearable? FALSE
+    :code-only? TRUE
+    :uses ("STELLA" "LOGIC" "XML-OBJECTS" "WEBSERVICES"))

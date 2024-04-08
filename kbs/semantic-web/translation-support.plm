@@ -1,0 +1,44 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+(IN-PACKAGE "STELLA")
+
+(defmodule "/XMLNS/TRANSLATION-SUPPORT"
+  :documentation "Support module for translation bookkeeping & Namespace mapping."
+  :INCLUDES ("PL-KERNEL")
+  :USES ("LOGIC" "STELLA")
+  :CASE-SENSITIVE? FALSE)
+
+(IN-MODULE "XMLNS/TRANSLATION-SUPPORT")
+
+(IN-DIALECT :KIF)
+
+(ASSERT (DOCUMENTATION /XMLNS/TRANSLATION-SUPPORT
+		       "Support module for translation bookkeeping & Namespace mapping.  Version $Id$"))
+
+(DEFRELATION ASSOCIATED-XML-NAMESPACE ((?module-name STRING) (?ns STRING))
+  :DOCUMENTATION "The XML namespace associated with this ?module-name")
+
+(DEFRELATION OBJECT-NAME-MAPPING (?o (?ns STRING) (?n STRING))
+  :DOCUMENTATION "The XML namespace and name associated with this object.")
+
+;;; Need to be here because of file reading limitations to
+;;; only having a single IN-MODULE.
+
+(ASSERT (ASSOCIATED-XML-NAMESPACE 
+	 "/XMLNS/RDF"
+	 "http://www.w3.org/1999/02/22-rdf-syntax-ns#"))	    ; RDF
+(ASSERT (ASSOCIATED-XML-NAMESPACE
+	 "/XMLNS/RDFS"
+	 "http://www.w3.org/2000/01/rdf-schema#")) ; RDFS
+(ASSERT (ASSOCIATED-XML-NAMESPACE
+	 "/XMLNS/RDFS/OLD"
+	 "http://www.w3.org/TR/1999/PR-rdf-schema-19990303#")) ; older RDFS
+(ASSERT (ASSOCIATED-XML-NAMESPACE
+	 "/XMLNS/XMLS"
+	 "http://www.w3.org/2001/XMLSchema#"))               ; XML-S
+(ASSERT (ASSOCIATED-XML-NAMESPACE
+	 "/XMLNS/DAML"
+	 "http://www.daml.org/2001/03/daml+oil#"))    ; DAML+OIL
+(ASSERT (ASSOCIATED-XML-NAMESPACE
+	 "/XMLNS/OWL"
+	 "http://www.w3.org/2002/07/owl#"))

@@ -1,0 +1,181 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;; control-panel-script.lisp
+
+#|
+ +---------------------------- BEGIN LICENSE BLOCK ---------------------------+
+ |                                                                            |
+ | Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          |
+ |                                                                            |
+ | The contents of this file are subject to the Mozilla Public License        |
+ | Version 1.1 (the "License"); you may not use this file except in           |
+ | compliance with the License. You may obtain a copy of the License at       |
+ | http://www.mozilla.org/MPL/                                                |
+ |                                                                            |
+ | Software distributed under the License is distributed on an "AS IS" basis, |
+ | WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   |
+ | for the specific language governing rights and limitations under the       |
+ | License.                                                                   |
+ |                                                                            |
+ | The Original Code is the PowerLoom KR&R System.                            |
+ |                                                                            |
+ | The Initial Developer of the Original Code is                              |
+ | UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          |
+ | 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               |
+ |                                                                            |
+ | Portions created by the Initial Developer are Copyright (C) 2000-2023      |
+ | the Initial Developer. All Rights Reserved.                                |
+ |                                                                            |
+ | Contributor(s):                                                            |
+ |                                                                            |
+ | Alternatively, the contents of this file may be used under the terms of    |
+ | either the GNU General Public License Version 2 or later (the "GPL"), or   |
+ | the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   |
+ | in which case the provisions of the GPL or the LGPL are applicable instead |
+ | of those above. If you wish to allow use of your version of this file only |
+ | under the terms of either the GPL or the LGPL, and not to allow others to  |
+ | use your version of this file under the terms of the MPL, indicate your    |
+ | decision by deleting the provisions above and replace them with the notice |
+ | and other provisions required by the GPL or the LGPL. If you do not delete |
+ | the provisions above, a recipient may use your version of this file under  |
+ | the terms of any one of the MPL, the GPL or the LGPL.                      |
+ |                                                                            |
+ +----------------------------- END LICENSE BLOCK ----------------------------+
+|#
+
+(CL:IN-PACKAGE "STELLA")
+
+;;; Auxiliary variables:
+
+(CL:DEFVAR SYM-CONTROL-PANEL-SCRIPT-ONTOSAURUS-STARTUP-CONTROL-PANEL-SCRIPT NULL)
+(CL:DEFVAR SYM-CONTROL-PANEL-SCRIPT-STELLA-METHOD-STARTUP-CLASSNAME NULL)
+
+;;; Forward declarations:
+
+(CL:DECLAIM (CL:SPECIAL *STARTUP-TIME-PHASE* *MODULE* EOL))
+
+;;; (DEFUN WRITE-CONTROL-PANEL-SCRIPT ...)
+
+(CL:DEFUN WRITE-CONTROL-PANEL-SCRIPT (STREAM)
+  (%%PRINT-STREAM STREAM "<SCRIPT LANGUAGE='JavaScript'>" EOL
+   "<!-- Hide from non-javascript browsers" EOL EOL
+   "// Copyright 2000 University of Southern California" EOL
+   "// All rights reserved." EOL EOL
+   "function putRight(newLoc) {parent.frames[2].document.location.href = newLoc;};"
+   EOL EOL
+   "function putLeft(newLoc) {parent.frames[1].document.location.href = newLoc;};"
+   EOL
+   "// var URLpath = self.document.location.href.substring(0, self.document.location.href.lastIndexOf('/') + 1);"
+   EOL EOL "function myescape (str) {" EOL
+   "  // Needed because the built-in escape doesn't escape the '+' character."
+   EOL "  var i = str.indexOf('+');" EOL "  var newstr = '';" EOL
+   "  if (i == -1) {return str;}" EOL "  else {" EOL
+   "    newstr += str.substring(0,str.indexOf('+')) + '%2B';" EOL
+   "    if (i+1 < str.length)" EOL
+   "      {newstr +=  myescape(str.substring(i+1,str.length))};" EOL
+   "    return newstr;" EOL "  };" EOL "}" EOL EOL
+   "function lispify (str, caseflag) {" EOL
+   "  if (caseflag) {var sym = myescape(escape(str.toUpperCase()));} "
+   EOL "  else {var sym = myescape(escape(str));};" EOL "  return sym;"
+   EOL "};" EOL EOL "function loadTopContextURL() {" EOL
+   "  var form = window.document.navform;" EOL
+   "  var sel = form.elements[0].options[form.elements[0].selectedIndex].text;"
+   EOL
+   "  var URLpath = window.document.location.href.substring(0, window.document.location.href.lastIndexOf('/') + 1"
+   EOL "					       );" EOL
+   "  return URLpath + \"do-action?show+context+\" + sel + \"+NIL\";"
+   EOL "}" EOL EOL "function loadURL(windowName, url, form) {" EOL
+   "  var sel = form.elements[0].options[form.elements[0].selectedIndex].text;"
+   EOL
+   "  var typ = form.objecttype.options[form.objecttype.selectedIndex].value;"
+   EOL
+   "  var URLpath = self.document.location.href.substring(0, self.document.location.href.lastIndexOf('/') + 1);"
+   EOL EOL EOL "  if (url == \"show\") {" EOL
+   "    if (form.matchtype.options[form.matchtype.selectedIndex].value==\"caseInsensitive\") {url = \"findinsensitive\"}"
+   EOL
+   "    else if (form.matchtype.options[form.matchtype.selectedIndex].value==\"substring\") {url = \"findsubstring\"};"
+   EOL "  } else if (url == \"edit\") {" EOL
+   "    if (form.matchtype.options[form.matchtype.selectedIndex].value==\"caseInsensitive\") {url = \"editinsensitive\"}"
+   EOL
+   "    else if (form.matchtype.options[form.matchtype.selectedIndex].value==\"substring\") {url = \"editsubstring\"};"
+   EOL "  };" EOL EOL "  if (form.find.value == \"?\") {" EOL
+   "     // window.open (URLpath + \"help/regexp.html\", \"toc\")" EOL
+   "        parent.frames[\"toc\"].document.location.href = URLpath + \"help/regexp.html\""
+   EOL "  }" EOL "  else if (url == \"new\") {" EOL
+   "    if (typ == \"instance\") {" EOL
+   "     parent.frames[windowName].document.location.href = URLpath + \"do-action?new+instance+\" + sel + \"+NIL\"}"
+   EOL EOL "       else {" EOL
+   "     parent.frames[windowName].document.location.href = URLpath + \"do-action?new+\" + typ + \"+\" + sel + \"+NIL\""
+   EOL "}" EOL "  }" EOL "  else if (form.find.value.length > 0) {" EOL
+   "        url = \"do-action?\" + url +\"+\" + typ + \"+\";" EOL
+   "     parent.frames[windowName].document.location.href = URLpath + url + sel + \"+\" + lispify(form.find.value, false)"
+   EOL "  } else {" EOL
+   "   alert(\"No input provided. You need to enter name to look up.\");"
+   EOL "  };" EOL "};" EOL EOL
+   "function loadContextURL(windowName, action, form) {" EOL
+   "  var sel = form.elements[0].options[form.elements[0].selectedIndex].text;"
+   EOL
+   "  var URLpath = self.document.location.href.substring(0, self.document.location.href.lastIndexOf('/') + 1);"
+   EOL
+   "  parent.frames[windowName].document.location.href = URLpath + \"do-action?\" + action + \"+context+\" + sel + \"+NIL\";"
+   EOL "};" EOL EOL
+   "function loadNewContextURL(windowName, lispPackage, form) {" EOL
+   "  var sel = form.elements[0].options[form.elements[0].selectedIndex].text;"
+   EOL
+   "  var URLpath = self.document.location.href.substring(0, self.document.location.href.lastIndexOf('/') + 1);"
+   EOL
+   "  parent.frames[windowName].document.location.href = URLpath + \"do-action?new+context+BUILT-IN-THEORY+\" + lispPackage;"
+   EOL "};" EOL EOL
+   "function loadVanillaURL(windowName, action, form) {" EOL
+   "  var URLpath = self.document.location.href.substring(0, self.document.location.href.lastIndexOf('/') + 1);"
+   EOL "  window.open(URLpath + action, windowName).focus();" EOL "};"
+   EOL EOL "function loadFrameVanillaURL(windowName, action, form) {"
+   EOL
+   "  var URLpath = self.document.location.href.substring(0, self.document.location.href.lastIndexOf('/') + 1);"
+   EOL "  // window.open(URLpath + action, windowName).focus();" EOL
+   "  parent.frames[windowName].document.location.href = URLpath + action;"
+   EOL "};" EOL EOL "function formTest(form) {" EOL
+   "  loadURL('content', 'show', form);" EOL "  return false;" EOL "};"
+   EOL EOL "function setConInfo(con, theory) {" EOL
+   "  var Form = self.document.navform;" EOL
+   "  var Selection = Form.context;" EOL "  var tempResult = \"\";" EOL
+   "  for (var i = 0; i < Selection.options.length; i++) {" EOL
+   "    if (Selection.options[i].text == theory) {" EOL
+   "      Selection.options[i].selected = true;" EOL "    } else {" EOL
+   "      Selection.options[i].selected = false;" EOL "    };" EOL
+   "  };" EOL "  Form.find.value = con;" EOL "};" EOL EOL
+   "// End hiding from old browsers -->" EOL "</SCRIPT>" EOL))
+
+(CL:DEFUN STARTUP-CONTROL-PANEL-SCRIPT ()
+  (CL:LET*
+   ((*MODULE*
+     (GET-STELLA-MODULE "/ONTOSAURUS" (> *STARTUP-TIME-PHASE* 1)))
+    (*CONTEXT* *MODULE*))
+   (CL:DECLARE (CL:SPECIAL *MODULE* *CONTEXT*))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 2)
+    (CL:SETQ
+     SYM-CONTROL-PANEL-SCRIPT-ONTOSAURUS-STARTUP-CONTROL-PANEL-SCRIPT
+     (INTERN-RIGID-SYMBOL-WRT-MODULE "STARTUP-CONTROL-PANEL-SCRIPT"
+      NULL 0))
+    (CL:SETQ SYM-CONTROL-PANEL-SCRIPT-STELLA-METHOD-STARTUP-CLASSNAME
+     (INTERN-RIGID-SYMBOL-WRT-MODULE "METHOD-STARTUP-CLASSNAME"
+      (GET-STELLA-MODULE "/STELLA" CL:T) 0)))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 6) (FINALIZE-CLASSES))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 7)
+    (DEFINE-FUNCTION-OBJECT "WRITE-CONTROL-PANEL-SCRIPT"
+     "(DEFUN WRITE-CONTROL-PANEL-SCRIPT ((STREAM NATIVE-OUTPUT-STREAM)))"
+     (CL:FUNCTION WRITE-CONTROL-PANEL-SCRIPT) NULL)
+    (DEFINE-FUNCTION-OBJECT "STARTUP-CONTROL-PANEL-SCRIPT"
+     "(DEFUN STARTUP-CONTROL-PANEL-SCRIPT () :PUBLIC? TRUE)"
+     (CL:FUNCTION STARTUP-CONTROL-PANEL-SCRIPT) NULL)
+    (CL:LET*
+     ((FUNCTION
+       (LOOKUP-FUNCTION
+        SYM-CONTROL-PANEL-SCRIPT-ONTOSAURUS-STARTUP-CONTROL-PANEL-SCRIPT)))
+     (SET-DYNAMIC-SLOT-VALUE (%DYNAMIC-SLOTS FUNCTION)
+      SYM-CONTROL-PANEL-SCRIPT-STELLA-METHOD-STARTUP-CLASSNAME
+      (WRAP-STRING "_StartupControlPanelScript") NULL-STRING-WRAPPER)))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 8) (FINALIZE-SLOTS)
+    (CLEANUP-UNFINALIZED-CLASSES))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 9)
+    (%IN-MODULE (COPY-CONS-TREE (WRAP-STRING "ONTOSAURUS"))))))

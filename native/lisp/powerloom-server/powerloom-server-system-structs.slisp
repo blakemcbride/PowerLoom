@@ -1,0 +1,251 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;; powerloom-server-system-structs.slisp
+
+#|
+ +---------------------------- BEGIN LICENSE BLOCK ---------------------------+
+ |                                                                            |
+ | Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          |
+ |                                                                            |
+ | The contents of this file are subject to the Mozilla Public License        |
+ | Version 1.1 (the "License"); you may not use this file except in           |
+ | compliance with the License. You may obtain a copy of the License at       |
+ | http://www.mozilla.org/MPL/                                                |
+ |                                                                            |
+ | Software distributed under the License is distributed on an "AS IS" basis, |
+ | WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   |
+ | for the specific language governing rights and limitations under the       |
+ | License.                                                                   |
+ |                                                                            |
+ | The Original Code is the PowerLoom KR&R System.                            |
+ |                                                                            |
+ | The Initial Developer of the Original Code is                              |
+ | UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          |
+ | 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               |
+ |                                                                            |
+ | Portions created by the Initial Developer are Copyright (C) 2002-2023      |
+ | the Initial Developer. All Rights Reserved.                                |
+ |                                                                            |
+ | Contributor(s):                                                            |
+ |                                                                            |
+ | Alternatively, the contents of this file may be used under the terms of    |
+ | either the GNU General Public License Version 2 or later (the "GPL"), or   |
+ | the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   |
+ | in which case the provisions of the GPL or the LGPL are applicable instead |
+ | of those above. If you wish to allow use of your version of this file only |
+ | under the terms of either the GPL or the LGPL, and not to allow others to  |
+ | use your version of this file under the terms of the MPL, indicate your    |
+ | decision by deleting the provisions above and replace them with the notice |
+ | and other provisions required by the GPL or the LGPL. If you do not delete |
+ | the provisions above, a recipient may use your version of this file under  |
+ | the terms of any one of the MPL, the GPL or the LGPL.                      |
+ |                                                                            |
+ +----------------------------- END LICENSE BLOCK ----------------------------+
+|#
+
+(CL:IN-PACKAGE "STELLA")
+
+
+(CL:DEFSTRUCT (|PLString| (:CONC-NAME |%PLString.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLString| ()) (:COPIER ()) (:PREDICATE ())) (|Value| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|PLSurrogate| (:CONC-NAME |%PLSurrogate.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLSurrogate| ()) (:COPIER ()) (:PREDICATE ())) (ID STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|ServerException| (:CONC-NAME |%ServerException.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-ServerException| ()) (:COPIER ()) (:PREDICATE ())) (|Type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|Message| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|PLModuleContainer| (:CONC-NAME |%PLModuleContainer.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLModuleContainer| ()) (:COPIER ()) (:PREDICATE ())) (|PLModule| NULL))
+
+(CL:DEFSTRUCT (|PLModule| (:CONC-NAME |%PLModule.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLModule| ()) (:COPIER ()) (:PREDICATE ())) (|ModuleName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|SourceString| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|CppPackage| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|LispPackage| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|JavaPackage| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|JavaCatchallClass| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|Documentation| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (API STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|CaseSensitive| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|PLModule| NULL)
+  (|PLSurrogate| NULL))
+
+(CL:DEFSTRUCT (|PLConcept| (:CONC-NAME |%PLConcept.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLConcept| ()) (:COPIER ()) (:PREDICATE ())) (|ConceptName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|Module| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|SourceString| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|PLConcept| NULL)
+  (|PLSurrogate| NULL))
+
+(CL:DEFSTRUCT (|PLConceptContainer| (:CONC-NAME |%PLConceptContainer.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLConceptContainer| ()) (:COPIER ()) (:PREDICATE ())) (|PLConcept| NULL))
+
+(CL:DEFSTRUCT (|PLRelation| (:CONC-NAME |%PLRelation.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLRelation| ()) (:COPIER ()) (:PREDICATE ())) (|RelationName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|SourceString| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|Module| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|IsFunction| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|IsClosed| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|PLRelation| NULL)
+  (|PLSurrogate| NULL))
+
+(CL:DEFSTRUCT (|PLRelationContainer| (:CONC-NAME |%PLRelationContainer.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLRelationContainer| ()) (:COPIER ()) (:PREDICATE ())) (|PLRelation| NULL))
+
+(CL:DEFSTRUCT (|PLInstance| (:CONC-NAME |%PLInstance.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLInstance| ()) (:COPIER ()) (:PREDICATE ())) (|InstanceName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|Module| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|SourceString| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|PLInstanceContainer| (:CONC-NAME |%PLInstanceContainer.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLInstanceContainer| ()) (:COPIER ()) (:PREDICATE ())) (|PLInstance| NULL))
+
+(CL:DEFSTRUCT (|PLProposition| (:CONC-NAME |%PLProposition.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLProposition| ()) (:COPIER ()) (:PREDICATE ())) (|PropositionName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|IsStrict| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|IsAsserted| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|IsRule| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|PLPropositionContainer| (:CONC-NAME |%PLPropositionContainer.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLPropositionContainer| ()) (:COPIER ()) (:PREDICATE ())) (|PLProposition| NULL))
+
+(CL:DEFSTRUCT (|PLRule| (:CONC-NAME |%PLRule.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLRule| ()) (:COPIER ()) (:PREDICATE ())) (|RuleName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|PLVariable| (:CONC-NAME |%PLVariable.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLVariable| ()) (:COPIER ()) (:PREDICATE ())) (|VariableName| NULL)
+  (|VariableType| NULL))
+
+(CL:DEFSTRUCT (|PLVariableList| (:CONC-NAME |%PLVariableList.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLVariableList| ()) (:COPIER ()) (:PREDICATE ())) (|PLVariable| NULL))
+
+(CL:DEFSTRUCT (|PLModuleFileList| (:CONC-NAME |%PLModuleFileList.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLModuleFileList| ()) (:COPIER ()) (:PREDICATE ())) (|PLModuleFile| NULL))
+
+(CL:DEFSTRUCT (|PLModuleFile| (:CONC-NAME |%PLModuleFile.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLModuleFile| ()) (:COPIER ()) (:PREDICATE ())) (|KBName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|ModuleName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|KBDescription| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|FileName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|PLFile| (:CONC-NAME |%PLFile.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLFile| ()) (:COPIER ()) (:PREDICATE ())) (|FileName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|PLFileContent| NULL))
+
+(CL:DEFSTRUCT
+ (|PLFileContent| (:CONC-NAME |%PLFileContent.|) (:INCLUDE |XMLObject|)
+  (:CONSTRUCTOR |%MAKE-PLFileContent| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT (|PLDirectory| (:CONC-NAME |%PLDirectory.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLDirectory| ()) (:COPIER ()) (:PREDICATE ())) (|DirectoryName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|PLDirectoryContents| (:CONC-NAME |%PLDirectoryContents.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLDirectoryContents| ()) (:COPIER ()) (:PREDICATE ())) (|DirectoryName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|PLDirectory| NULL)
+  (|PLFile| NULL))
+
+(CL:DEFSTRUCT (|PLSurrogateCollection| (:CONC-NAME |%PLSurrogateCollection.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLSurrogateCollection| ()) (:COPIER ()) (:PREDICATE ())) (|PLSurrogate| NULL))
+
+(CL:DEFSTRUCT (|PLObjectUnion| (:CONC-NAME |%PLObjectUnion.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLObjectUnion| ()) (:COPIER ()) (:PREDICATE ())) (|Type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|PLSurrogate| NULL)
+  (|LiteralValue| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|PLTuple| (:CONC-NAME |%PLTuple.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLTuple| ()) (:COPIER ()) (:PREDICATE ())) (|PLObjectUnion| NULL))
+
+(CL:DEFSTRUCT (|PLQuery| (:CONC-NAME |%PLQuery.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLQuery| ()) (:COPIER ()) (:PREDICATE ())) (|IsAsk| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|QueryName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|Query| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|Module| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|InferenceLevel| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|Timeout| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|Moveout| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|MatchMode| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|NumResults| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|MinScore| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|MaxUnknowns| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|MaximizeScore| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|DontOptimize| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|PLQueryResult| (:CONC-NAME |%PLQueryResult.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLQueryResult| ()) (:COPIER ()) (:PREDICATE ())) (|PLTuple| NULL))
+
+(CL:DEFSTRUCT (|PLSearchParameter| (:CONC-NAME |%PLSearchParameter.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLSearchParameter| ()) (:COPIER ()) (:PREDICATE ())) (|ModuleName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|SearchString| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|SearchConcept| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|SearchRelation| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|SearchInstance| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|CaseSensitive| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT (|PLSearchResult| (:CONC-NAME |%PLSearchResult.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLSearchResult| ()) (:COPIER ()) (:PREDICATE ())) (|PLSearchResultItem| NULL))
+
+(CL:DEFSTRUCT (|PLSearchResultItem| (:CONC-NAME |%PLSearchResultItem.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLSearchResultItem| ()) (:COPIER ()) (:PREDICATE ())) (|ModuleName| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING)
+  (|PLObjectUnion| NULL))
+
+(CL:DEFSTRUCT (|PLServerInfo| (:CONC-NAME |%PLServerInfo.|) (:INCLUDE |XMLObject|) (:CONSTRUCTOR |%MAKE-PLServerInfo| ()) (:COPIER ()) (:PREDICATE ())) (|AllowRemoteFileBrowsing| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:EVAL-WHEN (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)
+  (CL:UNLESS (CL:FIND-PACKAGE "PLSOAP")
+     (CL:DEFPACKAGE "PLSOAP" (:USE))))
+
+(CL:IN-PACKAGE "PLSOAP")
+
+(CL:DEFSTRUCT
+ (|module| (:CONC-NAME |%module.|) (:INCLUDE STELLA::|XMLObject|)
+  (:CONSTRUCTOR |%MAKE-module| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT (|nresults| (:CONC-NAME |%nresults.|) (:INCLUDE STELLA::|XMLObject|) (:CONSTRUCTOR |%MAKE-nresults| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT
+ (|pattern| (:CONC-NAME |%pattern.|) (:INCLUDE STELLA::|XMLObject|)
+  (:CONSTRUCTOR |%MAKE-pattern| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|options| (:CONC-NAME |%options.|) (:INCLUDE STELLA::|XMLObject|)
+  (:CONSTRUCTOR |%MAKE-options| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT (SOAP-COMMAND (:CONC-NAME %SOAP-COMMAND.) (:INCLUDE STELLA::|XMLObject|) (:CONSTRUCTOR %MAKE-SOAP-COMMAND ()) (:COPIER ()) (:PREDICATE ())) "Common parent in type hierarchy.  This will
+not actually be realized in surface syntax."
+  (TARGET-MODULE STELLA::NULL))
+
+(CL:DEFSTRUCT (|retrieval| (:CONC-NAME |%retrieval.|) (:INCLUDE SOAP-COMMAND) (:CONSTRUCTOR |%MAKE-retrieval| ()) (:COPIER ()) (:PREDICATE ())) (NRESULTS STELLA::NULL)
+  (QUERY-PATTERN STELLA::NULL)
+  (OPTIONS STELLA::NULL))
+
+(CL:DEFSTRUCT (|ask| (:CONC-NAME |%ask.|) (:INCLUDE SOAP-COMMAND) (:CONSTRUCTOR |%MAKE-ask| ()) (:COPIER ()) (:PREDICATE ())) (OPTIONS STELLA::NULL))
+
+(CL:DEFSTRUCT
+ (|retraction| (:CONC-NAME |%retraction.|) (:INCLUDE SOAP-COMMAND)
+  (:CONSTRUCTOR |%MAKE-retraction| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|assertion| (:CONC-NAME |%assertion.|) (:INCLUDE SOAP-COMMAND)
+  (:CONSTRUCTOR |%MAKE-assertion| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|command| (:CONC-NAME |%command.|) (:INCLUDE SOAP-COMMAND)
+  (:CONSTRUCTOR |%MAKE-command| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|query| (:CONC-NAME |%query.|) (:INCLUDE STELLA::|XMLObject|)
+  (:CONSTRUCTOR |%MAKE-query| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|result| (:CONC-NAME |%result.|) (:INCLUDE STELLA::|XMLObject|)
+  (:CONSTRUCTOR |%MAKE-result| ()) (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT (|answer| (:CONC-NAME |%answer.|) (:INCLUDE STELLA::|XMLObject|) (:CONSTRUCTOR |%MAKE-answer| ()) (:COPIER ()) (:PREDICATE ())) (QUERY STELLA::NULL)
+  (RESULT STELLA::NULL))
+
+(CL:DEFSTRUCT (|item| (:CONC-NAME |%item.|) (:INCLUDE STELLA::|XMLObject|) (:CONSTRUCTOR |%MAKE-item| ()) (:COPIER ()) (:PREDICATE ())) (|type| STELLA::NULL-STRING :TYPE CL:SIMPLE-STRING))
+
+(CL:DEFSTRUCT
+ (|proposition| (:CONC-NAME |%proposition.|)
+  (:INCLUDE STELLA::|XMLObject|) (:CONSTRUCTOR |%MAKE-proposition| ())
+  (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT (|tuple| (:CONC-NAME |%tuple.|) (:INCLUDE STELLA::|XMLObject|) (:CONSTRUCTOR |%MAKE-tuple| ()) (:COPIER ()) (:PREDICATE ())) (NRESULTS STELLA::NULL)
+  (ITEM STELLA::NULL))
+
+(CL:DEFSTRUCT (|tuples| (:CONC-NAME |%tuples.|) (:INCLUDE STELLA::|XMLObject|) (:CONSTRUCTOR |%MAKE-tuples| ()) (:COPIER ()) (:PREDICATE ())) (NRESULTS STELLA::NULL)
+  (QUERY STELLA::NULL)
+  (QUERY-PATTERN STELLA::NULL)
+  (TUPLE STELLA::NULL))
+
+(CL:DEFSTRUCT (|propositions| (:CONC-NAME |%propositions.|) (:INCLUDE STELLA::|XMLObject|) (:CONSTRUCTOR |%MAKE-propositions| ()) (:COPIER ()) (:PREDICATE ())) (NRESULTS STELLA::NULL)
+  (PROPOSITION STELLA::NULL))
+
+(CL:DEFSTRUCT
+ (|powerloomerror| (:CONC-NAME |%powerloomerror.|)
+  (:INCLUDE STELLA::|XMLObject|)
+  (:CONSTRUCTOR |%MAKE-powerloomerror| ()) (:COPIER ())
+  (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|stellaerror| (:CONC-NAME |%stellaerror.|)
+  (:INCLUDE STELLA::|XMLObject|) (:CONSTRUCTOR |%MAKE-stellaerror| ())
+  (:COPIER ()) (:PREDICATE ())))
+
+(CL:DEFSTRUCT
+ (|nativeerror| (:CONC-NAME |%nativeerror.|)
+  (:INCLUDE STELLA::|XMLObject|) (:CONSTRUCTOR |%MAKE-nativeerror| ())
+  (:COPIER ()) (:PREDICATE ())))

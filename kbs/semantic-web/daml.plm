@@ -1,0 +1,368 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;; Dependencies: webcore.plm
+
+(IN-PACKAGE "STELLA")
+
+(DEFMODULE "/XMLNS/DAML"
+  :documentation "Namespace for DAML+OIL symbols."
+  :CASE-SENSITIVE? TRUE)
+
+
+(IN-MODULE "/PL-KERNEL/WEB-CORE")
+
+(IN-DIALECT :KIF)
+
+(ASSERT (DOCUMENTATION /PL-KERNEL-KB/WEB-CORE "DAML+OIL definitions.  Version $Id$."))
+
+(DEFCONCEPT /XMLNS/DAML/Class (?x /XMLNS/RDFS/Class)
+  :DOCUMENTATION "The class of all \"object\" classes"
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/DAML/Class)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/Class "Class")))
+
+(DEFCONCEPT /XMLNS/DAML/Datatype (?x /XMLNS/RDFS/Class)
+  :DOCUMENTATION "The class of all datatype classes"
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/DAML/Datatype)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/Datatype "Datatype")))
+
+(DEFCONCEPT /XMLNS/DAML/Thing (?x)
+  :DOCUMENTATION "The most general (object) class in DAML.
+This is equal to the union of any class and its complement."
+  :<=> (OR (/XMLNS/DAML/Nothing ?x) (NOT (/XMLNS/DAML/Nothing ?x)))
+  :AXIOMS (AND (/XMLNS/DAML/Class /XMLNS/DAML/Thing)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/Thing "Thing")))
+
+(DEFCONCEPT /XMLNS/DAML/Nothing (?x)
+  :DOCUMENTATION "the class with no things in it."
+  :<=> (NOT (/XMLNS/DAML/Thing ?x))
+  :AXIOMS (AND (/XMLNS/DAML/Class /XMLNS/DAML/Nothing)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/Nothing "Nothing")))
+
+(DEFRELATION /XMLNS/DAML/equivalentTo (?x ?y)
+  :DOCUMENTATION "for equivalentTo(X, Y), read X is an equivalent term to Y."
+  :<<=>> (= ?x ?y)			; ZZZ !!! CORRECT??
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/equivalentTo)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/equivalentTo "equivalentTo")))
+
+(DEFRELATION /XMLNS/DAML/sameClassAs (?x ?y)
+  :DOCUMENTATION "for sameClassAs(X, Y), read X is an equivalent class to Y.
+cf OIL Equivalent"
+  :=>> (/XMLNS/DAML/equivalentTo ?x ?y)
+  :=>> (/XMLNS/RDFS/subClassOf ?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/sameClassAs)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/sameClassAs "sameClassAs")
+	       (NTH-DOMAIN /XMLNS/DAML/sameClassAs 0 /XMLNS/DAML/Class)
+	       (NTH-DOMAIN /XMLNS/DAML/sameClassAs 1 /XMLNS/DAML/Class)))
+
+(DEFRELATION /XMLNS/DAML/samePropertyAs (?x ?y)
+  :DOCUMENTATION "for samePropertyAs(P, R), read P is an equivalent property to R."
+  :=>> (/XMLNS/DAML/equivalentTo ?x ?y)
+  :=>> (/XMLNS/RDFS/subPropertyOf ?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/samePropertyAs)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/samePropertyAs "samePropertyAs")))
+
+(DEFRELATION /XMLNS/DAML/sameIndividualAs (?x ?y)
+  :DOCUMENTATION "for sameIndividualAs(a, b), read a is the same individual as b."
+  :=>> (/XMLNS/DAML/equivalentTo ?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/sameIndividualAs)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/sameIndividualAs "sameIndividualAs")
+	       (NTH-DOMAIN /XMLNS/DAML/sameIndividualAs 0 /XMLNS/DAML/Thing)
+	       (NTH-DOMAIN /XMLNS/DAML/sameIndividualAs 1 /XMLNS/DAML/Thing)))
+
+(DEFRELATION /XMLNS/DAML/disjointWith (?x ?y)
+  :DOCUMENTATION "for disjointWith(X, Y) read: X and Y have no members in common.
+cf OIL Disjoint"
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/disjointWith)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/disjointWith "disjointWith")
+	       (NTH-DOMAIN /XMLNS/DAML/disjointWith 0 /XMLNS/DAML/Class)
+	       (NTH-DOMAIN /XMLNS/DAML/disjointWith 1 /XMLNS/DAML/Class)))
+
+(DEFRELATION /XMLNS/DAML/differentIndividualFrom (?x ?y)
+  :DOCUMENTATION "for differentIndividualFrom(a, b), read a is not the same individual as b."
+  :<<=>> (NOT (= ?x ?y))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/differentIndividualFrom)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/differentIndividualFrom "differentIndividualFrom")
+	       (NTH-DOMAIN /XMLNS/DAML/differentIndividualFrom 0 /XMLNS/DAML/Thing)
+	       (NTH-DOMAIN /XMLNS/DAML/differentIndividualFrom 1 /XMLNS/DAML/Thing)))
+
+(DEFRELATION /XMLNS/DAML/unionOf (?x ?y)
+  :DOCUMENTATION "for unionOf(X, Y) read: X is the union of the classes in the list Y;
+i.e. if something is in any of the classes in Y, it's in X, and vice versa.
+cf OIL OR"
+  :<<=>> (AND (HOLDS ?x ?z) (EXISTS ?c (AND (MEMBER-OF ?c ?y) (HOLDS ?c ?z))))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/unionOf)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/unionOf "unionOf")
+	       (NTH-DOMAIN /XMLNS/DAML/unionOf 0 /XMLNS/DAML/Class)
+	       (NTH-DOMAIN /XMLNS/DAML/unionOf 1 /XMLNS/DAML/List)))
+
+(DEFRELATION /XMLNS/DAML/disjointUnionOf (?x ?y)
+  :DOCUMENTATION "for disjointUnionOf(X, Y) read: X is the disjoint union of the classes in
+the list Y: (a) for any c1 and c2 in Y, disjointWith(c1, c2),
+and (b) unionOf(X, Y). i.e. if something is in any of the classes in Y, it's
+in X, and vice versa.
+cf OIL disjoint-covered"
+  :<<=>> (AND (/XMLNS/DAML/unionOf ?x ?y) (MUTUALLY-DISJOINT-COLLECTION ?y))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/disjointUnionOf)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/disjointUnionOf "disjointUnionOf")
+	       (NTH-DOMAIN /XMLNS/DAML/disjointUnionOf 0 /XMLNS/DAML/Class)
+	       (NTH-DOMAIN /XMLNS/DAML/disjointUnionOf 1 /XMLNS/DAML/List)))
+
+(DEFRELATION /XMLNS/DAML/intersectionOf (?x ?y)
+  :DOCUMENTATION "for intersectionOf(X, Y) read: X is the intersection of the classes in the list Y;
+i.e. if something is in all the classes in Y, then it's in X, and vice versa.
+cf OIL AND"
+  :<<=>> (AND (HOLDS ?x ?z) (FORALL ?c (=> (MEMBER-OF ?c ?y) (HOLDS ?c ?z))))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/intersectionOf)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/intersectionOf "intersectionOf")
+	       (NTH-DOMAIN /XMLNS/DAML/intersectionOf 0 /XMLNS/DAML/Class)
+	       (NTH-DOMAIN /XMLNS/DAML/intersectionOf 1 /XMLNS/DAML/List)))
+
+(DEFRELATION /XMLNS/DAML/complementOf (?x ?y)
+  :DOCUMENTATION "for complementOf(X, Y) read: X is the complement of Y; if something is in Y,
+then it's not in X, and vice versa.
+cf OIL NOT"
+  :<<=>> (AND (HOLDS ?x ?z) (NOT (HOLDS ?y ?z)))
+  :<<=>> (AND (NOT (HOLDS ?x ?z)) (HOLDS ?y ?z))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/complementOf)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/complementOf "complementOf")
+	       (NTH-DOMAIN /XMLNS/DAML/complementOf 0 /XMLNS/DAML/Class)
+	       (NTH-DOMAIN /XMLNS/DAML/complementOf 1 /XMLNS/DAML/Class)))
+
+(DEFRELATION /XMLNS/DAML/oneOf (?x ?y)
+  :DOCUMENTATION "for oneOf(C, L) read everything in C is one of the
+things in L;
+This lets us define classes by enumerating the members.
+cf OIL OneOf"
+  :<<=>> (<=> (HOLDS ?x ?z) (MEMBER-OF ?z ?y))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/oneOf)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/oneOf "oneOf")
+	       (NTH-DOMAIN /XMLNS/DAML/oneOf 0 /XMLNS/DAML/Class)
+	       (NTH-DOMAIN /XMLNS/DAML/oneOf 1 /XMLNS/DAML/List)))
+
+(DEFCONCEPT /XMLNS/DAML/Restriction (?x)
+  :DOCUMENTATION "something is in the class R if it satisfies the attached restrictions, 
+and vice versa."
+  :=>> (/XMLNS/DAML/Class ?x)
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/DAML/Restriction)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/Restriction "Restriction")))
+
+(DEFRELATION /XMLNS/DAML/onProperty (?r ?p)
+  :DOCUMENTATION "for onProperty(R, P), read:
+R is a restricted with respect to property P."
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/onProperty)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/onProperty "onProperty")
+	       (NTH-DOMAIN /XMLNS/DAML/onProperty 0 /XMLNS/DAML/Restriction)
+	       (NTH-DOMAIN /XMLNS/DAML/onProperty 1 /XMLNS/RDF/Property)))
+
+(DEFRELATION /XMLNS/DAML/toClass (?r ?x)
+  :DOCUMENTATION "for onProperty(R, P) and toClass(R, X), read:
+i is in class R if and only if for all j, P(i, j) implies type(j, X).
+cf OIL ValueType"
+;  :<=> (=> (AND (/XMLNS/DAML/onProperty ?r ?p) (/XMLNS/DAML/toClass ?r ?x))
+;	   (<=> (HOLDS ?r ?i) (RANGE-TYPE ?p ?i ?x)))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/toClass)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/toClass "toClass")
+	       (NTH-DOMAIN /XMLNS/DAML/toClass 0 /XMLNS/DAML/Restriction)
+	       (NTH-DOMAIN /XMLNS/DAML/toClass 1 /XMLNS/RDFS/Class)))
+
+(DEFRELATION /XMLNS/DAML/hasValue (?r ?v)
+  :DOCUMENTATION "for onProperty(R, P) and hasValue(R, V), read:
+i is in class R if and only if P(i, V).
+cf OIL HasFiller"
+;  :<=> (=> (AND (/XMLNS/DAML/onProperty ?r ?p) (/XMLNS/DAML/hasValue ?r ?v))
+;	   (<=> (HOLDS ?r ?i) (HOLDS ?p ?i ?v)))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/hasValue)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/hasValue "hasValue")
+	       (NTH-DOMAIN /XMLNS/DAML/hasValue 0 /XMLNS/DAML/Restriction)))
+
+(DEFRELATION /XMLNS/DAML/hasClass (?x ?y)
+  :DOCUMENTATION "for onProperty(R, P) and hasClass(R, X), read:
+i is in class R if and only if for some j, P(i, j) and type(j, X).
+cf OIL HasValue"
+;  :<=> (=> (AND (/XMLNS/DAML/onProperty ?r ?p) (/XMLNS/DAML/hasClass ?r ?x))
+;	   (<=> (HOLDS ?r ?i) (EXISTS ?j (AND (HOLDS ?p ?i ?j) (HOLDS ?y ?j)))))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/hasClass)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/hasClass "hasClass")
+	       (NTH-DOMAIN /XMLNS/DAML/hasClass 0 /XMLNS/DAML/Restriction)
+	       (NTH-DOMAIN /XMLNS/DAML/hasClass 1 /XMLNS/RDFS/Class)))
+
+(DEFRELATION /XMLNS/DAML/minCardinality (?r ?n)
+  :DOCUMENTATION "for onProperty(R, P) and minCardinality(R, n), read:
+i is in class R if and only if there are at least n distinct j with P(i, j).
+cf OIL MinCardinality"
+;    :<=> (=> (AND (/XMLNS/DAML/onProperty ?r ?p) (/XMLNS/DAML/minCardinality ?r ?n))
+;	     (<=> (HOLDS ?r ?i) (RANGE-MIN-CARDINALITY ?p ?i ?n)))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/minCardinality)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/minCardinality "minCardinality")
+	       (NTH-DOMAIN /XMLNS/DAML/minCardinality 0 /XMLNS/DAML/Restriction)
+	       (NTH-DOMAIN /XMLNS/DAML/minCardinality 1 /XMLNS/XMLS/nonNegativeInteger)))
+
+(DEFRELATION /XMLNS/DAML/maxCardinality (?r ?n)
+  :DOCUMENTATION "for onProperty(R, P) and maxCardinality(R, n), read:
+i is in class R if and only if there are at most n distinct j with P(i, j).
+cf OIL MaxCardinality"
+;  :<=> (=> (AND (/XMLNS/DAML/onProperty ?r ?p) (/XMLNS/DAML/maxCardinality ?r ?n))
+;	   (<=> (HOLDS ?r ?i) (RANGE-MAX-CARDINALITY ?p ?i ?n)))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/maxCardinality)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/maxCardinality "maxCardinality")
+	       (NTH-DOMAIN /XMLNS/DAML/maxCardinality 0 /XMLNS/DAML/Restriction)
+	       (NTH-DOMAIN /XMLNS/DAML/maxCardinality 1 /XMLNS/XMLS/nonNegativeInteger)))
+
+(DEFRELATION /XMLNS/DAML/cardinality (?r ?n)
+  :DOCUMENTATION "for onProperty(R, P) and cardinality(R, n), read:
+i is in class R if and only if there are exactly n distinct j with P(i, j).
+cf OIL Cardinality"
+  :<=> (AND (/XMLNS/DAML/minCardinality ?r ?n)
+	    (/XMLNS/DAML/maxCardinality ?r ?n))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/cardinality)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/cardinality "cardinality")
+	       (NTH-DOMAIN /XMLNS/DAML/cardinality 0 /XMLNS/DAML/Restriction)
+	       (NTH-DOMAIN /XMLNS/DAML/cardinality 1 /XMLNS/XMLS/nonNegativeInteger)))
+
+(DEFRELATION /XMLNS/DAML/hasClassQ (?x ?y)
+  :DOCUMENTATION "property for specifying class restriction with cardinalityQ constraints"
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/hasClassQ)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/hasClassQ "hasClassQ")
+	       (NTH-DOMAIN /XMLNS/DAML/hasClassQ 0 /XMLNS/DAML/Restriction)
+	       (NTH-DOMAIN /XMLNS/DAML/hasClassQ 1 /XMLNS/RDFS/Class)))
+
+(DEFRELATION /XMLNS/DAML/minCardinalityQ (?r ?n)
+  :DOCUMENTATION "for onProperty(R, P), minCardinalityQ(R, n) and hasClassQ(R, X), read:
+i is in class R if and only if there are at least n di stinct j with P(i, j) 
+and type(j, X).
+cf OIL MinCardinality"
+ #|  ;; relation QUALIFIED-RANGE-MIN-CARDINALITY doesn't exists in PL yet
+    :<=> (=> (AND (/XMLNS/DAML/onProperty ?r ?p) (/XMLNS/DAML/hasClassQ ?r ?x) (/XMLNS/DAML/minCardinalityQ ?r ?n))
+    (<=> (HOLDS ?r ?i) (QUALIFIED-RANGE-MIN-CARDINALITY ?p ?i ?x ?n)))
+ |#
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/minCardinalityQ)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/minCardinalityQ "minCardinalityQ")
+	       (NTH-DOMAIN /XMLNS/DAML/minCardinalityQ 0 /XMLNS/DAML/Restriction)
+	       (NTH-DOMAIN /XMLNS/DAML/minCardinalityQ 1 /XMLNS/XMLS/nonNegativeInteger)))
+
+(DEFRELATION /XMLNS/DAML/maxCardinalityQ (?r ?n)
+  :DOCUMENTATION "    for onProperty(R, P), maxCardinalityQ(R, n) and hasClassQ(R, X), read:
+i is in class R if and only if there are at most n distinct j with P(i, j)
+and type(j, X).
+cf OIL MaxCardinality"
+ #|  ;; relation QUALIFIED-RANGE-MAX-CARDINALITY doesn't exists in PL yet
+    :<=> (=> (AND (/XMLNS/DAML/onProperty ?r ?p) (/XMLNS/DAML/hasClassQ ?r ?x) (/XMLNS/DAML/maxCardinalityQ ?r ?n))
+    (<=> (HOLDS ?r ?i) (QUALIFIED-RANGE-MAX-CARDINALITY ?p ?i ?x ?n)))
+ |#
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/maxCardinalityQ)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/maxCardinalityQ "maxCardinalityQ")
+	       (NTH-DOMAIN /XMLNS/DAML/maxCardinalityQ 0 /XMLNS/DAML/Restriction)
+	       (NTH-DOMAIN /XMLNS/DAML/maxCardinalityQ 1 /XMLNS/XMLS/nonNegativeInteger)))
+
+(DEFRELATION /XMLNS/DAML/cardinalityQ (?r ?n)
+  :DOCUMENTATION "for onProperty(R, P), cardinalityQ(R, n) and hasClassQ(R, X), read:
+i is in class R if and only if there are exactly n distinct j with P(i, j)
+and type(j, X).
+cf OIL Cardinality"
+  :<=> (AND (/XMLNS/DAML/minCardinalityQ ?r ?n)
+	    (/XMLNS/DAML/maxCardinalityQ ?r ?n))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/cardinalityQ)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/cardinalityQ "cardinalityQ")
+	       (NTH-DOMAIN /XMLNS/DAML/cardinalityQ 0 /XMLNS/DAML/Restriction)
+	       (NTH-DOMAIN /XMLNS/DAML/cardinalityQ 1 /XMLNS/XMLS/nonNegativeInteger)))
+
+
+
+(DEFCONCEPT /XMLNS/DAML/ObjectProperty (?x /XMLNS/RDF/Property)
+  :DOCUMENTATION "if P is an ObjectProperty, and P(x, y), then y is an object."
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/DAML/ObjectProperty)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/ObjectProperty "ObjectProperty")))
+
+(DEFCONCEPT /XMLNS/DAML/DatatypeProperty (?p /XMLNS/RDF/Property)
+  :DOCUMENTATION "if P is a DatatypeProperty, and P(x, y), then y is a data value."
+  :<<=>> (AND (/XMLNS/RDF/Property ?p)
+              (NTH-DOMAIN ?p 1 /XMLNS/DAML/Datatype))
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/DAML/DatatypeProperty)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/DatatypeProperty "DatatypeProperty")))
+
+(DEFRELATION /XMLNS/DAML/inverseOf (?r ?s)
+  :DOCUMENTATION "for inverseOf(R, S) read: R is the inverse of S; i.e.
+if R(x, y) then S(y, x) and vice versa.
+cf OIL inverseRelationOf"
+  :<<=>> (AND (INVERSE ?r ?s)
+              (/XMLNS/DAML/ObjectProperty ?r)
+              (/XMLNS/DAML/ObjectProperty ?s))
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/inverseOf)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/inverseOf "inverseOf")
+	       (NTH-DOMAIN /XMLNS/DAML/inverseOf 0 /XMLNS/DAML/ObjectProperty)
+	       (NTH-DOMAIN /XMLNS/DAML/inverseOf 0 /XMLNS/DAML/ObjectProperty)))
+
+(DEFCONCEPT /XMLNS/DAML/TransitiveProperty (?p /XMLNS/DAML/ObjectProperty)
+  :DOCUMENTATION "if P is a TransitiveProperty, then if P(x, y) and P(y, z) then P(x, z).
+cf OIL TransitiveProperty."
+  :<<=>> (AND (TRANSITIVE ?p) (/XMLNS/DAML/ObjectProperty ?p))
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/DAML/TransitiveProperty)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/TransitiveProperty "TransitiveProperty")))
+
+(DEFCONCEPT /XMLNS/DAML/UniqueProperty (?p /XMLNS/RDF/Property)
+  :DOCUMENTATION "compare with maxCardinality=1; e.g. integer successor:
+if P is a UniqueProperty, then if P(x, y) and P(x, z) then y=z.
+cf OIL FunctionalProperty."
+  :=>> (FUNCTION ?p)
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/DAML/UniqueProperty)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/UniqueProperty "UniqueProperty")))
+
+
+(DEFCONCEPT /XMLNS/DAML/UnambiguousProperty (?p /XMLNS/DAML/ObjectProperty)
+  :DOCUMENTATION "if P is an UnambiguousProperty, then if P(x, y) and P(z, y) then x=z.
+aka injective. e.g. if firstBorne(m, Susan)
+and firstBorne(n, Susan) then m and n are the same."
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/DAML/UnambiguousProperty)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/UnambiguousProperty "UnambiguousProperty")))
+
+
+
+(DEFCONCEPT /XMLNS/DAML/List (?x /XMLNS/RDF/Seq)
+  :axioms (/XMLNS/RDFS/Class /XMLNS/DAML/List))
+
+(DEFOBJECT /XMLNS/DAML/nil 
+    :AXIOMS (/XMLNS/DAML/List /XMLNS/DAML/nil))
+
+(DEFRELATION /XMLNS/DAML/first (?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/first)
+	       (NTH-DOMAIN /XMLNS/DAML/first 0 /XMLNS/DAML/List)))
+
+(DEFRELATION /XMLNS/DAML/rest (?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/rest)
+	       (NTH-DOMAIN /XMLNS/DAML/rest 0 /XMLNS/DAML/List)
+	       (NTH-DOMAIN /XMLNS/DAML/rest 1 /XMLNS/DAML/List)))
+
+(DEFRELATION /XMLNS/DAML/item (?l ?i)
+  :DOCUMENTATION "for item(L, I) read: I is an item in L; either first(L, I)
+or item(R, I) where rest(L, R)."
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/item)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/item "item")
+	       (NTH-DOMAIN /XMLNS/DAML/item 0 /XMLNS/DAML/List)))
+
+(DEFCONCEPT /XMLNS/DAML/Ontology (?x)
+  :DOCUMENTATION "An Ontology is a document that describes
+a vocabulary of terms for communication between
+(human and) automated agents."
+  :AXIOMS (AND (/XMLNS/RDFS/Class /XMLNS/DAML/Ontology)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/Ontology "Ontology")))
+
+(DEFRELATION /XMLNS/DAML/versionInfo (?x ?y)
+  :DOCUMENTATION "generally, a string giving information about this
+version; e.g. RCS/CVS keywords"
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/versionInfo)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/versionInfo "versionInfo")))
+
+(DEFRELATION /XMLNS/DAML/imports (?x ?y)
+  :DOCUMENTATION "for imports(X, Y) read: X imports Y;
+i.e. X asserts the* contents of Y by reference;
+i.e. if imports(X, Y) and you believe X and Y says something,
+then you should believe it.
+Note: \"the contents\" is, in the general case,
+an il-formed definite description. Different
+interactions with a resource may expose contents
+that vary with time, data format, preferred language,
+requestor credentials, etc. So for \"the contents\",
+read \"any contents\". "
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/DAML/imports)
+	       (/XMLNS/RDFS/label /XMLNS/DAML/imports "imports")))
+

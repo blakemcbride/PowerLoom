@@ -1,0 +1,502 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                          ;
+;  COPYRIGHT (C) UNIVERSITY OF SOUTHERN CALIFORNIA, 2002                   ;
+;  University of Southern California, Information Sciences Institute       ;
+;  4676 Admiralty Way                                                      ;
+;  Marina Del Rey, California 90292                                        ;
+;                                                                          ;
+;  This software was developed under the terms and conditions of Contract  ;
+;  No. ????? EELD ????? between the Defense Advanced Research Projects     ;
+;  Agency and the University of Southern California, Information Sciences  ;
+;  Institute.  Use and distribution of this software is further subject    ;
+;  to the provisions of that contract and any other agreements developed   ;
+;  between the user of the software and the University of Southern         ;
+;  California, Information Sciences Institute.  It is supplied "AS IS",    ;
+;  without any warranties of any kind.  It is furnished only on the basis  ;
+;  that any party who receives it indemnifies and holds harmless the       ;
+;  parties who furnish and originate it against any claims, demands, or    ;
+;  liabilities connected with using it, furnishing it to others or         ;
+;  providing it to a third party.  THIS NOTICE MUST NOT BE REMOVED FROM    ;
+;  THE SOFTWARE, AND IN THE EVENT THAT THE SOFTWARE IS DIVIDED, IT SHOULD  ;
+;  BE ATTACHED TO EVERY PART.                                              ;
+;                                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; Version: $Id$
+
+;;; Support to generate and print upward closures from a set of seed terms.
+
+(in-package "STELLA")
+
+(in-module "TRANSLATORS")
+
+
+(defspecial *ignoredClosureObjects* (CONS OF LOGIC-OBJECT) NIL
+  :documentation "List of logic objects references to which should be ignored.
+Conceivably, this list could be passed as a parameter through all the
+functions involved, but for now we maintain it as a special."
+  :public? TRUE)
+
+(defun (exclude-ignored-closure-objects (CONS OF LOGIC-OBJECT))
+    ((originalObjects (CONS OF LOGIC-OBJECT)))
+  ;; Remove all currently ignored objects from `originalObjects' and
+  ;;    return the result.
+  (return (difference originalObjects *ignoredClosureObjects*)))
+
+(defun (collect-direct-relation-supers CONS) ((relation LOGIC-OBJECT))
+  ;; Collect all direct super relations of `relation' and return the result.
+  (return
+    (exclude-ignored-closure-objects
+     (consify
+      (call-retrieve
+       (bquote
+        (ALL ?X (PL-KERNEL/DIRECT-SUPERRELATION
+                 ;; use `generate-term' so we can deal with NATs:
+                 & (generate-term relation) ?X)
+             :INFERENCE-LEVEL :SHALLOW)))))))
+
+(defun (collect-direct-direct-types CONS) ((object LOGIC-OBJECT))
+  ;; Collect all direct types of `object' and return the result.
+  (return (exclude-ignored-closure-objects (all-direct-types object))))
+
+(defun (collect-object-documentation CONS) ((object LOGIC-OBJECT))
+  ;; Collect all documentation strings about `object' and return them.
+  (return
+    (consify
+     (call-retrieve
+      (bquote
+       (ALL ?X (PL-KERNEL/DOCUMENTATION & (generate-term object) ?X)
+            :INFERENCE-LEVEL :SHALLOW))))))
+
+(defun (collect-relation-domains (CONS OF CONS)) ((relation NAMED-DESCRIPTION))
+  ;; Collect all domains of `relation' and return the result.
+  (when (eql? (home-module relation) (get-stella-module "CYC" FALSE))
+    (return (collect-cyc-relation-domains relation)))
+  (let ((relationName (generate-term relation))
+        (minArity INTEGER NULL)
+        (argumentDomains NIL)
+        (domains (CONS OF CONS) NIL))
+    ;; do this, since we don't handle minimum arity yet:
+    (setq minArity (length (io-variable-types relation)))
+    (foreach i in (interval 0 (1- minArity))
+        do (setq argumentDomains
+             (consify
+              (call-retrieve
+               (bquote
+                (ALL ?X (PL-KERNEL/NTH-DOMAIN & relationName & i ?X)
+                     :INFERENCE-LEVEL :SHALLOW)))))
+           (when (empty? argumentDomains)
+             (setq argumentDomains
+               (cons-list (get-description PL-KERNEL/@THING))))
+        collect (exclude-ignored-closure-objects argumentDomains)
+        into domains)
+    (return domains)))
+
+(defun (collect-cyc-relation-domains (CONS OF CONS))
+    ((relation NAMED-DESCRIPTION))
+  ;; Collect all domains of the Cyc relation `relation' and return the result.
+  ;; This is a kludge, since the domain and arity handling of Cyc is
+  ;;    significantly different from ours.  Conceivably, `fetch-cyc-predicate'
+  ;;    could handle this and assert `NTH-DOMAIN's, so the standard mechanism
+  ;;    would be sufficient.
+  ;; TO DO: POTENTIALLY MOVE A VARIANT OF THIS INTO `cyc-store.ste'.
+  (let ((relationName (generate-term relation))
+        (minArity INTEGER-WRAPPER NULL)
+        (function? FALSE)
+        (argumentDomains NIL)
+        (domains (CONS OF CONS) NIL))
+    (setq function? (function? relation))
+    ;; do this, since we don't handle minimum arity yet:
+    (setq minArity (length (io-variable-types relation)))
+    (when function?
+      (-- minArity)) ;; Cyc doesn't count the output arg
+    (foreach i in (interval 1 minArity) ;; `argIsa' is 1-based
+        do (setq argumentDomains
+             (consify
+              (call-retrieve
+               (bquote
+                (ALL ?X
+                     (OR (& (nth (bquote (CYC/|arg1Isa| CYC/|arg2Isa|
+                                              CYC/|arg3Isa| CYC/|arg4Isa|
+                                              CYC/|arg5Isa|))
+                                 (1- i))
+                            & relationName ?X)
+                         (CYC/|argIsa| & relationName & i ?X)
+                         (CYC/|argsIsa| & relationName ?X))
+                     :INFERENCE-LEVEL :SHALLOW)))))
+           (when (empty? argumentDomains)
+             (setq argumentDomains
+               (cons-list (get-description PL-KERNEL/@THING))))
+        collect (exclude-ignored-closure-objects argumentDomains)
+        into domains)
+    (when function?
+      ;; need to collect `resultIsa's:
+      (setq domains
+        (bquote (&& domains
+                    & (exclude-ignored-closure-objects
+                       (consify
+                        (call-retrieve
+                         (bquote
+                          (ALL ?X (CYC/|resultIsa| & relationName ?X)
+                               :INFERENCE-LEVEL :SHALLOW)))))))))
+    (return domains)))
+
+(defun (collect-concept-definition-parts PROPERTY-LIST) ((concept LOGIC-OBJECT))
+  ;; Collect all relevant definitional information about `concept' and
+  ;;    return it as a property list.
+  (unless (class? concept)
+    (inform ";;; WARNING: " concept " is not a concept")
+    (return NULL))
+  (let ((definition (new PROPERTY-LIST)))
+    (insert-at definition :self concept)
+    (insert-at definition :supers (collect-direct-relation-supers concept))
+    (insert-at definition :documentation
+               (collect-object-documentation concept))
+    (insert-at definition :types (collect-direct-direct-types concept))
+    (return definition)))
+
+(defun (collect-relation-definition-parts PROPERTY-LIST)
+    ((relation LOGIC-OBJECT))
+  ;; Collect all relevant definitional information about `relation' and
+  ;;    return it as a property list.
+  (unless (relation? relation)
+    (inform ";;; WARNING: " relation " is not a relation")
+    (return NULL))
+  (let ((definition (new PROPERTY-LIST))) 
+    (insert-at definition :self relation)
+    (insert-at definition :supers (collect-direct-relation-supers relation))
+    (insert-at definition :documentation
+               (collect-object-documentation relation))
+    (insert-at definition :domains (collect-relation-domains relation))
+    (insert-at definition :types (collect-direct-direct-types relation))
+    (when (variable-arity? relation)
+      (insert-at definition :variable-arity? TRUE-WRAPPER))
+    (return definition)))
+
+(defun (collect-instance-definition-parts PROPERTY-LIST)
+    ((instance LOGIC-OBJECT))
+  ;; Collect all relevant definitional information about `instance' and
+  ;;    return it as a property list.
+  (let ((definition (new PROPERTY-LIST)))
+    (insert-at definition :self instance)
+    (insert-at definition :documentation
+               (collect-object-documentation instance))
+    (insert-at definition :types (collect-direct-direct-types instance))
+    (return definition)))
+
+(defun (collect-object-definition-parts PROPERTY-LIST) ((object LOGIC-OBJECT))
+  ;; Collect all relevant definitional information about `object' and
+  ;;    return it as a property list.
+  (cond ((class? object)
+         (return (collect-concept-definition-parts object)))
+        ((relation? object)
+         (return (collect-relation-definition-parts object)))
+        (otherwise
+         (return (collect-instance-definition-parts object)))))
+
+(defun (collect-object-definition-references (CONS OF LOGIC-OBJECT))
+    ((definition PROPERTY-LIST))
+  ;; Collect all objects that are referenced in the `definition' of an object.
+  (let ((supers (CONS OF LOGIC-OBJECT) (lookup definition :supers))
+        (types (CONS OF LOGIC-OBJECT) (lookup definition :types))
+        (domains (CONS OF (CONS OF LOGIC-OBJECT)) (lookup definition :domains))
+        (skolems (CONS OF SKOLEM) NIL)
+        (references (first-defined supers NIL)))
+    (when (defined? types)
+      (setq references (union references types)))
+    (when (defined? domains)
+      (foreach argumentDomains in domains
+          do (setq references (union references argumentDomains))))
+    ;; collect arguments to function terms - experimental:
+    (loop
+      (setq skolems (collect ref in references where (skolem? ref)))
+      (when (empty? skolems)
+        (break))
+      (setq references (difference references skolems))
+      (foreach skolem in skolems
+          where (function-output-skolem? skolem)
+          do (let ((proposition (defining-proposition skolem))
+                   (function (get-description (operator proposition)))
+                   (arguments (arguments proposition)))
+               (unless (memb? references function)
+                 (pushq references function))
+               (foreach arg in arguments
+                   where (and (not (eql? arg skolem))
+                              (isa? arg @LOGIC-OBJECT)
+                              (not (memb? references arg)))
+                   do (pushq references arg)))))
+    (return references)))
+
+(defun (collect-upward-closure (CONS OF PROPERTY-LIST)) ((seeds CONS))
+  :documentation
+  "Collect the upward closure of `seeds' relative to the current context
+and return it as a list of object definitions.  `seeds' can be a list of
+symbols or objects."
+  :public? TRUE
+  ;; TO DO: MAINTAIN SEEDS AND VISITED LISTS AS HASH SETS SO WE WON'T BLOW
+  ;;    UP WITH QUADRATIC COMPLEXITY IF THE CLOSURE GETS LARGE.
+  (let ((evaluatedSeeds NIL)
+        (alreadyVisited NIL)
+        (current LOGIC-OBJECT NULL)
+        (closure NIL))
+    (foreach seed in seeds
+        do (setq current (get-instance seed))
+           (when (null? current)
+             (warn "Undefined seed object: " seed)
+             (continue))
+        collect current into evaluatedSeeds)
+    (setq seeds evaluatedSeeds)
+    (while (non-empty? seeds)
+      (setq current (first seeds))
+      (setq seeds (rest seeds))
+      (if (member? alreadyVisited current)
+          (continue)
+        (pushq alreadyVisited current))
+      (pushq closure (collect-object-definition-parts current))
+      (setq seeds (union (collect-object-definition-references (first closure))
+                         seeds)))
+    (return closure)))
+
+(defun (restrict-upward-closure (CONS OF PROPERTY-LIST))
+    ((closure (CONS OF PROPERTY-LIST))
+     (module MODULE)
+     (local? BOOLEAN)
+     (sort? BOOLEAN))
+  :documentation
+  "Restrict `closure' to objects that are visible from `module' (or the
+current module if `module' is NULL).  If `local?' only consider objects
+defined in `module'.  If `sort?' sort the definitions in `closure' by name.
+This is useful to only print part of the full closure to a particular file,
+e.g., all definitions with a particular home module."
+  :public? TRUE
+  (let ((restrictedClosure NIL)
+        (object LOGIC-OBJECT NULL))
+    (when (null? module)
+      (setq module *module*))
+    (foreach definition in closure
+        do (setq object (lookup definition :self))
+           (when (and local?
+                      (not (eql? (home-module object) module)))
+             (continue))
+           (when (not (visible-from? (home-module object) module))
+             (continue))
+        collect definition into restrictedClosure)
+    (when sort?
+      (setq restrictedClosure
+        (sort restrictedClosure (the-code :function object-definition<))))
+    (return restrictedClosure)))
+
+(defun (object-definition< BOOLEAN) ((definitionA PROPERTY-LIST)
+                                     (definitionB PROPERTY-LIST))
+  ;; Return true if the object defined by `definitionA' comes lexicographically
+  ;;    before the object defined by `definitionB'.
+  (let ((nameA (generate-term (lookup definitionA :self)))
+        (nameB (generate-term (lookup definitionB :self))))
+    (if (or (cons? nameA) (cons? nameB)) ;; we have a function term
+        (return (string< (stringify nameA) (stringify nameB)))
+      (return (generalized-symbol-less-than? nameA nameB)))))
+
+(defun (generate-concept-definition-from-parts CONS) ((parts PROPERTY-LIST))
+  ;; Generate a DEFCONCEPT tree for the concept defined by `parts'.
+  (let ((self (lookup parts :self))
+        (selfName (generate-term self))
+        (supers
+         CONS (first-defined (deobjectify-tree (lookup parts :supers)) NIL))
+        (types
+         CONS (first-defined (deobjectify-tree (lookup parts :types)) NIL))
+        (documentation
+         CONS (first-defined (lookup parts :documentation) NIL))
+        (definition (bquote (PL-KERNEL/DEFCONCEPT & selfName & supers)))
+        (axioms NIL))
+    (foreach doc in documentation
+        collect (bquote (PL-KERNEL/DOCUMENTATION & selfName & doc))
+        into axioms)
+    (foreach type in types
+        where (not (eql? type (quote PL-KERNEL/CONCEPT))) ;; uninteresting
+        collect (bquote (& type & selfName)) into axioms)
+    (when (non-empty? axioms)
+      (setq definition (bquote (&& definition :axioms & axioms))))
+    (return definition)))
+
+(defun (generate-relation-definition-from-parts CONS) ((parts PROPERTY-LIST))
+  ;; Generate a definition tree for the relation defined by `parts'.
+  (let ((self NAMED-DESCRIPTION (lookup parts :self))
+        (selfName (generate-term self))
+        (domains
+         (CONS OF CONS)
+         (first-defined (deobjectify-tree (lookup parts :domains)) NIL))
+        (supers
+         CONS (first-defined (deobjectify-tree (lookup parts :supers)) NIL))
+        (types
+         CONS (first-defined (deobjectify-tree (lookup parts :types)) NIL))
+        (documentation
+         CONS (first-defined (lookup parts :documentation) NIL))
+        (variableArity? (eql? (lookup parts :variable-arity?) TRUE-WRAPPER))
+        (definition
+          (bquote
+           (& (choose (function? self)
+                      (bquote PL-KERNEL/DEFRELATION)
+                      (bquote PL-KERNEL/DEFRELATION))
+              & selfName & (the-cons-list (io-variable-names self)))))
+        (axioms NIL))
+    (foreach doc in documentation
+        collect (bquote (PL-KERNEL/DOCUMENTATION & selfName & doc))
+        into axioms)
+    (foreach argDomains in domains
+        as i in (interval 0 NULL)
+        do (foreach domain in argDomains
+               collect (bquote (PL-KERNEL/NTH-DOMAIN & selfName & i & domain))
+               into axioms))
+    (foreach super in supers
+        collect (bquote (PL-KERNEL/SUBSET-OF & selfName & super)) into axioms)
+    (foreach type in types
+        where (not (or (eql? type (quote PL-KERNEL/RELATION))
+                       (eql? type (quote PL-KERNEL/FUNCTION))))
+        collect (bquote (& type & selfName)) into axioms)
+    (when variableArity?
+      (setq axioms (bquote (&& axioms (PL-KERNEL/VARIABLE-ARITY & selfName)))))
+    (when (non-empty? axioms)
+      (setq definition (bquote (&& definition :axioms & axioms))))
+    (return definition)))
+
+(defun (generate-instance-definition-from-parts CONS) ((parts PROPERTY-LIST))
+  ;; Generate a definition tree for the instance defined by `parts'.
+  (let ((self (lookup parts :self))
+        (selfName (generate-term self))
+        (types
+         CONS (first-defined (deobjectify-tree (lookup parts :types)) NIL))
+        (documentation
+         CONS (first-defined (lookup parts :documentation) NIL))
+        (definition (bquote (PL-KERNEL/DEFINSTANCE & selfName)))
+        (axioms NIL))
+    (foreach doc in documentation
+        collect (bquote (PL-KERNEL/DOCUMENTATION & selfName & doc))
+        into axioms)
+    (foreach type in types
+        collect (bquote (& type & selfName)) into axioms)
+    (when (non-empty? axioms)
+      (setq definition (bquote (&& definition :axioms & axioms))))
+    (return definition)))
+
+(defun (generate-object-definition-from-parts CONS) ((parts PROPERTY-LIST))
+  ;; Generate a definition tree for the object defined by `parts'.
+  (let ((self (lookup parts :self)))
+    (cond ((class? self)
+           (return (generate-concept-definition-from-parts parts)))
+          ((relation? self)
+           (return (generate-relation-definition-from-parts parts)))
+          (otherwise
+           (return (generate-instance-definition-from-parts parts))))))
+
+(defun print-upward-closure-to-stream ((closure (CONS OF PROPERTY-LIST))
+                                       (stream OUTPUT-STREAM))
+  :documentation "Print all definitions in `closure' onto `stream'."
+  :public? TRUE
+  (special ((*printPretty?* TRUE)
+            (*printReadably?* TRUE))
+    (print-stream stream EOL ";;; Concept definitions:" EOL EOL)
+    (foreach definition in closure
+        where (class? (lookup definition :self))
+        do (print-stream stream
+                         (generate-object-definition-from-parts definition)
+                         EOL EOL))
+    (print-stream stream EOL ";;; Relation definitions:" EOL EOL)
+    (foreach definition in closure
+        where (and (relation? (lookup definition :self))
+                   (not (class? (lookup definition :self))))
+        do (print-stream stream
+                         (generate-object-definition-from-parts definition)
+                         EOL EOL))
+    (print-stream stream EOL ";;; Instance definitions:" EOL EOL)
+    (foreach definition in closure
+        where (not (relation? (lookup definition :self)))
+        do (print-stream stream
+                         (generate-object-definition-from-parts definition)
+                         EOL EOL))))
+
+(defun print-upward-closure-to-file ((closure (CONS OF PROPERTY-LIST))
+                                     (file STRING))
+  :documentation "Print all definitions in `closure' onto `file'."
+  :public? TRUE
+  (with-output-file (out file)
+    (print-upward-closure-to-stream closure out)))
+
+
+;; Example usage:
+#|
+STELLA(241): (cc cyc)
+|MDL|/PL-KERNEL-KB/PL-USER/CYC
+STELLA(242): (cmt |WorldGeographyMt|)
+|WLD| #$WorldGeographyMt
+STELLA(243): (eval (get-instance @|Switzerland|))
+|i|Switzerland
+STELLA(244): (setq *ignoredClosureObjects*
+              (eval
+               (cons-list
+                 (get-instance @|PublicConstant|)
+                 (get-instance @|PublicConstant-DefinitionalGAFsOK|)
+                 (get-instance @|ProposedPublicConstant-DefinitionalGAFsOK|)
+                 (get-instance @|ProposedPublicConstant-CommentOK|)
+                 (get-instance @|PublicConstant-CommentOK|)
+                 (get-instance @|ProposedPublicConstant|)
+                 (get-instance @|EELDConstant|)
+                 (get-instance @|CycLConstant|)
+                 )))
+(|c|PublicConstant |c|PublicConstant-DefinitionalGAFsOK
+ |c|ProposedPublicConstant-DefinitionalGAFsOK
+ |c|ProposedPublicConstant-CommentOK |c|PublicConstant-CommentOK
+ |c|ProposedPublicConstant |c|EELDConstant |c|CycLConstant)
+STELLA(245): (print-upward-closure-to-file
+               (restrict-upward-closure
+                (collect-upward-closure
+                 (cons-list (get-instance (eval @|Switzerland|))))
+                *module*
+                TRUE
+                TRUE)
+               "/tmp/test.out")
+ppppppp
+()
+STELLA(246):
+
+;;; Generating the EELD ontology:
+
+STELLA(279): (cmt |EELDGeneralCollectorMt|)
+|WLD| #$EELDGeneralCollectorMt
+STELLA(280): (setq *ignoredClosureObjects*
+              (eval
+               (cons-list
+                (get-instance @|AspectTenseConstant|)
+                (get-instance @|CycLConstant|)
+                (get-instance @|EELDConstant|)
+                (get-instance @|EELDSharedOntologyCandidateConstant|)
+                (get-instance @|EELDSharedOntologyConstant|)
+                (get-instance @|EELDSharedOntologyConstant|)
+                (get-instance @|EELDSharedOntologyCoreConstant|)
+                (get-instance @|EELDSyntheticDataConstant|)
+                (get-instance @|ProposedPublicConstant|)
+                (get-instance @|ProposedPublicConstant-CommentOK|)
+                (get-instance @|ProposedPublicConstant-DefinitionalGAFsOK|)
+                (get-instance @|PublicConstant|)
+                (get-instance @|PublicConstant-CommentOK|)
+                (get-instance @|PublicConstant-DefinitionalGAFsOK|)
+                          )))
+(|c|AspectTenseConstant |c|CycLConstant |c|EELDConstant
+ |c|EELDSharedOntologyCandidateConstant |c|EELDSharedOntologyConstant
+ |c|EELDSharedOntologyConstant |c|EELDSharedOntologyCoreConstant
+ |c|EELDSyntheticDataConstant |c|ProposedPublicConstant
+ |c|ProposedPublicConstant-CommentOK ...)
+STELLA(281):  (print-upward-closure-to-file
+               (restrict-upward-closure
+                (collect-upward-closure
+                 (consify (retrieve all ?x (|EELDSyntheticDataConstant| ?x))))
+                *module*
+                TRUE
+                TRUE)
+               "/tmp/eeld-preds-closure.plm")
+ppppppp
+()
+STELLA(282):  
+|#

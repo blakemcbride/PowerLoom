@@ -1,0 +1,80 @@
+This is manual.info, produced by makeinfo version 6.7 from manual.texi.
+
+This file documents the STELLA programming language.
+
+   Copyright (C) 2006 University of Southern California, Information
+Sciences Institute 4676 Admiralty Way Marina Del Rey, CA 90292
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+
+Indirect:
+manual.info-1: 426
+manual.info-2: 340645
+
+Tag Table:
+(Indirect)
+Node: Top426
+Node: Overview1341
+Node: Credits and History5554
+Node: Installation6953
+Node: System Requirements7252
+Node: Unpacking the Sources10642
+Node: Lisp Installation11223
+Node: C++ Installation13160
+Node: Java Installation14665
+Node: X/Emacs Setup15860
+Node: Removing Unneeded Files16750
+Node: The STELLA Language17542
+Node: Language Overview17833
+Node: Basic Data Types22211
+Node: Control Structure22406
+Node: Conditionals22624
+Node: Functions29541
+Node: Classes29705
+Node: Methods29855
+Node: Macros30002
+Node: Modules30147
+Node: Programming in STELLA30278
+Node: Hello World in STELLA30539
+Node: Hello World in Lisp32815
+Node: Hello World in C++36750
+Node: Hello World in Java41132
+Node: Incrementally Developing STELLA Code44619
+Node: Performance Hints55344
+Node: Lisp Performance Hints60783
+Node: Library Classes64249
+Node: Library Functions64425
+Node: Basic Constants and Predicates64919
+Node: Numbers68744
+Node: Characters74473
+Node: Strings76589
+Node: CONS Lists and Trees87410
+Node: CONS Lists as Sets99068
+Node: Lists101031
+Node: Lists as Sets108105
+Node: Property and Key-Value Lists112060
+Node: Vectors118481
+Node: Hash Tables122659
+Node: Key Value Maps132006
+Node: Hash Sets135900
+Node: Iterators141282
+Node: Symbols142927
+Node: Contexts and Modules149711
+Node: Input and Output158815
+Node: Files160842
+Node: Dates and Times167921
+Node: XML Support174742
+Node: Miscellaneous182294
+Node: Function Index340645
+Node: Variable Index433950
+Node: Concept Index438755
+
+End Tag Table
+
+
+Local Variables:
+coding: utf-8
+End:

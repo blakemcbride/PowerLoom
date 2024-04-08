@@ -1,0 +1,44 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                          ;
+;  COPYRIGHT (C) UNIVERSITY OF SOUTHERN CALIFORNIA, 2004                   ; 
+;  University of Southern California, Information Sciences Institute       ;
+;  4676 Admiralty Way                                                      ;
+;  Marina Del Rey, California 90292                                        ;
+;  All rights reserved.                                                    ;
+;                                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; Version: $Id$
+
+(in-package "STELLA")
+
+(in-module "STELLA")
+
+
+  ;;
+;;;;;; POWERLOOM-SOAP-ASERVE defsystem
+  ;;
+
+(defsystem POWERLOOM-SOAP-ASERVE
+  :directory ("logic" "soap" "aserve")
+  :required-systems ("ontosaurus-aserve" "powerloom-soap")
+  :cardinal-module "LOGIC/PLSOAP"
+  :production-settings (1 0 3 3)
+  :development-settings (3 2 3 3)
+  :lisp-only-files ("aserve-init.lisp"
+		    "http-interface.lisp")
+  :files ()
+  :copyright-header
+  " +--------------------------------------------------------------------------+
+ |                                                                          |
+ |  COPYRIGHT (C) UNIVERSITY OF SOUTHERN CALIFORNIA, 2004-#$(YEAR)              |
+ |  University of Southern California, Information Sciences Institute       |
+ |  4676 Admiralty Way                                                      |
+ |  Marina Del Rey, California 90292                                        |
+ |  All rights reserved.                                                    |
+ |                                                                          |
+ +--------------------------------------------------------------------------+"
+  )					; end of POWERLOOM-SOAP-ASERVE defsystem

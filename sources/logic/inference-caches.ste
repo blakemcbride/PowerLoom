@@ -1,0 +1,571 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;; BEGIN LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                            ;
+; Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          ;
+;                                                                            ;
+; The contents of this file are subject to the Mozilla Public License        ;
+; Version 1.1 (the "License"); you may not use this file except in           ;
+; compliance with the License. You may obtain a copy of the License at       ;
+; http://www.mozilla.org/MPL/                                                ;
+;                                                                            ;
+; Software distributed under the License is distributed on an "AS IS" basis, ;
+; WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   ;
+; for the specific language governing rights and limitations under the       ;
+; License.                                                                   ;
+;                                                                            ;
+; The Original Code is the PowerLoom KR&R System.                            ;
+;                                                                            ;
+; The Initial Developer of the Original Code is                              ;
+; UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          ;
+; 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               ;
+;                                                                            ;
+; Portions created by the Initial Developer are Copyright (C) 1997-2019      ;
+; the Initial Developer. All Rights Reserved.                                ;
+;                                                                            ;
+; Contributor(s):                                                            ;
+;                                                                            ;
+; Alternatively, the contents of this file may be used under the terms of    ;
+; either the GNU General Public License Version 2 or later (the "GPL"), or   ;
+; the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   ;
+; in which case the provisions of the GPL or the LGPL are applicable instead ;
+; of those above. If you wish to allow use of your version of this file only ;
+; under the terms of either the GPL or the LGPL, and not to allow others to  ;
+; use your version of this file under the terms of the MPL, indicate your    ;
+; decision by deleting the provisions above and replace them with the notice ;
+; and other provisions required by the GPL or the LGPL. If you do not delete ;
+; the provisions above, a recipient may use your version of this file under  ;
+; the terms of any one of the MPL, the GPL or the LGPL.                      ;
+;                                                                            ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; END LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; Using worlds to cache logical inferences
+
+(in-package "STELLA")
+
+(in-module "LOGIC")
+
+
+  ;;
+;;;;;; Cache world creation
+  ;;
+
+(defun (world-state? BOOLEAN) ((self CONTEXT))
+  :public? TRUE
+  ;; Return TRUE if 'self' represents a module or top-level
+  ;;    world-state.  In this case, it must be a module.
+  (typecase self
+    (WORLD
+     (return (and (null? (inference-cache-of self))
+                  (not (monotonic? self)))))
+    (otherwise
+     (return TRUE))) )
+
+(defun (get-world-state CONTEXT) ((self CONTEXT))
+  :public? TRUE
+  ;; If 'self' is a world state, return it.  Otherwise, return its
+  ;;    base module.
+  (return (choose (world-state? self) self (base-module (cast self WORLD)))) )
+  
+
+;; Inference cache slots for modules or worlds that represent states
+;;    (e.g., as needed by planners):
+(defslot CONTEXT meta-inference-cache :type WORLD)
+(defslot CONTEXT truth-maintained-inference-cache :type WORLD)
+(defslot CONTEXT just-in-time-inference-cache :type WORLD)
+
+;; Backlink that allows us to dynamically determine whether we are
+;;    in an inference cache context, and what kind it is:
+(defslot WORLD inference-cache-of :type CONTEXT
+	 :public? TRUE)
+
+(defun (lookup-inference-cache WORLD) ((context CONTEXT) (kind KEYWORD))
+  :public? TRUE
+  ;; Return a cache world of type 'kind' if one is attached to 'context'.
+  (let ((cacheWorld CONTEXT NULL))
+    (case kind
+      (:JUST-IN-TIME
+       (setq cacheWorld (just-in-time-inference-cache context)))
+      (:META
+       (setq cacheWorld (meta-inference-cache context)))
+      (:TMS
+        (setq cacheWorld (truth-maintained-inference-cache context))))
+;; ELIMINATE THIS IF BUG DOES NOT RESURFACE:
+;    (if (and (defined? cacheWorld)
+;             (deleted? cacheWorld))
+;      (progn
+;        (print "BUG: Skipping over deleted cache world that shouldn't be there.")
+;        (return NULL))
+;      (return cacheWorld))
+    (safety 3 (or (null? cacheWorld) (not (deleted? cacheWorld)))
+            "Bug in inference caches has resurfaced.")
+    (return cacheWorld)
+    ))
+
+(defun initialize-inference-world ((world WORLD))
+  ;; Initialize slots for inference cache or hypothetical world.
+  ;; Conceivably, we could initialize propagation environments here.
+  NULL)
+
+(defun (create-inference-cache WORLD) ((context CONTEXT) (kind KEYWORD))
+  :public? TRUE
+  ;; Assume that a cache world of type 'kind' does not exist for
+  ;;    'context', create one, and return the result.
+  (let ((world
+         (create-world
+          ;; compute parent world for newly-created world:
+          (choose (member? (quote (:JUST-IN-TIME :TMS)) kind)
+                  (get-inference-cache context :META)
+                  context)
+          NULL)))
+    (case kind
+      (:JUST-IN-TIME
+       (setf (just-in-time-inference-cache context) world))
+      (:META
+       ;; we disable these settings to make meta caches behave identically to jit caches,
+       ;; otherwise strange asymmetries might arise during non-jit forward inference:
+       ;(setf (monotonic? world) TRUE)
+       ;; 'world' is up-to-date if it has no propositions (yet):
+       ;(setf (up-to-date-inferences? world)
+       ;      (not (next? (all-propositions (base-module context) TRUE))))
+       (setf (meta-inference-cache context) world))
+      (:TMS
+        (setf (truth-maintained-inference-cache context) world)))
+    (setf (inference-cache-of world) context)
+    (initialize-inference-world world)
+    (return world)))
+
+(defun (just-in-time-inference-cache? BOOLEAN) ((self CONTEXT))
+  :documentation "Return true if `self' is the JIT cache of some world state."
+  :public? TRUE
+  (typecase self
+    (WORLD
+     (let ((worldState (inference-cache-of self)))
+       (return (and (defined? worldState)
+                    (eql? (just-in-time-inference-cache worldState) self)))))
+    (otherwise
+     (return FALSE))))
+
+(defun (meta-inference-cache? BOOLEAN) ((self CONTEXT))
+  :documentation "Return true if `self' is the meta-JIT cache of some world state."
+  :public? TRUE
+  (typecase self
+    (WORLD
+     (let ((worldState (inference-cache-of self)))
+       (return (and (defined? worldState)
+                    (eql? (meta-inference-cache worldState) self)))))
+    (otherwise
+     (return FALSE))))
+
+(defun (get-inference-cache WORLD) ((context CONTEXT) (kind KEYWORD))
+  :public? TRUE
+  ;; If 'context' is a module or a "world state", find or create
+  ;;     a cache world of type 'kind' for 'context'.
+  ;; Otherwise, return 'context'.
+  ;; Inherit cached inferences from parent modules onto
+  ;;    a newly-created :JUST-IN-TIME, :META or :TMS cache.
+  (when (not (world-state? context))
+    (return context))
+  (let ((world (lookup-inference-cache context kind)))
+    (when (defined? world)
+      (return world))
+    ;; do this now, so that update side-effects don't instantly
+    ;;    destroy the new cache:
+    (process-check-types-agenda)
+    (setq world (create-inference-cache context kind))
+    (case kind
+      (:JUST-IN-TIME NULL)
+      ((:META :TMS)
+       (foreach parentModule in (parent-modules (base-module context))
+           do (inherit-cached-inferences
+               (lookup-inference-cache parentModule kind) world))))
+    (return world) ))
+
+(defun destroy-inference-cache ((context CONTEXT) (kind KEYWORD))
+  :public? TRUE
+  ;; Eliminate the inference cache world of type 'kind' from 'context'.
+  (let ((cache WORLD NULL))
+    (safety 3 (world-state? context)
+            "BUG: Called 'destroy-inference-cache' on a cache world'.")
+    (case kind
+      (:JUST-IN-TIME
+       (setq cache (just-in-time-inference-cache context))
+       (setf (just-in-time-inference-cache context) NULL))
+      (:META
+       (setq cache (meta-inference-cache context))
+       (setf (meta-inference-cache context) NULL))
+      (:TMS
+        (setq cache (truth-maintained-inference-cache context))
+        (setf (truth-maintained-inference-cache context) NULL)))
+    (when (and (defined? cache)
+               (not (deleted? cache)))
+      (destroy-world cache))))
+
+(defun destroy-all-inference-caches ((context CONTEXT) (kind KEYWORD))
+  :public? TRUE
+  ;; Eliminate the inference cache world of type 'kind' from 'context'
+  ;;    and all its subcontexts.
+  (destroy-inference-cache context kind)
+  ;; inherit the update response to children:
+  (foreach child in (all-subcontexts *context* :preorder)
+      where (world-state? child)
+      do (destroy-inference-cache child kind)))
+
+(defun unlink-inference-cache ((self WORLD))
+  ;; If 'self' is an inference cache, unlink it from the world state
+  ;;    that points to it.
+  ;; Called by 'destroy-context-hook'.
+  (when (defined? (inference-cache-of self))
+    (let ((worldState (inference-cache-of self)))
+      (cond
+       ((eql? self (just-in-time-inference-cache worldState))
+        (setf (just-in-time-inference-cache worldState) NULL))
+       ((eql? self (meta-inference-cache worldState))
+        (setf (meta-inference-cache worldState) NULL))
+       ((eql? self (truth-maintained-inference-cache worldState))
+        (setf (truth-maintained-inference-cache worldState) NULL)))
+      (setf (inference-cache-of self) NULL))) )
+
+(defun destroy-inference-caches ((context CONTEXT))
+  :public? TRUE
+  ;; Eliminate all inference caches attached to 'context'.
+  (destroy-inference-cache context :JUST-IN-TIME)
+  (destroy-inference-cache context :META)
+  (destroy-inference-cache context :TMS))
+
+(defspecial *invisibleAssertion?* BOOLEAN FALSE
+  :documentation "Used to signal an assertion that doesn't
+blow away inference caches.")
+
+(defun (meta-proposition? BOOLEAN) ((proposition PROPOSITION))
+  :documentation "Return TRUE if 'proposition' is tied only to at least one meta object
+and no other objects except literals or function terms that are itself meta objects."
+  ;; NOTE: this will return true for implies rules as well as observed-cardinality-of terms.
+  :public? TRUE
+  (when (null? proposition)
+    (return FALSE))
+  (let ((arguments (arguments proposition))
+        (pointsToMetaObject? FALSE))
+    (foreach arg in arguments
+        do (typecase arg
+             (DESCRIPTION
+              (setq pointsToMetaObject? TRUE))
+             (LITERAL-WRAPPER NULL)
+             (SKOLEM
+              (cond ((and (eql? arg (last arguments))
+                          (eql? (kind proposition) :FUNCTION))
+                     NULL)
+                    ((and (defined? (defining-proposition arg))
+                          (meta-proposition? (defining-proposition arg)))
+                     (setq pointsToMetaObject? TRUE))
+                    (otherwise
+                     (return FALSE))))
+             (otherwise
+              (return FALSE))))
+    (return pointsToMetaObject?)))
+
+(defun handle-out-of-date-inference-cache 
+       ((assertOrRetract KEYWORD) (proposition PROPOSITION))
+  ;; Called by 'assign-truth-value', 'deassign-truth-value', etc.
+  ;; If the current context is a world-state, blow away any out-of-date
+  ;;    inference caches.
+  ;; If the current context has a monotonic cache, blow away the cache.
+  ;; Otherwise, mark the cache out-of-date.
+  (when (world-state? *context*)
+    ;; too tricky: if a top-level assertion occurs while we are in the
+    ;;    middle of a query AND if we aren't in a world, then we must be
+    ;;    asserting the truth of a satellite rule.  In this case, we 
+    ;;    don't worry about upsetting the consistency of the inference
+    ;;    caches:
+    (when (or ;; FIXME: comment this, since it can make us miss retraction propagation for
+              ;; cases where the meta cache isn't initialized yet (see below).  Kaybe we can
+              ;; key in on the :retract keyword to not do this for assertions.  However, we
+              ;; need to leave this for now, since otherwise it breaks the logic bootstrap.
+              ;; This can cause a problem if we are asserting a function propositon in a context,
+              ;; asking about it in a subcontext which creates an inference cache there, retracting
+              ;; it in the home context which then doesn't propagate the retraction since we fall
+              ;; out right here due to missing meta cache... messy...
+              (null? (lookup-inference-cache *context* :META))
+              (defined? *queryIterator*)
+              (description-mode?)
+              *invisibleAssertion?*)
+      (return))
+    (let ((description (only-if (defined? proposition)
+                                (get-description (relationRef proposition)))))
+      (when (and (defined? description)
+                 (test-property? description PL-KERNEL/@HIDDEN-RELATION))
+        (return)))
+    (cond
+     ((and (meta-proposition? proposition)
+           (eql? assertOrRetract :RETRACT)
+           (not (truth-maintained?
+                 (lookup-inference-cache *context* :META))))
+      (trace-if :PERFORMANCE-CLUES "DELETING META CACHE" EOL)
+      (destroy-inference-cache *context* :META))
+     (*just-in-time-forward-inference?*
+      (when (defined? (just-in-time-inference-cache *context*))
+        (trace-if :PERFORMANCE-CLUES "DELETING JIT CACHE" EOL)
+        ;; make retractions propagate down (we might also have to do this
+        ;;    for meta and tms caches - THINK ABOUT THIS SOME MORE WITH RESPECT TO
+        ;;    PERFORMANCE, also once we can multiply inherit for inference caches
+        ;;    some of this mechanism will have to change anyway):
+        (destroy-all-inference-caches *context* :JUST-IN-TIME)))
+     (otherwise
+      (let ((cache (lookup-inference-cache *context* :TMS)))
+        (when (and (defined? cache)
+                   (not (truth-maintained? cache)))
+          (destroy-inference-cache *context* :TMS)))))
+    (return))
+  ;; not a top level update; update directly on an inference cache or
+  ;;    a hypothetical world:
+  (let ((world (safe-cast *context* WORLD)))
+    (when (and (monotonic? world)
+               (eql? assertOrRetract :RETRACT))
+      ;; this warning is currently the only thing special happening for monotonic contexts:
+      (if (defined? proposition)
+          (warn "Retraction of " proposition " occurred in world " world
+            " which is marked monotonic.")
+        (warn "Retraction occurred in world " world
+              " which is marked monotonic.")))
+    (when (not (truth-maintained? world))
+     ;; otherwise, indicate that the world 'world' is not up-to-date:
+      (setf (up-to-date-inferences? world) FALSE))) )
+
+(defun (best-inference-cache WORLD) ((context CONTEXT))
+  ;; If in JUST-IN-TIME mode, return a just-in-time-inference cache.
+  ;; Otherwise, return a default inference cache of `context' if one 
+  ;;    exists, else return a meta one.
+  (safety 3 (world-state? context) 
+          "BUG: Not in world state when calling 'best-inference-cache'.")
+  (when *just-in-time-forward-inference?*
+    (return (get-inference-cache context :JUST-IN-TIME)))
+  (let ((cache (lookup-inference-cache context :TMS)))
+    (if (defined? cache)
+      (return cache)
+      (return (lookup-inference-cache context :META)))))
+
+
+  ;;
+;;;;;; 'get-xxx-context' procedures
+  ;;
+
+;;; These procedures select the appropriate world or module for
+;;;    queries, updates, and constraint propagation.
+
+(defun (get-query-context CONTEXT) ()
+  :public? TRUE
+  ;; Determine what context to use within a query.
+  ;; If we are in a module or world state, returns its best inference cache.
+  ;; Otherwise, return the current `*context*'.
+  (when (not (world-state? *context*))
+    (return *context*))
+  (let ((cache (best-inference-cache *context*)))
+    (return (choose (defined? cache) cache *context*))))
+
+(defun (get-property-test-context CONTEXT) ()
+  ;; Return what context to use for a property test operation
+  ;;    such as `test-isa?'.
+  ;; Similar to `get-query-context', but does not generate a new inference
+  ;;    cache if one doesn't exist already.
+  (let ((constraintPropagationWorld
+         (lookup-constraint-propagation-world *context*)))
+    (if (null? constraintPropagationWorld)
+        (return *context*)
+      (return constraintPropagationWorld))))
+
+(defun (get-inferable-test-context CONTEXT) ()
+  ;; Return what context to use for an `inferable?' computation.
+  ;; This is the cache in which inferred rules are kept or the current
+  ;;    *context* if no cache has been created yet.
+  (if (not (world-state? *context*))
+      (return *context*)
+    (return
+      (first-defined
+       (lookup-inference-cache *context* :META)
+       *context*))))
+
+(defun (get-top-level-update-context CONTEXT) ()
+  ;; Determine what context to use to make a top-level update.
+  (return (get-world-state *context*)) )  
+
+;;; The 'lookup-constraint-propagation-world' methods are normally passed
+;;;    the argument '*context*'.  If that argument is a world,
+;;;    it is returned.  This supposes that if we are in, say, a
+;;;    default inference world, that *context* will have been
+;;;    set to that world.  If *context* is a module having no
+;;;    meta inference cache, then NULL is returned.
+
+(defun (lookup-constraint-propagation-world WORLD) ((self CONTEXT))
+  ;; If constraint propagation is enabled for 'self', return
+  ;;    a world:
+  ;;    If 'self' is a module or a world state world, return a
+  ;;       jit or tms inference cache for the world 'self' if one exists,
+  ;;       otherwise, return NULL.
+  ;;    If we are inside of a query, then a new jit world is created if
+  ;;       one does not exist and *just-in-time-forward-inference?* is set.
+  ;;    If 'self' is a "normal" world, return self.
+  (if (world-state? self)
+    (if *just-in-time-forward-inference?*
+      (if (defined? *queryIterator*)
+        (return (get-inference-cache self :JUST-IN-TIME))
+        (return (lookup-inference-cache self :JUST-IN-TIME)))
+      (return (lookup-inference-cache self :TMS)))
+    (return self)) )
+
+
+  ;;
+;;;;;; Inheritance of truth-values and variable-value links
+  ;;
+
+;; IF WE SWITCH TO MULTIPLE INHERITANCE IN WORLDS, THESE ARE
+;;    PROBABLY OBSOLETE:
+(defun inherit-cached-inferences ((fromWorld WORLD) (toWorld WORLD))
+  ;; Called by 'get-inference-cache'.
+  ;; Inherit truth-values and variable-values found in 'fromWorld'
+  ;;    onto corresponding propositions and skolems in 'toWorld'.
+  (ignore toWorld)
+  (when (null? fromWorld)
+    (return))
+  "NOT YET IMPLEMENTED"
+  )
+
+(defun inherit-truth-value-update ((proposition PROPOSITION) (toWorld WORLD))
+  ;; Inherit the truth or falsity of 'proposition' in the current
+  ;;    context onto the same proposition in the world 'toWorld'.
+  ;; If the inherited value was not already found in 'toWorld',
+  ;;    propagate constraints triggered by the update.
+  "NOT YET IMPLEMENTED")
+
+(defun inherit-variable-value-update ((skolem SKOLEM) (toWorld WORLD))
+  ;; Inherit the variable-values link on 'skolem' in the current
+  ;;    context onto the same skolem in the world 'toWorld'.
+  ;; If the inherited value was not already found in 'toWorld',
+  ;;    propagate constraints triggered by the update.
+  "NOT YET IMPLEMENTED")
+
+
+  ;;
+;;;;;; Public constraint propagation functions
+  ;;
+
+(defun call-propagate-constraints ((context CONTEXT))
+  :documentation "OBSOLETE: use `call-run-forward-rules' instead."
+  (call-run-forward-rules context TRUE FALSE))
+
+(defun propagate-constraints (&rest (name NAME))
+  :documentation "OBSOLETE: use `run-forward-rules' instead."
+  :public? TRUE :command? TRUE :evaluate-arguments? FALSE
+  (let ((optionalName (coerce-&rest-to-cons name))
+        (module MODULE NULL))
+    (when (defined? (first optionalName))
+      (setq module (coerce-to-module (first optionalName) TRUE)))
+    (when (null? module)
+      (setq module *module*))
+    (call-run-forward-rules module TRUE FALSE)))
+
+(defun repropagate-constraints (&rest (name NAME))
+  :documentation "OBSOLETE: use `run-forward-rules' instead."
+  :public? TRUE :command? TRUE :evaluate-arguments? FALSE
+  (let ((optionalName (coerce-&rest-to-cons name))
+        (context (coerce-to-module (first optionalName) TRUE)))
+    (when (null? context)
+      (setq context *context*))
+    (call-run-forward-rules context TRUE TRUE)))
+
+(defun call-run-forward-rules ((context CONTEXT) (local? BOOLEAN) (force? BOOLEAN))
+  :documentation "Callable implementation for `run-forward-rules' (which see)."
+  :public? TRUE
+  ;; XREF: a prior commented rewrite of this is available in the previous commit
+  (when (null? context)
+    (setq context *context*))
+  (finalize-objects)
+  (process-check-types-agenda)
+  (let ((worldState (get-world-state context))
+        (propWorld WORLD NULL)
+        (propEnv PROPAGATION-ENVIRONMENT NULL))
+    (when force?
+      (destroy-inference-caches (get-world-state context)))
+    ;; ensure both JIT and META caches are allocated:
+    (get-inference-cache worldState :JUST-IN-TIME)
+    ;; this will pick JIT if we are in JIT-mode or the more stable META otherwise:
+    (setq propWorld (best-inference-cache worldState))
+    (setq propEnv (get-propagation-environment propWorld))
+    ;; the code below mirrors various aspects of `elaborate-instance':
+    (special ((*evaluationMode* :EXTENSIONAL-ASSERTION)
+              (*inhibitObjectFinalization?* TRUE)
+              (*queryIterator* NULL)
+              (*context* propWorld))
+      (when (up-to-date-inferences? propWorld)
+        (return))
+      (exception-case 
+          (special ((*fillingConstraintPropagationQueues?* TRUE)
+                    (*deferingDefaultForwardInferences?* TRUE))
+            (foreach prop in (all-propositions worldState local?)
+                where (true-proposition? prop)
+                do (react-to-kb-update propWorld prop)
+                   ;; mark prop's args as elaborated for smoother interaction with JIT:
+                   ;; ISSUE: should we do this in the parallel JIT or META cache as well?
+                   (foreach arg in (arguments prop)
+                       where (and (isa? arg @LOGIC-OBJECT)
+                                  (not (member? (elaborated-objects propEnv) arg)))
+                       do (insert (elaborated-objects propEnv) arg)))
+            (execute-constraint-propagation-queues)
+            (foreach prop in (deferred-default-propositions propEnv)
+                do (assign-truth-value prop DEFAULT-TRUE-TRUTH-VALUE)
+                   ;; mark prop's args as elaborated for smoother interaction with JIT:
+                   (foreach arg in (arguments prop)
+                       where (and (isa? arg @LOGIC-OBJECT)
+                                  (not (member? (elaborated-objects propEnv) arg)))
+                       do (insert (elaborated-objects propEnv) arg)))
+            (clear (deferred-default-propositions propEnv))
+            (setq *deferingDefaultForwardInferences?* FALSE)
+            (execute-constraint-propagation-queues))
+        (CLASH (e)
+          (push *clash-exceptions* (new EXCEPTION-RECORD :exception e :context *context* :module *module*))
+          (print-stream STANDARD-ERROR (exception-message e))
+          (inform "   One or more facts need to be retracted to eliminate the inconsistency.")))
+      (setf (up-to-date-inferences? propWorld) TRUE))))
+
+(defun run-forward-rules  (&rest (options OBJECT))
+  :documentation
+  "Run forward inference rules in the module defined by the :module option (which
+defaults to the current module).  If forward inferencing is already up-to-date
+in the designated module, no additional inferencing will occur, unless the :force?
+option is specified as TRUE, in which case all forward rules are run or rerun (for
+backwards compatibility, this command also supports the old <module> :force arguments
+specified with a non-standard keyword notation).  If :local? is TRUE (the default),
+only propositions asserted locally in the module will be posted for forward inference,
+otherwise, all true propositions visible in the module will be posted.
+
+Calling `run-forward-rules' with :disable-jit? TRUE will disable future just-in-time
+forward inference which will preserve cached forward inference in case of monotonic
+assertions that do not clip (implicitly retract) any existing values.  Subsequent calls
+can then trigger new inferences based on these updates only.  If the JIT stays enabled,
+even monotonic updates will throw away the JIT cache.  Also, once any retractions have
+been performed, all cached inferences will be thrown away and forward inference has to
+be rerun from scratch or just-in-time forward inference needs to be enabled again."
+  :public? TRUE :command? TRUE :evaluate-arguments? FALSE
+  (let ((optionsList (coerce-&rest-to-cons options))
+        (theOptions
+         (parse-options
+          (choose (keyword? (first optionsList))
+                  optionsList
+                  ;; we have an old-style invocation, construct an argument list:
+                  (cons-list :module (first optionsList) :force? (eql? (second optionsList) :force)))
+          (bquote (:module @MODULE
+                   :local? @BOOLEAN
+                   :force? @BOOLEAN
+                   :disable-jit? @BOOLEAN))
+          TRUE FALSE))
+        (theModule MODULE (lookup-with-default theOptions :module *module*))
+        (local? BOOLEAN (lookup-with-default theOptions :local? TRUE))
+        (force? BOOLEAN (lookup-with-default theOptions :force? FALSE))
+        ;; the default for this really should be TRUE, but that's too disruptive with existing scripts:
+        (disableJit? BOOLEAN (lookup-with-default theOptions :disable-jit? FALSE)))
+    (when (and *just-in-time-forward-inference?*
+               disableJit?)
+      ;; turn this off, so subsequent assertions don't throw out the JIT cache:
+      (unset-powerloom-feature :just-in-time-inference)
+      (print "Disabled just-in-time forward inference" EOL))
+    (call-run-forward-rules theModule local? force?)))

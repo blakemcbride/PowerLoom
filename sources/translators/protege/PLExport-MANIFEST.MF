@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+
+Name: edu.isi.powerloom.protege.PowerLoomExporter.class
+Export-Plugin: True
+

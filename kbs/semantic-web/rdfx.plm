@@ -1,0 +1,168 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;; Dependencies: webcore.plm
+
+(IN-PACKAGE "STELLA")
+
+(IN-MODULE "/PL-KERNEL/WEB-CORE")
+
+(IN-DIALECT :KIF)
+
+
+(ASSERT (DOCUMENTATION /PL-KERNEL/WEB-CORE "Module for RDF and RDFS definitions.  This corresponds to the RDF-Schema items.  Version $Id$"))
+
+(DEFCONCEPT /XMLNS/RDF/Property (?x)
+  :<<=>> (BINARY-RELATION ?x)		; :<=>  instead?
+  :AXIOMS (/XMLNS/RDFS/Class /XMLNS/RDF/Property))
+
+;; Should this imply a PowerLoom PROPOSITION?
+(DEFCONCEPT /XMLNS/RDF/Statement (?x)
+  :AXIOMS (/XMLNS/RDFS/Class /XMLNS/RDF/Statement))
+
+(DEFCONCEPT /XMLNS/RDF/Seq (?x /XMLNS/RDFS/Container)
+  :AXIOMS (/XMLNS/RDFS/Class /XMLNS/RDF/Seq))
+(DEFCONCEPT /XMLNS/RDF/Bag (?x /XMLNS/RDFS/Container)
+  :AXIOMS (/XMLNS/RDFS/Class /XMLNS/RDF/Bag))
+(DEFCONCEPT /XMLNS/RDF/Alt (?x /XMLNS/RDFS/Container)
+  :AXIOMS (/XMLNS/RDFS/Class /XMLNS/RDF/Alt))
+(DEFCONCEPT /XMLNS/RDF/List (?x)
+  :AXIOMS (/XMLNS/RDFS/Class /XMLNS/RDF/List))
+
+(DEFCONCEPT /XMLNS/RDF/XMLLiteral ((?x /XMLNS/RDFS/Literal))
+  :AXIOMS (/XMLNS/RDFS/Class  /XMLNS/RDF/XMLLiteral))
+
+
+(DEFCONCEPT /XMLNS/RDFS/Class (?x) 
+  :<<=>> (CONCEPT ?x)			; :<=>  instead?
+  :AXIOMS (/XMLNS/RDFS/Class /XMLNS/RDFS/Class))
+
+(DEFCONCEPT /XMLNS/RDFS/Resource (?x)
+  :AXIOMS (/XMLNS/RDFS/Class /XMLNS/RDFS/Resource))
+
+(DEFCONCEPT /XMLNS/RDFS/Literal ((?x /XMLNS/RDFS/Resource))
+  :<<=>> (LITERAL ?x)
+  :AXIOMS (/XMLNS/RDFS/Class /XMLNS/RDFS/Literal))
+
+(DEFCONCEPT /XMLNS/RDFS/Datatype ((?x /XMLNS/RDFS/Class))
+  :=>> (/XMLNS/RDFS/subClassOf ?x /XMLNS/RDFS/Literal)
+  :AXIOMS (/XMLNS/RDFS/Class /XMLNS/RDFS/Datatype))
+
+(DEFCONCEPT /XMLNS/RDFS/Container (?x)
+  :AXIOMS (/XMLNS/RDFS/Class /XMLNS/RDFS/ContainerMembershipProperty))
+
+(DEFCONCEPT /XMLNS/RDFS/ContainerMembershipProperty ((?x /XMLNS/RDF/Property))
+  :=>> (/XMLNS/RDFS/subPropertyOf ?x /XMLNS/RDFS/member)
+  :AXIOMS (/XMLNS/RDFS/Class /XMLNS/RDFS/ContainerMembershipProperty)  )
+
+
+(DEFRELATION /XMLNS/RDFS/domain (?x ?y)
+  :<<=>> (DOMAIN ?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property  /XMLNS/RDFS/domain)
+	       (/XMLNS/RDFS/domain /XMLNS/RDFS/domain /XMLNS/RDF/Property)
+	       (/XMLNS/RDFS/range /XMLNS/RDFS/domain /XMLNS/RDFS/Class)))
+
+(DEFRELATION /XMLNS/RDFS/OLD/domain (?x ?y)
+  :DOCUMENTATION "Older domain restriction that is not conjunctive."
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/RDFS/OLD/domain)
+	       (/XMLNS/RDFS/domain /XMLNS/RDFS/OLD/domain /XMLNS/RDF/Property)
+	       (/XMLNS/RDFS/range /XMLNS/RDFS/OLD/domain /XMLNS/RDFS/Class)))
+
+(DEFRELATION /XMLNS/RDFS/range (?x ?y)
+  :<<=>> (RANGE ?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property  /XMLNS/RDFS/range)
+	       (/XMLNS/RDFS/domain /XMLNS/RDFS/range /XMLNS/RDF/Property)
+	       (/XMLNS/RDFS/range /XMLNS/RDFS/range /XMLNS/RDFS/Class)))
+
+(DEFRELATION /XMLNS/RDFS/subClassOf (?x ?y)
+  :=>> (AND (CONCEPT ?x) (CONCEPT ?y) (SUBSET-OF ?x ?y))
+  :<<= (AND (SUBSET-OF ?x ?y)
+	    (BOUND-VARIABLES ?x ?y)
+	    (CONCEPT ?x) 
+	    (CONCEPT ?y) ) 
+  :AXIOMS (AND ;(TRANSITIVE /XMLNS/RDFS/subClassOf) ;; problematic, we are getting transitivity via subset-of
+	       (/XMLNS/RDF/Property  /XMLNS/RDFS/subClassOf)
+	       (/XMLNS/RDFS/domain /XMLNS/RDFS/subClassOf /XMLNS/RDFS/Class)
+	       (/XMLNS/RDFS/range /XMLNS/RDFS/subClassOf /XMLNS/RDFS/Class)))
+
+(DEFRELATION /XMLNS/RDFS/subPropertyOf (?x ?y)
+  :=>> (AND (BINARY-RELATION ?x) (BINARY-RELATION ?y) (SUBSET-OF ?x ?y))
+  :<<= (AND (SUBSET-OF ?x ?y)
+	    (BOUND-VARIABLES ?x ?y)
+	    (BINARY-RELATION ?x) 
+	    (BINARY-RELATION ?y) ) 
+  :AXIOMS (AND ;(TRANSITIVE /XMLNS/RDFS/subPropertyOf) ;; problematic, we are getting transitivity via subset-of
+	       (/XMLNS/RDF/Property /XMLNS/RDFS/subPropertyOf)
+	       (/XMLNS/RDFS/domain /XMLNS/RDFS/subPropertyOf /XMLNS/RDF/Property)
+	       (/XMLNS/RDFS/range /XMLNS/RDFS/subPropertyOf /XMLNS/RDF/Property)))
+
+(DEFRELATION /XMLNS/RDFS/label (?x (?y STRING))
+  :AXIOMS (AND (/XMLNS/RDF/Property  /XMLNS/RDFS/label)
+	       (/XMLNS/RDFS/domain /XMLNS/RDFS/label /XMLNS/RDFS/Resource)
+	       (/XMLNS/RDFS/range /XMLNS/RDFS/label /XMLNS/RDFS/Literal)))
+
+(DEFRELATION /XMLNS/RDFS/comment (?x (?y STRING))
+  :<<=>> (DOCUMENTATION ?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property  /XMLNS/RDFS/comment)
+	       (/XMLNS/RDFS/domain /XMLNS/RDFS/comment /XMLNS/RDFS/Resource)
+	       (/XMLNS/RDFS/range /XMLNS/RDFS/comment /XMLNS/RDFS/Literal)))
+
+(DEFRELATION /XMLNS/RDFS/member (?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/RDFS/member)
+	       (/XMLNS/RDFS/domain /XMLNS/RDFS/member /XMLNS/RDFS/Resource)
+	       (/XMLNS/RDFS/range /XMLNS/RDFS/member /XMLNS/RDFS/Resource)))
+
+(DEFRELATION /XMLNS/RDFS/seeAlso (?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/RDFS/seeAlso)
+	       (/XMLNS/RDFS/domain /XMLNS/RDFS/seeAlso /XMLNS/RDFS/Resource)
+	       (/XMLNS/RDFS/range /XMLNS/RDFS/seeAlso /XMLNS/RDFS/Resource)))
+
+(DEFRELATION /XMLNS/RDFS/isDefinedBy (?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/RDFS/isDefinedBy)
+	       (/XMLNS/RDFS/subPropertyOf /XMLNS/RDFS/isDefinedBy /XMLNS/RDFS/seeAlso)
+	       (/XMLNS/RDFS/domain /XMLNS/RDFS/isDefinedBy /XMLNS/RDFS/Resource)
+	       (/XMLNS/RDFS/range /XMLNS/RDFS/isDefinedBy /XMLNS/RDFS/Resource)))
+
+(DEFRELATION /XMLNS/RDF/type ((?x /XMLNS/RDFS/Resource)
+			      (?y /XMLNS/RDFS/Class))
+  :<<=>> (INSTANCE-OF ?x ?y)
+  :AXIOMS (/XMLNS/RDF/Property  /XMLNS/RDF/type))
+
+(DEFRELATION /XMLNS/RDF/value (?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property  /XMLNS/RDF/value)
+	       (/XMLNS/RDFS/domain /XMLNS/RDF/predicate /XMLNS/RDFS/Resource)
+	       (/XMLNS/RDFS/range /XMLNS/RDF/predicate /XMLNS/RDFS/Resource)))
+
+(DEFRELATION /XMLNS/RDF/predicate (?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/RDF/predicate)
+	       (/XMLNS/RDFS/domain /XMLNS/RDF/predicate /XMLNS/RDF/Statement)
+	       (/XMLNS/RDFS/range /XMLNS/RDF/predicate /XMLNS/RDF/Property)))
+
+(DEFRELATION /XMLNS/RDF/subject (?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/RDF/subject)
+	       (/XMLNS/RDFS/domain /XMLNS/RDF/subject /XMLNS/RDF/Statement)
+	       (/XMLNS/RDFS/range /XMLNS/RDF/subject /XMLNS/RDFS/Resource)))
+
+(DEFRELATION /XMLNS/RDF/object (?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/RDF/object)
+	       (/XMLNS/RDFS/domain /XMLNS/RDF/object /XMLNS/RDF/Statement)))
+
+
+(DEFRELATION /XMLNS/RDF/first (?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/RDF/first)
+	       (/XMLNS/RDFS/domain /XMLNS/RDF/first /XMLNS/RDF/List)
+	       (/XMLNS/RDFS/range /XMLNS/RDF/first /XMLNS/RDFS/Resource)))
+
+(DEFRELATION /XMLNS/RDF/rest (?x ?y)
+  :AXIOMS (AND (/XMLNS/RDF/Property /XMLNS/RDF/rest)
+	       (/XMLNS/RDFS/domain /XMLNS/RDF/rest /XMLNS/RDF/List)
+	       (/XMLNS/RDFS/range /XMLNS/RDF/rest /XMLNS/RDF/List))
+  )
+
+;; TO DO:
+;; Also _<n> where <n> is a decimal integer > 0 with no leading zeros.
+;; This probably needs to be translated directly, rather than by enumeration
+;; here.
+
+
+(ASSERT (/XMLNS/RDF/List /XMLNS/RDF/nil))
+

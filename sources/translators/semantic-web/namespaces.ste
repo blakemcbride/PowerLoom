@@ -1,0 +1,793 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;; BEGIN LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                            ;
+; Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          ;
+;                                                                            ;
+; The contents of this file are subject to the Mozilla Public License        ;
+; Version 1.1 (the "License"); you may not use this file except in           ;
+; compliance with the License. You may obtain a copy of the License at       ;
+; http://www.mozilla.org/MPL/                                                ;
+;                                                                            ;
+; Software distributed under the License is distributed on an "AS IS" basis, ;
+; WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   ;
+; for the specific language governing rights and limitations under the       ;
+; License.                                                                   ;
+;                                                                            ;
+; The Original Code is the PowerLoom KR&R System.                            ;
+;                                                                            ;
+; The Initial Developer of the Original Code is                              ;
+; UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          ;
+; 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               ;
+;                                                                            ;
+; Portions created by the Initial Developer are Copyright (C) 2004-2014      ;
+; the Initial Developer. All Rights Reserved.                                ;
+;                                                                            ;
+; Contributor(s):                                                            ;
+;                                                                            ;
+; Alternatively, the contents of this file may be used under the terms of    ;
+; either the GNU General Public License Version 2 or later (the "GPL"), or   ;
+; the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   ;
+; in which case the provisions of the GPL or the LGPL are applicable instead ;
+; of those above. If you wish to allow use of your version of this file only ;
+; under the terms of either the GPL or the LGPL, and not to allow others to  ;
+; use your version of this file under the terms of the MPL, indicate your    ;
+; decision by deleting the provisions above and replace them with the notice ;
+; and other provisions required by the GPL or the LGPL. If you do not delete ;
+; the provisions above, a recipient may use your version of this file under  ;
+; the terms of any one of the MPL, the GPL or the LGPL.                      ;
+;                                                                            ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; END LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; Version: $Id$
+
+;;; Various XML and RDF namespace support.
+
+(in-package "STELLA")
+
+(in-module "SEMANTIC-WEB")
+
+
+;;; TO DO:
+;;; - finish setup of `base-mapping' in environments where we have a base-uri
+;;; - generalize the RDF reader to create a namespace map from the attributes
+;;;   of the RDF element
+;;; - index namespaces as well and make sure they are unique with respect
+;;;   to the canonical URI they name
+;;; - maybe add a :canoncial? keyword to the definition syntax to make this
+;;;   more explicit instead of ordering alone
+;;; - try to support translation without necessarily having these modules defined,
+;;;   i.e., the mapping would just specify the module name
+;;; - we should allow a mapping scheme where we have a single target module (assertion
+;;;   space) and names are kept separate based on a namespace prefix (e.g., pl-user/ns:foo
+;;;   or /xmlns/ns/foo); since namespaces can be locally redefined, we'd have to ensure
+;;;   that the associated URIs match as well
+;;; - support :xml-namespace annotations on modules that can take value such as
+;;;   "http://www.w3.org/1999/02/22-rdf-syntax-ns#" (or some variant; we basically
+;;;   want to define the URI as well as - optionally - a namespace prefix to use;
+;;;   the latter might be needed if we use module inheritance but might get name
+;;;   clashes because of that).
+
+
+  ;;
+;;;;;; Built-in namespaces
+  ;;
+
+;;; Consider these be specials so that they can be rebound if necessary:
+
+(defglobal *XML-URI* STRING "http://www.w3.org/XML/1998/namespaces")
+(defglobal *XMLS-URI* STRING "http://www.w3.org/2001/XMLSchema#")
+(defglobal *OWL-URI* STRING "http://www.w3.org/2002/07/owl#")
+(defglobal *RDF-URI*  STRING "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
+(defglobal *RDFS-URI* STRING "http://www.w3.org/2000/01/rdf-schema#")
+(defglobal *RDFS-OLD-URI* STRING "http://www.w3.org/TR/1999/PR-rdf-schema-19990303#")
+(defglobal *DAML-URI* STRING "http://www.daml.org/2001/03/daml+oil#")
+(defglobal *CYC-URI*  STRING "http://opencyc.sourceforge.net/daml/cyc#")
+
+(defglobal *BUILT-IN-XML-MODULE-NAMES* CONS
+  (quote ("/XMLNS/RDF" "/XMLNS/RDFS" "/XMLNS/XMLS" "/XMLNS/DAML" "/XMLNS/OWL" "/XMLNS/RDFS/OLD"
+          "/XMLNS/TRANSLATION-SUPPORT" "/XMLNS/TRANSLATION-SUPPORT/NAMESPACE-MAPPING")))
+
+(defun load-support-modules ((kb-directory FILE-NAME))
+  :public? TRUE
+  :documentation "Loads the support modules for the translator.  The files should
+be located in `kb-directory'.  If this is `null', then the logical
+pathname \"pl:kbs;semantic-web;\" will be used as the directory."
+  (when (null? kb-directory) (setq kb-directory "pl:kbs;semantic-web;"))
+  (foreach file in (quote ("translation-support.plm"
+                           "xmls.plm"
+                           "rdfx.plm"
+                           "daml.plm"
+                           "owl.plm"))
+    do (load (concatenate kb-directory file))))
+
+
+  ;;
+;;;;;; Mapping namespaces (URI prefixes) to STELLA modules
+  ;;
+
+;;; We aim for a very flexible mapping scheme with the following characteristics:
+;;; - a URI prefix mapped to a module does not have to conform to the URI's namespace
+;;;   (just some initial substring)
+;;; - longer prefixes may override mappings defined for shorter ones, for example,
+;;;   "urn:aaa/bbb/foo" => MOD-B/foo, while "urn:aaa/bar" => MOD-A/bar
+;;; - multiple prefixes might be mapped onto the same module, in which case the
+;;;   last such defined prefix serves as the modules canonical prefix when mapping back
+;;; - unmapped prefixes can be mapped onto a default module
+;;; - unmapped modules can be mapped onto a default prefix
+;;; - there are different options for mapping a URI onto the name of a symbol
+;;;   representing it (see `mapping-style' below)
+
+;;; There is already various other namespace mapping machinery available:
+;;; - `defnamespace' in webtools/objects/xml-object.ste which handles namespaces
+;;;   in XML object de/serialization
+;;; - machinery at the beginning of the daml.ste file
+;;; Neither of these seems to be quite right for what we want to do here.
+
+
+(defclass NAMESPACE-MAP (DICTIONARY)
+  :slots ((mappings :type (LIST OF MAPPING-INFO)
+                    :initially (new LIST)
+                    :documentation "Stores mappings as they are encountered to preserve order.")
+          (the-map :type (KEY-VALUE-MAP OF OBJECT (LIST OF MAPPING-INFO))
+                   :initially (new KEY-VALUE-MAP))
+          (ordered-prefix-table :type (VECTOR-SEQUENCE OF STRING-WRAPPER))
+          (base-mapping :type MAPPING-INFO)
+          (default-mapping :type MAPPING-INFO)
+          (finalized? :type BOOLEAN :initially FALSE)))
+
+(defclass MAPPING-INFO (STANDARD-OBJECT)
+  :slots ((namespace-uri-prefix :type STRING)
+          (namespace :type STRING)
+          (namespace-module-path :type STRING)
+          (namespace-module :type MODULE)
+          (assertion-module-path :type STRING)
+          (assertion-module :type MODULE)
+          (mapping-style :type KEYWORD :initially :FULL-URI
+            :documentation "Determines how a symbol name is derived from a URI.
+The namespace portion of the URI determines the module, but there are different
+possibilities for the name of the derived symbol.  :FULL-URI specifies to use
+the full URI as the symbol name.  :PREFIXED-NAME specifies that the name portion
+of the URI will be used prefixed by a pseudo-qualification by a namespace
+qualifier to ensure that there are no collisions (as long as namespace names
+are unique).  :BARE-NAME specifies to use the bare name of the URI for the
+symbol name.  In this case, the module should be a namespace module descending
+from /XMLNS/ to ensure that there won't be any name collisions.")))
+
+(defmethod (copy MAPPING-INFO) ((self MAPPING-INFO))
+  :documentation "Return a copy of `self'."
+  :public? TRUE
+  (return (new MAPPING-INFO
+               :namespace-uri-prefix (namespace-uri-prefix self)
+               :namespace (namespace self)
+               :namespace-module-path (namespace-module-path self)
+               :namespace-module (namespace-module self)
+               :assertion-module-path (assertion-module-path self)
+               :assertion-module (assertion-module self)
+               :mapping-style (mapping-style self))))
+
+(defmethod (copy NAMESPACE-MAP) ((self NAMESPACE-MAP))
+  :documentation "Return a copy of `self'."
+  :public? TRUE
+  (let ((baseMapping (base-mapping self))
+        (defaultMapping (default-mapping self))
+        (copy (new NAMESPACE-MAP
+                   :base-mapping baseMapping
+                   :default-mapping defaultMapping))
+        (copiedInfo MAPPING-INFO NULL))
+    (foreach info in (mappings self)
+        do (setq copiedInfo (copy info))
+           (when (eql? info baseMapping)
+             (setf (base-mapping copy) copiedInfo))
+           (when (eql? info defaultMapping)
+             (setf (default-mapping copy) copiedInfo))
+        collect copiedInfo into (mappings copy))
+    (when (finalized? self)
+      (finalize-namespace-map copy))
+    (return copy)))
+
+(defmethod insert-mapping ((self NAMESPACE-MAP) (info MAPPING-INFO))
+  :documentation "Add a new mapping `info' to `self'."
+  :public? TRUE
+  (insert-last (mappings self) info)
+  (setf (finalized? self) FALSE))
+
+(defun call-map-namespace ((self NAMESPACE-MAP) (options PROPERTY-LIST))
+  :documentation "Callable version of `map-namespace' (which see)."
+  :public? TRUE
+  ;; normalize short-options onto long format:
+  (setf (the-plist options)
+    (substitute
+     (substitute
+      (substitute (the-plist options)
+        :namespace-uri :uri)
+        :namespace-module :module)
+        :mapping-style :style))
+  (let ((info
+         (new MAPPING-INFO
+              :namespace-uri-prefix (lookup-with-default options :namespace-uri "")
+              :namespace (lookup-with-default options :namespace NULL-STRING-WRAPPER)))
+        (moduleOption OBJECT NULL))
+    ;; we allow either a name or a module to specify module options, but we only
+    ;; store names for now and defer their dereferencing until the first lookup
+    ;; (this way we can define mappings without the modules needing to be defined):
+    (setq moduleOption (lookup options :namespace-module))
+    (when (and (defined? moduleOption)
+               (isa? moduleOption @MODULE))
+      (setq moduleOption (module-full-name (cast moduleOption MODULE))))
+    (setf (namespace-module-path info) (coerce-to-module-name moduleOption FALSE))
+    (setq moduleOption (lookup options :assertion-module))
+    (when (and (defined? moduleOption)
+               (isa? moduleOption @MODULE))
+      (setq moduleOption (module-full-name (cast moduleOption MODULE))))
+    (setf (assertion-module-path info) (coerce-to-module-name moduleOption FALSE))
+    (when (eql? (lookup options :default?) TRUE-WRAPPER)
+      (setf (default-mapping self) info))
+    (when (eql? (lookup options :base?) TRUE-WRAPPER)
+      (setf (base-mapping self) info))
+    ;; pick different mapping style default depending on the namespace module path:
+    (let ((xmlNamespace?
+           (and (defined? (namespace-module-path info))
+                (defined? (string-search (string-upcase (namespace-module-path info)) "XMLNS/" 0)))))
+      (setf (mapping-style info)
+        (lookup-with-default options :mapping-style (choose xmlNamespace? :BARE-NAME :FULL-URI))))
+    (insert-mapping self info)))
+
+(defmethod register-namespace-mapping ((self NAMESPACE-MAP) (info MAPPING-INFO) (namespace STRING))
+  ;; Register `namespace' as a name that can be used to lookup `info' in `map'.
+  ;; Assumes `info' has already been indexed in `self' and that `self' is finalized.
+  ;; IMPORTANT NOTE: these registrations are lost during refinalization and copying!
+  (safety 1 (finalized? self) "register-namespace-mapping: called on unfinalized map")
+  (when (defined? namespace)
+    (insert-at (the-map self) namespace (list info))))
+
+(defmethod finalize-mapping ((self NAMESPACE-MAP) (info MAPPING-INFO))
+  (when (null? (namespace-module info))
+    (setf (namespace-module info) (get-stella-module (namespace-module-path info) TRUE))
+    (when (null? (assertion-module info))
+      (when (null? (assertion-module-path info))
+        (if (subcontext? (namespace-module info) (get-stella-module "/XMLNS" TRUE))
+            (setf (assertion-module-path info) "/PL-KERNEL-KB/WEB-CORE")
+          (setf (assertion-module-path info) (namespace-module-path info))))
+      (setf (assertion-module info) (get-stella-module (assertion-module-path info) TRUE))))
+  (let ((index (the-map self))
+        (infos (lookup index (namespace-uri-prefix info))))
+    (when (null? infos)
+      (setq infos (new LIST))
+      (insert-at index (namespace-uri-prefix info) infos))
+    (push infos info)
+    ;; register info under its namespace prefix as well (these should be unique):
+    (when (defined? (namespace info))
+      (insert-at index (namespace info) (list info)))
+    (setq infos (lookup (the-map self) (namespace-module info)))
+    (when (null? infos)
+      (setq infos (new LIST))
+      (insert-at index (namespace-module info) infos))
+    (push infos info)))
+
+(defmethod finalize-namespace-map ((self NAMESPACE-MAP))
+  :public? TRUE
+  (unless (finalized? self)
+    (clear (the-map self))
+    (foreach info in (mappings self)
+        do (finalize-mapping self info))
+    (create-ordered-prefix-table self)
+    (setf (finalized? self) TRUE)))
+
+(defmethod refinalize-namespace-map ((self NAMESPACE-MAP))
+  :public? TRUE
+  (setf (finalized? self) FALSE)
+  (finalize-namespace-map self))
+
+(defmethod (create-ordered-prefix-table (VECTOR-SEQUENCE OF STRING-WRAPPER)) ((self NAMESPACE-MAP))
+  ;; Create the ordered prefix table of `self'.
+  (let ((prefixes (new VECTOR-SEQUENCE :array-size (* (length (the-map self)) 0.6))))
+    (foreach infos in (the-map self)
+        do (foreach info in infos
+               where (not (member? prefixes (namespace-uri-prefix info))) ;; ok, since maps are small
+               do (insert prefixes (namespace-uri-prefix info))))
+    ;; we sort them in reverse alphabetical order, which will make "aaa" appear before "aa":
+    (sort prefixes NULL)
+    (reverse prefixes)
+    (setf (ordered-prefix-table self) prefixes)
+    (return prefixes)))
+
+(defmethod (get-ordered-prefix-table (VECTOR-SEQUENCE OF STRING-WRAPPER)) ((self NAMESPACE-MAP))
+  ;; Return the ordered prefix table of `self', re/generate it if necessary.
+  (unless (finalized? self)
+    (finalize-namespace-map self))
+  (return (ordered-prefix-table self)))
+
+(defmethod (get-prefix-index INTEGER) ((self NAMESPACE-MAP) (prefix STRING))
+  ;; Lookup the position in `(ordered-prefix-table self)' where `prefix' would be inserted.
+  ;; The element currently occupying this position is either equal to `prefix', or, otherwise
+  ;; would be shifted to the right (i.e., all elements at or after this position are < than `prefix').
+  (return (get-name-insertion-index (get-ordered-prefix-table self) prefix)))
+
+(defun (get-name-insertion-index INTEGER) ((table (VECTOR-SEQUENCE OF STRING-WRAPPER)) (name STRING))
+  ;; `table' is assumed to be in reverse alphabetical order (no duplicates).
+  ;; Lookup the position where `name' is found, or, if not found, would be
+  ;; inserted such that order would be preserved (assuming everything starting
+  ;; at that position would be shifted to the right).
+  (let ((vector (the-array table))
+        (bot 0)
+        (top (1- (length table)))
+        (split 0)
+        (element STRING-WRAPPER NULL))
+    ;; find the position via binary search:
+    (loop
+      (when (> bot top)
+        (return (max split bot)))
+      (setq split (shift-right (+ bot top) 1))
+      (setq element (nth vector split))
+      (cond ((eql? element name)
+             (return split))
+            ((string< element name)
+             (-- split)
+             (setq top split))
+            (otherwise
+             (++ split)
+             (setq bot split))))))
+
+(defmethod (lookup-longest-prefix STRING-WRAPPER) ((self NAMESPACE-MAP) (name STRING))
+  :documentation "Look for the longest prefix of `name' that has a mdoule registered
+for it and return it; otherwise, return NULL.  We return the wrapped string here,
+so we don't have to rewrap when we lookup the module."
+  :public? TRUE
+  (let ((prefixes (get-ordered-prefix-table self))
+        (nPrefixes (length prefixes))
+        (index (get-prefix-index self name))
+        (matchingPrefix STRING-WRAPPER NULL))
+    (when (>= index nPrefixes)
+      (return NULL))
+    (while (and (>= index 0)
+                (starts-with? name (nth prefixes index) 0))
+      (setq matchingPrefix (nth prefixes index))
+      (-- index))
+    (return matchingPrefix)))
+
+(defmethod (lookup-module-mapping MAPPING-INFO) ((self NAMESPACE-MAP) (module MODULE))
+  :documentation "Lookup the canonical mapping associated with the given namespace `module'.
+Since we can have multiple URI prefixes mapped onto the same module, this returns the
+last one recorded.  If no mapping could be found, the default mapping of `self' will
+be used.  If that is also NULL, an error will be raised."
+  :public? TRUE
+  (unless (finalized? self)
+    (finalize-namespace-map self))
+  (let ((infos (lookup (the-map self) module))
+        (info (choose (defined? infos)
+                      (first infos) ;; stored in reverse order
+                      NULL)))
+    (when (null? info)
+      ;; we didn't find a module-specific mapping, use the default info:
+      (setq info (default-mapping self)))
+    (when (null? info)
+      ;; no default defined, raise an error for now:
+      (error "lookup-module-mapping: no applicable mapping defined for " module))
+    (return info)))
+
+(defmethod (lookup-prefix-mapping MAPPING-INFO) ((self NAMESPACE-MAP) (name STRING))
+  :documentation "Look for the longest prefix of `name' that has a mapping registered
+for it and return that; since multiple modules might be using the same URI prefix,
+the last one recorded will be returned.  If no mapping could be found, the default
+mapping of `self' will be used, otherwise, NULL will be returned."
+  :public? TRUE
+  (let ((prefix (lookup-longest-prefix self name))
+        (infos (choose (defined? prefix)
+                       (lookup (the-map self) prefix)
+                       NULL))
+        (info (choose (defined? infos)
+                      (first infos) ;; stored in reverse order
+                      (default-mapping self))))
+    (return info)))
+
+(defmethod (lookup-exact-prefix-mapping MAPPING-INFO) ((self NAMESPACE-MAP) (prefix STRING))
+  :documentation "Look for the mapping exactly associated with `prefix'.
+If none exists, return `self's default mapping."
+  :public? TRUE
+  (unless (finalized? self)
+    (finalize-namespace-map self))
+  (let ((infos (lookup (the-map self) prefix))
+        (info (choose (defined? infos)
+                      (first infos) ;; stored in reverse order
+                      (default-mapping self))))
+    (return info)))
+
+(defmethod (lookup-namespace-mapping MAPPING-INFO) ((self NAMESPACE-MAP) (namespace STRING))
+  :documentation "Look for the mapping associated with `namespace' (such as `rdf' or `xsd').
+Return NULL if none exists, since for a `namespace' qualifier we assume that it was defined."
+  :public? TRUE
+  ;; for now, since we put them into the same table for simplicity - but see
+  ;; `register-namespace-mapping' and ` finalize-mapping' in case this needs to change:
+  (unless (finalized? self)
+    (finalize-namespace-map self))
+  (let ((infos (lookup (the-map self) namespace))
+        (info (choose (defined? infos)
+                      (first infos) ;; stored in reverse order
+                      NULL)))
+    (return info)))
+
+(defmethod (all-namespace-mappings (CONS OF MAPPING-INFO)) ((self NAMESPACE-MAP))
+  :documentation "Collect mappings foreach module registered in `self' whose
+canonical mapping has a defined namespace string."
+  :public? TRUE
+  (let ((result (new (KEY-VALUE-MAP OF STRING-WRAPPER MAPPING-INFO))))
+    (foreach (namespace infos) in (the-map self)
+        where (isa? namespace @MODULE)
+        do (ignore infos)
+           (let ((info (lookup-module-mapping self namespace))
+                 (priorInfo MAPPING-INFO NULL))
+             (when (defined? (namespace info))
+               (setq priorInfo (lookup result (namespace info)))
+               (if (defined? priorInfo)
+                   (unless (eql? (namespace-uri-prefix priorInfo) (namespace-uri-prefix info))
+                     (error "Different namespace URIs are using same namespace " (namespace info)
+                            ":" (namespace-uri-prefix priorInfo)
+                            " " (namespace-uri-prefix info)))
+                 (insert-at result (namespace info) info)))))
+    (return (collect info in result))))
+
+;;; Symbol and URI mapping functions (they all take an optional `info' argument
+;;; for efficiency, so we don't have to look it up again during related calls):
+
+(defmethod (uri-to-symbol SYMBOL) ((self NAMESPACE-MAP) (uri STRING) (info MAPPING-INFO))
+  :documentation "Map `uri' onto a STELLA symbol according to `info'.
+If `info' is NULL, it will be looked up first from `self'.  In that case,
+the longest registered prefix in `self' that matches the initial portion
+of `uri' will determine its module, the remaining portion determines
+its symbol name (based on the particular mapping style)."
+  :public? TRUE
+  (when (null? info)
+    (setq info (lookup-prefix-mapping self uri)))
+  (let ((name uri)
+        (prefix (namespace-uri-prefix info))
+        (isUriPrefix? (starts-with? uri prefix 0)))
+    (case (mapping-style info)
+      (:BARE-NAME
+       ;; this is the mapping style where we assume that namespace URIs are
+       ;; mapped onto top-level namespace modules that do not inherit from
+       ;; each other and, therefore, we do not have to worry about collisions:
+       (when isUriPrefix?
+         (setq name (subsequence uri (length prefix) NULL)))
+       (return (intern-symbol-in-module name (namespace-module info) TRUE)))
+      (:PREFIXED-NAME
+       (let ((namespace (namespace info)))
+         (when (and isUriPrefix?
+                    (defined? namespace))
+           (setq name (subsequence uri (length prefix) NULL))
+           ;; we prepend the namespace to the symbol name to ensure that there are
+           ;; no accidental name collisions; this is useful if namespaces are mapped
+           ;; onto modules that inherit from each other:
+           (setq name (concatenate namespace "/" name)))
+         (return (intern-symbol-in-module name (namespace-module info) TRUE))))
+      (:FULL-URI
+       (unless isUriPrefix?
+         ;; we have a bare name, conatenate it with its namespace uri:
+         (setq uri (concatenate prefix uri)))
+       (return (intern-symbol-in-module uri (namespace-module info) TRUE))))))
+
+(defun (map-symbol-as-full-uri? BOOLEAN) ((symbol GENERALIZED-SYMBOL) (info MAPPING-INFO))
+  (if (eql? (mapping-style info) :FULL-URI)
+      (return TRUE)
+    (let ((name (symbol-name symbol)))
+      (return
+        ;; we are paranoid here, conceivably we could rely on mapping style:
+        (and (absolute-resource-name? name)
+             ;; SIRE kludge to handle |kb:E0349508| entities, figure
+             ;; out how to work around this problem more gracefully:
+             (not (starts-with? name "kb:" 0)))))))
+
+(defmethod (symbol-to-uri STRING) ((self NAMESPACE-MAP)
+                                   (symbol GENERALIZED-SYMBOL)
+                                   (info MAPPING-INFO)
+                                   (usage KEYWORD))
+  :documentation "Map `symbol' onto a fully qualified URI according to `info'.
+If `info' is NULL, it will be looked up from `self' based on `symbol's module.
+`usage' specifies how the generated URI will be used which determines what
+syntax will be generated (values can be :ENTITY, :ATTRIBUTE, :ID).  For this
+function only :ID affects the behavior."
+  :public? TRUE
+  (when (null? info)
+    (setq info (lookup-module-mapping self (interned-in symbol))))
+  (cond ((map-symbol-as-full-uri? symbol info)
+         (return (symbol-name symbol)))
+        ((eql? usage :ID)
+         (return (symbol-to-uri-name self symbol info)))
+        (otherwise
+         (return
+           (concatenate (namespace-uri-prefix info) (symbol-to-uri-name self symbol info))))))
+
+(defmethod (short-uri-to-symbol SYMBOL) ((self NAMESPACE-MAP) (uri STRING) (info MAPPING-INFO))
+  :documentation "Map the name of a short `uri' (usually a qualified name such as `rdf:type') onto
+a STELLA symbol according to `info'.  If `info' is NULL, it will be looked up first from `self'
+based on the namespace portion of `uri' (e.g., `rdf' for `rdf:type')."
+  :public? TRUE
+  (let ((colonPos (position uri #\: 0)))
+    (when (null? info)
+      (when (defined? colonPos)
+        (setq info (lookup-namespace-mapping self (subsequence uri 0 colonPos))))
+      (when (null? info)
+        (when (null? colonPos)
+          (setq info (base-mapping self)))
+        (when (null? info)
+          (setq info (default-mapping self)))))
+    (when (defined? colonPos)
+      (setq uri (subsequence uri (1+ colonPos) NULL)))
+    (return (uri-to-symbol self uri info))))
+
+(defmethod (symbol-to-short-uri STRING) ((self NAMESPACE-MAP)
+                                         (symbol GENERALIZED-SYMBOL)
+                                         (info MAPPING-INFO)
+                                         (usage KEYWORD))
+  :documentation "Map `symbol' onto a fully qualified URI according to `info', but
+use a namespace prefix if possible.  See `symbol-to-uri' for documentation on
+`usage' and `info'."
+  :public? TRUE
+  (when (null? info)
+    (setq info (lookup-module-mapping self (interned-in symbol))))
+  (when (map-symbol-as-full-uri? symbol info)
+    (return (symbol-name symbol)))
+  (let ((namespace (namespace info))
+        (name (symbol-to-uri-name self symbol info)))
+    (cond ((eql? usage :ID)
+           (return name))
+          ((defined? namespace)
+           (case usage
+             (:ENTITY (return (concatenate namespace ":" name)))
+             (:ATTRIBUTE (return (concatenate "&" namespace ";" name)))))
+          (otherwise
+           (return (concatenate (namespace-uri-prefix info) name))))))
+
+(defmethod (symbol-to-relative-uri STRING) ((self NAMESPACE-MAP)
+                                            (symbol GENERALIZED-SYMBOL)
+                                            (info MAPPING-INFO)
+                                            (usage KEYWORD))
+  :documentation "Map `symbol' onto a relative URI according to `self's base-mapping
+if possible; otherwise, return a short URI for it.  See `symbol-to-uri' for documentation
+on `usage' and `info'."
+  :public? TRUE
+  (when (null? (base-mapping self))
+    (return (symbol-to-short-uri self symbol info usage)))
+  (when (null? info)
+    (setq info (lookup-module-mapping self (interned-in symbol))))
+  (when (map-symbol-as-full-uri? symbol info)
+    (return (symbol-name symbol)))
+  (let ((base (base-mapping self))
+        (name (symbol-to-uri-name self symbol info))
+        (symbolPrefix (namespace-uri-prefix info))
+        (basePrefix (namespace-uri-prefix base)))
+    (when (eql? usage :ID)
+      (return name))
+    (if (or (eql? symbolPrefix basePrefix)
+            ;; can we normalize these somehow for simpler testing?
+            (and (starts-with? symbolPrefix basePrefix 0)
+                 (ends-with? symbolPrefix "#" NULL)
+                 (= (length symbolPrefix) (1+ (length basePrefix)))))
+        (return (concatenate "#" name))
+      (return (symbol-to-short-uri self symbol info usage)))))
+
+(defun (escape-uri-name STRING) ((uri STRING))
+  ;;; TO DO: FIX THIS, IT IS HORRIBLY SLOW - WE BASICALLY WANT A FAST
+  ;;; `escape-uri-name' in streams.ste.
+  (let ((out (new STRING-OUTPUT-STREAM)))
+    (write-html-escaping-url-special-characters out uri)
+    (return (the-string out))))
+
+(defmethod (symbol-to-uri-name STRING) ((self NAMESPACE-MAP)
+                                        (symbol GENERALIZED-SYMBOL)
+                                        (info MAPPING-INFO))
+  :documentation "Map `symbol' onto the unqualified name portion of its URI representation."
+  :public? TRUE
+  (when (null? info)
+    (setq info (lookup-module-mapping self (interned-in symbol))))
+  (let ((name (symbol-name symbol)))
+    (case (mapping-style info)
+      (:BARE-NAME NULL) 
+      (:PREFIXED-NAME
+       (let ((namespace (namespace info)))
+         (when (and (defined? namespace)
+                    (starts-with? name namespace 0))
+           (setq name (subsequence name (length namespace) NULL)))))
+      (:FULL-URI NULL))
+    (return (escape-uri-name name))))
+
+(defmethod (symbol-to-namespace STRING) ((self NAMESPACE-MAP)
+                                         (symbol GENERALIZED-SYMBOL)
+                                         (info MAPPING-INFO))
+  :documentation "Map `symbol' onto the namespace associated with its URI  (might be NULL)."
+  :public? TRUE
+  (when (null? info)
+    (setq info (lookup-module-mapping self (interned-in symbol))))
+  (return (namespace info)))
+
+(defmethod (module-to-namespace STRING) ((self NAMESPACE-MAP)
+                                         (module MODULE)
+                                         (info MAPPING-INFO))
+  :documentation "Map `module' onto its namespace (might be NULL)."
+  :public? TRUE
+  (when (null? info)
+    (setq info (lookup-module-mapping self module)))
+  (return (namespace info)))
+
+
+  ;;
+;;;;;; Top-level commands
+  ;;
+
+(defun (create-namespace-map NAMESPACE-MAP) ()
+  :documentation "Return a new, empty namespace map."
+  :public? TRUE :command? TRUE
+  (return (new NAMESPACE-MAP)))
+  
+(defun (copy-namespace-map NAMESPACE-MAP) ((self NAMESPACE-MAP))
+  :documentation "Return a structural copy of `self'."
+  :public? TRUE :command? TRUE
+  (return (copy self)))
+
+(defglobal *default-namespace-map* NAMESPACE-MAP (create-default-namespace-map))
+
+(defun (create-default-namespace-map NAMESPACE-MAP) ()
+  :documentation "Create a namespace map handling various standard semantic web namespaces."
+  :public? TRUE :command? TRUE
+  ;; TO DO: what this could do instead is to map over all currently loaded
+  ;;        modules and look for :xml-namespaces annotations (we might allow
+  ;;        multiple to handle different variants).  This could be cached
+  ;;        with a cache that's wiped out with module re/definitions.
+  ;;        Local additions could then add or modify aspects of this map.
+  ;;        Currently, /XMLNS/RDF and friends do not have namespaces assigned.
+  (when (null? (get-stella-module "/XMLNS/XMLS" FALSE))
+    ;; try to load the required support files:
+    (load-support-modules NULL))
+  (let ((map (new NAMESPACE-MAP)))
+    (map-namespace map
+                   :namespace "xmls"
+                   :namespace-uri "http://www.w3.org/2001/XMLSchema#"
+                   :namespace-module "/XMLNS/XMLS"
+                   :mapping-style :bare-name)
+    (map-namespace map
+                   :namespace "rdf"
+                   :namespace-uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+                   :namespace-module "/XMLNS/RDF"
+                   :mapping-style :bare-name)
+    (map-namespace map
+                   :namespace "dc"
+                   :namespace-uri "http://purl.org/dc/elements/1.1/"
+                   :namespace-module "/XMLNS/RDFS" ;; for now
+                   :mapping-style :bare-name)
+    ;; define this one after the "dc" stuff to make it the canonical output mapping:
+    (map-namespace map
+                   :namespace "rdfs"
+                   :namespace-uri "http://www.w3.org/2000/01/rdf-schema#"
+                   :namespace-module "/XMLNS/RDFS"
+                   :mapping-style :bare-name)
+    (map-namespace map
+                   :namespace "owl2"
+                   :namespace-uri "http://www.w3.org/2006/12/owl2-xml#"
+                   :namespace-module "/XMLNS/OWL"  ;; for now
+                   :mapping-style :bare-name)
+    ;; define this one last to make it the canonical output mapping:
+    (map-namespace map
+                   :namespace "owl"
+                   :namespace-uri "http://www.w3.org/2002/07/owl#"
+                   :namespace-module "/XMLNS/OWL"
+                   :mapping-style :bare-name)
+    (map-namespace map
+                   :namespace-uri "urn:unknown/"
+                   :namespace-module "PL-USER"
+                   :mapping-style :full-uri
+                   :default? TRUE)
+    (finalize-namespace-map map)
+    (return map)))
+
+(defun (get-default-namespace-map NAMESPACE-MAP) ()
+  :documentation "Return the current default map."
+  :public? TRUE :command? TRUE
+  (finalize-namespace-map *default-namespace-map*)
+  (return *default-namespace-map*))
+
+(defun set-default-namespace-map ((map NAMESPACE-MAP))
+  :documentation "Set the current default map to `map'."
+  :public? TRUE :command? TRUE
+  (setq *default-namespace-map* map))
+
+(defun (map-namespace NAMESPACE-MAP) ((self NAMESPACE-MAP) &rest (options OBJECT))
+  :documentation "Define a mapping entry in `self' according to `options'.
+If `self' is NULL, it will be initialized with a default map as created by
+`create-default-namespace-map' (which see).  The following options are
+supported: :uri defines the URI of the mapped namespace, :namespace defines
+its shorthand prefix such as `rdf' or `rdfs', :module defines the corresponding PowerLoom
+namespace module (or name), :assertion-module specifies the corresponding PowerLoom assertion
+module (if different from the namespace module), :style can be one of :full-uri, :prefixed-name
+or :bare-name.  :full-uri specifies to use the full URI as the symbol name. :prefixed-name
+specifies that the name portion of the uri will be used prefixed by a pseudo-qualification
+by a namespace qualifier to ensure that there are no collisions (as long as namespace names
+are unique).  :bare-name specifies to use the bare name of the URI for the symbol name.
+In this case, the module should be a namespace module descending from /XMLNS/ to ensure
+that there won't be any name collisions.  The :base? option defines the URI as the base
+URI and the :default? option specifies that this module should be used in case no other
+mapping applies."
+  :public? TRUE :command? TRUE
+  (let ((theOptions
+         (parse-logic-command-options
+          (coerce-&rest-to-cons options)
+          (bquote (:namespace-uri @STRING
+                   :uri @STRING
+                   :namespace @STRING
+                   :namespace-module @OBJECT
+                   :module @OBJECT
+                   :assertion-module @OBJECT
+                   :mapping-style @KEYWORD
+                   :style @KEYWORD
+                   :base? @BOOLEAN
+                   :default? @BOOLEAN))
+          TRUE FALSE)))
+    (when (null? self)
+      (setq self (create-default-namespace-map)))
+    (call-map-namespace self theOptions)
+    (return self)))
+
+(defun (define-namespace-map NAMESPACE-MAP) (&rest (options OBJECT))
+  :documentation "Define a new namespace map with a list of mappings.  The general
+syntax is `(define-namespace-map [:base-map <mapspec>] {(<map-options>*)}*)'
+:base-map can be an existing map or the value :default to create a default map.
+If no map is supplied, a default map is created also, only if a NULL map is specified
+explicitly will a new empty map be created.  Each map-options tuple takes the same
+options supported by `map-namespace' (which see)."
+  :public? TRUE :command? TRUE :evaluate-arguments? TRUE
+  (let ((optionsList (coerce-&rest-to-cons options))
+        (baseOptions
+         (collect option in optionsList where (not (cons? option))))
+        (mapOptions
+         (collect option in optionsList where (cons? option)))
+        (theBaseOptions
+         (parse-logic-command-options
+          baseOptions
+          (bquote (:base-map @OBJECT))
+          TRUE FALSE))
+        (map (lookup theBaseOptions :base-map)))
+    (when (null? map)
+      (unless (member? baseOptions :base-map)
+        (setq map :default)))
+    (cond ((eql? map :default)
+           (setq map (create-default-namespace-map)))
+          ((null? map)
+           (setq map (new NAMESPACE-MAP)))
+          ((not (isa? map @NAMESPACE-MAP))
+           (error "define-namespace-map: illegal :base-map specification: " map)))
+    (foreach mapOption in mapOptions
+        do (let ((theOptions
+                  (parse-logic-command-options
+                   mapOption
+                   (bquote (:namespace-uri @STRING
+                            :uri @STRING
+                            :namespace @STRING
+                            :namespace-module @OBJECT
+                            :module @OBJECT
+                            :assertion-module @OBJECT
+                            :mapping-style @KEYWORD
+                            :style @KEYWORD
+                            :base? @BOOLEAN
+                            :default? @BOOLEAN))
+                   TRUE FALSE)))
+             (call-map-namespace map theOptions)))
+    (finalize-namespace-map (cast map NAMESPACE-MAP))
+    (return map)))
+
+#|
+;;; Example call that effectively creates the default namespace map:
+
+(define-namespace-map
+    :base-map NULL
+    '(:namespace "xmls" :uri "http://www.w3.org/2001/XMLSchema#" :module "/XMLNS/XMLS" :style :bare-name)
+    '(:namespace "rdf" :uri "http://www.w3.org/1999/02/22-rdf-syntax-ns#" :module "/XMLNS/RDF" :style :bare-name)
+    '(:namespace "dc" :uri "http://purl.org/dc/elements/1.1/" :module "/XMLNS/RDFS" :style :bare-name)
+    '(:namespace "rdfs" :uri "http://www.w3.org/2000/01/rdf-schema#" :module "/XMLNS/RDFS" :style :bare-name)
+    '(:namespace "owl2" :uri "http://www.w3.org/2006/12/owl2-xml#" :module "/XMLNS/OWL" :style :bare-name)
+    '(:namespace "owl" :uri "http://www.w3.org/2002/07/owl#" :module "/XMLNS/OWL" :style :bare-name)
+    '(:uri "urn:unknown/" :module "PL-USER" :style :full-uri :default? TRUE))
+
+;;; Call that achieves the same:
+
+(define-namespace-map)
+|#

@@ -1,0 +1,1756 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;; BEGIN LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                            ;
+; Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          ;
+;                                                                            ;
+; The contents of this file are subject to the Mozilla Public License        ;
+; Version 1.1 (the "License"); you may not use this file except in           ;
+; compliance with the License. You may obtain a copy of the License at       ;
+; http://www.mozilla.org/MPL/                                                ;
+;                                                                            ;
+; Software distributed under the License is distributed on an "AS IS" basis, ;
+; WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   ;
+; for the specific language governing rights and limitations under the       ;
+; License.                                                                   ;
+;                                                                            ;
+; The Original Code is the PowerLoom KR&R System.                            ;
+;                                                                            ;
+; The Initial Developer of the Original Code is                              ;
+; UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          ;
+; 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               ;
+;                                                                            ;
+; Portions created by the Initial Developer are Copyright (C) 1997-2019      ;
+; the Initial Developer. All Rights Reserved.                                ;
+;                                                                            ;
+; Contributor(s):                                                            ;
+;                                                                            ;
+; Alternatively, the contents of this file may be used under the terms of    ;
+; either the GNU General Public License Version 2 or later (the "GPL"), or   ;
+; the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   ;
+; in which case the provisions of the GPL or the LGPL are applicable instead ;
+; of those above. If you wish to allow use of your version of this file only ;
+; under the terms of either the GPL or the LGPL, and not to allow others to  ;
+; use your version of this file under the terms of the MPL, indicate your    ;
+; decision by deleting the provisions above and replace them with the notice ;
+; and other provisions required by the GPL or the LGPL. If you do not delete ;
+; the provisions above, a recipient may use your version of this file under  ;
+; the terms of any one of the MPL, the GPL or the LGPL.                      ;
+;                                                                            ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; END LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; Version: $Id$
+
+;;; Evaluator routines that compute forward propagation for the
+;;;    propositional calculus.
+
+(in-package "STELLA")
+
+(in-module "LOGIC")
+
+
+;;; NOTES:
+;;; - we want to reuse forward-inferred results from parent modules without
+;;;   having to re-derive them in each child context; which requires multiple-
+;;;   inheritance JIT caches
+;;; - it could be that a rule that didn't fire in a parent context now
+;;;   succeeds due to some additionally available propositions; if the
+;;;   new propositions trigger the required inference, we are ok, however
+;;;   if they don't, we would have to rerun everything to get the desired result
+;;; - if we do introduce multiple-inheritance JIT caches, then we have to revisit
+;;;   the cycle detection problem for variable-value links (see the new
+;;;   `synchronize-variable-value-inference-caches' in `bind-skolem-to-value')
+;;; - we might want to have a special version of `all-facts-of' that uses
+;;;   the table of the propagation environment instead of its own
+;;; - the table of propositions in the propagation environment could either
+;;;   be generated in the standard "all-facts-of" style, or it could be filled
+;;;   with all available propositions, if we want to run a forced propagate
+;;; - if we derive a new forward rule, we might want to force finding all
+;;;   possible antecedents for it in the environment and run them
+;;; - if we are destroying a JIT cache, we might want to preserve the previously
+;;;   generated posted propositions and repost them instead of relying on
+;;;   elaboration to slowly regenerate them
+;;; - in JIT mode, if an object is linked to more than x% of the propositions
+;;;   in a module, we might not want to add its propositions, since it isn't
+;;;   selective enough and will likely be taken care of by other objects in
+;;;   the module
+;;; - interaction between forward and back chainer: if we are deriving new
+;;;   forward results during a backward query, we might have to run it again
+;;;   to take advantage of that; this might require some time stamping
+;;; - since we now mandate shallow mode, we might be able to figure out what ground
+;;;   facts a complex forward rule depends on, which might allow us to figure
+;;;   out what stuff needs to be selectively re-run in a subcontext
+
+
+  ;;
+;;;;;; Constraint Propagation Environment
+  ;;
+
+(defclass PROPAGATION-ENVIRONMENT (STANDARD-OBJECT)
+  :slots ((evaluation-queue :type (LIST OF PROPOSITION) :initially (list))
+          (evaluation-states :type (KEY-VALUE-MAP OF PROPOSITION KEYWORD)
+                             :initially (new KEY-VALUE-MAP))
+          (forward-chaining-queue :type (LIST OF PROPOSITION) :initially (list))
+          (forward-chaining-set :type (HASH-SET OF PROPOSITION PROPOSITION)
+                                   :initially (new HASH-SET))
+          (deferred-default-propositions :type (LIST OF PROPOSITION) :initially (list))
+          (elaborated-objects :type HASH-SET :initially (new HASH-SET))))
+
+(defun print-propagation-environment-stats ((self PROPAGATION-ENVIRONMENT))
+  ;; Performance debugging aid.
+  (when (null? self)
+    (setq self (get-propagation-environment *context*)))
+  (print "Propagation environment stats:" EOL)
+  (print "  " (length (evaluation-queue self)) " propositions in evaluation-queue" EOL)
+  (print "  " (length (forward-chaining-set self)) " propositions in forward-chaining-queue" EOL)
+  (print "  " (length (elaborated-objects self)) " objects elaborated" EOL))
+
+(defslot CONTEXT propagation-environment :type PROPAGATION-ENVIRONMENT
+         :public? TRUE
+         :documentation "Holds propositions posted for evaluation and
+forward chaining as well as various other propagation control information.")
+
+(defun (get-propagation-environment PROPAGATION-ENVIRONMENT) ((self CONTEXT))
+  ;; Access the propagation environment of `self' (create it if necessary).
+  (safety 3 (not (world-state? self)) 
+          "INTERNAL ERROR: Called 'get-propagation-environment' on world state: " self)
+  (safety 3 (not (deleted? self))
+          "INTERNAL ERROR: Called 'get-propagation-environment' on deleted context: " self)
+  (let ((environment (propagation-environment self)))
+    (when (null? environment)
+      (setq environment (new PROPAGATION-ENVIRONMENT))
+      (setf (propagation-environment self) environment))
+    (return environment)))
+
+(defun unlink-propagation-environment ((self CONTEXT))
+  ;; Remove the propagation environment linked to `self' if it has one.
+  (setf (propagation-environment self) NULL))
+
+(defmethod defer-default-proposition ((self PROPAGATION-ENVIRONMENT)
+                                      (proposition PROPOSITION))
+  ;; Register `proposition' as a deferred default proposition.
+  ;; TO DO: POTENTIALLY CONSIDER DUPLICATES HERE AND MAKE THIS A HASH SET.
+  (insert (deferred-default-propositions self) proposition))
+
+(defmethod clear-propagation-queues ((self PROPAGATION-ENVIRONMENT))
+  ;; Clear both queues.
+  (clear (evaluation-queue self))
+  (clear (forward-chaining-queue self)))
+
+(defmethod (copy (LIKE self)) ((self PROPAGATION-ENVIRONMENT))
+  ;; Return a copy of the propagation environment `self'.
+  (let ((copy (new PROPAGATION-ENVIRONMENT)))
+    (setf (evaluation-queue copy)
+      (copy (evaluation-queue self)))
+    (foreach (prop state) in (evaluation-states self)
+        do (insert-at (evaluation-states copy) prop state))
+    (setf (forward-chaining-queue copy)
+      (copy (forward-chaining-queue self)))
+    (foreach prop in (forward-chaining-set self)
+        do (insert (forward-chaining-set copy) prop))
+    (setf (deferred-default-propositions copy)
+      (copy (deferred-default-propositions self)))
+    (foreach obj in (elaborated-objects self)
+        do (insert (elaborated-objects copy) obj))
+    (return copy)))
+
+
+  ;;
+;;;;;; Evaluation queue
+  ;;
+
+(defspecial *fillingConstraintPropagationQueues?* BOOLEAN FALSE
+  :documentation "True if we are inside of 'react-to-kb-update'.")
+
+(defspecial *deferingDefaultForwardInferences?* BOOLEAN FALSE
+  :documentation "True if we are propagating strict inferences, and
+posting derived default propositions to temporary queues.")
+
+(defun (evaluation-state KEYWORD) ((proposition PROPOSITION))
+  :documentation "Return :POSTED if `proposition' is on the evaluation queue
+for *context*, :EVALUATED if has been evaluated, or NULL if it has never been evaluated."
+  :public? TRUE :globally-inline? TRUE
+  (if (description-mode?)
+      (return NULL)
+    (return (lookup (evaluation-states (get-propagation-environment *context*)) proposition))))
+
+(defun evaluation-state-setter ((proposition PROPOSITION) (state KEYWORD))
+  :documentation "Record the evaluation `state' of 'proposition'."
+  :public? TRUE
+  (unless (description-mode?)
+    (insert-at (evaluation-states (get-propagation-environment *context*)) proposition state)))
+
+(defun post-for-evaluation ((self PROPOSITION) (world CONTEXT))
+  :documentation "Push 'self' onto the evaluation queue (unless it's already there)."
+  :public? TRUE
+  (when (null? world)
+    (setq world *context*))
+  (when (not *fillingConstraintPropagationQueues?*)
+    ;; evaluate immediately if we are outside of a constraint 
+    ;;    propagation activity:
+    (within-context world
+      (evaluate-proposition self)
+      (return)))
+  (let ((environment (get-propagation-environment world)))
+    (unless (eql? (lookup (evaluation-states environment) self) :POSTED)
+      (insert (evaluation-queue environment) self)
+      (insert-at (evaluation-states environment) self :POSTED))))
+
+
+  ;;
+;;;;;; Forward-chaining rules
+  ;;
+
+(defun (help-collect-forward-rules (CONS OF KEY-VALUE-LIST))
+    ((description DESCRIPTION)
+     (rules KEY-VALUE-LIST)
+     (indices KEY-VALUE-LIST)
+     (touchedDefault? BOOLEAN)
+     (beenThere LIST))
+  ;; Helping function for 'collect-forward-chaining-rules'.
+  (when (null? rules) (setq rules (new KEY-VALUE-LIST)))
+  (when (null? indices) (setq indices (new KEY-VALUE-LIST)))
+  (when (null? beenThere) (setq beenThere (new LIST)))
+  (insert beenThere description)
+  (foreach index in (forward-chaining-indices description)
+      where (and (not (deleted? (master-rule index)))
+                 (true? (master-rule index)))
+      do (insert-at indices index touchedDefault?))
+  (foreach p in (applicable-rules-of-description description :FORWARD TRUE)
+      where (not (backward-only? p))
+      do (let ((consequent (nth (arguments p) 1)))
+           ;; tricky: if 'consequent' has a name and is of the same arity as
+           ;;    the antecedent, we have a simple implies-link which we don't
+           ;;    need to forward-chain on, since it will be picked up by the
+           ;;    standard lookup/specialization inference.  UNLESS: if the
+           ;;    rule is marked as :forward, then we do take this as a hint
+           ;;    from the user to forward-chain.  This works around a problem
+           ;;    with rules such as (=>> (subClassOf ?x ?y) (SUBSET-OF ?x ?y))
+           ;;    which won't be handled by the standard lookup machinery and
+           ;;    need to be forward-chained.
+           ;; Otherwise, we use 'p' as a forward rule:
+           (typecase consequent
+             (NAMED-DESCRIPTION
+              (let ((super (value-of consequent)))
+                (when (default-true? p)
+                  (setq touchedDefault? TRUE))
+                ;; check for ignorable implies-link:
+                (when (or (forward-only? p)
+                          ;; arity must match if both are concepts or relations:
+                          (not (eql? (class? description) (class? super))))
+                  (insert-at rules p touchedDefault?))
+                (when (not (member? beenThere super))
+                  (help-collect-forward-rules 
+                   super rules indices touchedDefault? beenThere))))
+             (DESCRIPTION
+              (insert-at rules p touchedDefault?))
+             (otherwise NULL))))
+  (return (cons rules (cons indices NIL))))
+
+(defun (collect-forward-chaining-rules 
+        (KEY-VALUE-LIST OF PROPOSITION BOOLEAN-WRAPPER)
+        (KEY-VALUE-LIST OF FORWARD-CHAINING-INDEX BOOLEAN-WRAPPER))
+       ((description DESCRIPTION))
+  ;; Generate all forward-chaining rules and indices attached to 'description'
+  ;;    and its supers.
+  (let ((rules (CONS OF KEY-VALUE-LIST)
+	     (memoize (description *context*)
+		    :timestamps :META-KB-UPDATE :max-values 500
+		    (help-collect-forward-rules description
+					  NULL NULL FALSE NULL))))
+    (return (first rules) (second rules))))
+
+(defun (has-forward-chaining-rules? BOOLEAN) 
+       ((description DESCRIPTION) (proposition PROPOSITION))
+  ;; Return TRUE if forward rules are attached either to 'description'
+  ;;    or to superdescriptions reachable by non-backward links.
+  ;; If 'proposition' is FALSE, test for rules attached to the complement
+  ;;    of 'description'.
+  (when (false? proposition)
+    (setq description (get-inferable-complement-description description))
+    (when (null? description)
+      (return FALSE)))
+  (mv-bind (rules indices)
+      (collect-forward-chaining-rules description)
+    (return (or (non-empty? rules)
+                (non-empty? indices)))))
+
+(defun post-to-forward-chaining-queue ((self PROPOSITION) (world WORLD))
+  ;; Test to see if the proposition 'self' should be placed on
+  ;;    a forward-chaining queue for `world'; post it if so.
+  (when (and (unknown? self)
+             (not (eql? (kind self) :FUNCTION)))
+    (return))
+  (when (null? world)
+    (setq world *context*))
+  (let ((environment (get-propagation-environment world))
+        (description NAMED-DESCRIPTION NULL))
+    (case (kind self)
+      ((:ISA :PREDICATE :FUNCTION)
+       (when (member? (forward-chaining-set environment) self)
+         (return))
+       (setq description (get-description (relationRef self)))
+       (when (and (defined? description)
+                  (has-forward-chaining-rules? description self))
+         ;(count-forward-chaining-posting self)
+         (insert (forward-chaining-set environment) self)
+         (insert (forward-chaining-queue environment) self)))
+      (otherwise NULL))))
+
+#|
+;; performance debugging support; uncomment call to
+;; `count-forward-chaining-posting' above and `clear' this table:
+
+(defglobal *forward-chaining-stats* (KEY-VALUE-MAP OF PROPOSITION INTEGER-WRAPPER)
+           (new KEY-VALUE-MAP))
+
+(defun count-forward-chaining-posting ((prop PROPOSITION))
+  (let ((stats INTEGER-WRAPPER (lookup *forward-chaining-stats* prop)))
+    (if (defined? stats)
+        (++ (wrapper-value stats)) ;; destructive modification!
+      (insert-at *forward-chaining-stats* prop
+                 (new INTEGER-WRAPPER :wrapper-value 1)))))
+  
+(defun print-forward-chaining-stats ()
+  (let ((min -1)
+        (max 0)
+        (sum 0)
+        (n 0))
+    (foreach (prop count) in *forward-chaining-stats*
+        do (when (or (< min 0)
+                     (< count min))
+             (setq min count))
+           (when (> count max)
+             (setq max count))
+           (++ sum count)
+           (++ n))
+    (print "min=" (max min 0) " avg=" (/ sum (max n 1)) " max=" max EOL)))
+|#
+
+(defspecial *collectForwardPropositions* (CONS OF PROPOSITION) NULL
+  :documentation "Collect goes-true propositions produced by forward
+chaining.")
+
+#|
+;;; BUG?: we still get potentially infinite forward-inference with recursive
+;;;       function rules like the one below.  Even though the query succeeds,
+;;;       tracing the forward chainer shows that we are inferring extraneous
+;;;       nested functions that could generate more damage - not really sure
+;;;       why they don't...
+
+(defconcept person)
+(deffunction father-of ((?c person) (?f person)))
+(deffunction twin-of ((?p person) (?t person)))
+
+(assert
+  (=>> (person ?x)
+       (= (father-of ?x) (father-of (twin-of ?x)))))
+
+(assert (person fred))
+
+(retrieve (father-of fred ?f))
+|#
+
+#|
+;; Avoid infinite expansion triggered by forward skolemization;
+;;    e.g., (=>> (R ?x ?y) (exists (?z) (R ?x ?z))) would create a
+;;    skolem during forward inference, which in turn would
+;;    trigger the (admittedly stupid) rule, etc.
+
+;; New mechanism to avoid infinite skolem recursion that allows
+;; forward skolemization up to a certain depth (or generation count).
+;; The rule above creates 2**depth skolems, so we don't want to set
+;; the count to high.  PROBLEM: we need to call multiple retrieves to
+;; retrieve the whole closure; we really need to work on the
+;; interaction between forward and backward chainer with respect to
+;; completeness of results.
+|#
+
+(defslot SKOLEM skolem-generation-count :type INTEGER :default 0)
+(defglobal *max-skolem-generation-count* INTEGER 3)
+
+(defun apply-rule-consequent-to-vector
+       ((consequent DESCRIPTION)
+        (arguments ARGUMENTS-VECTOR)
+        (rule PROPOSITION)
+        (triggerDescription DESCRIPTION) 
+        (triggerProposition PROPOSITION)
+        (touchedDefault? BOOLEAN)
+        (bc-justification JUSTIFICATION))
+  ;; Helping function for 'apply-forward-rules-to-vector'.
+  ;; 'rule' is an IMPLIES or a FORALL (used for tracing only).
+  (ignore triggerDescription)
+  (special ((*collectForwardPropositions* NIL))
+   (let ((touchedDefaultKnowledge?
+          (or (default-true? triggerProposition)
+              (default-true? rule)
+              touchedDefault?))
+         (skolem SKOLEM NULL)
+         (skolemGenerationCount 0))
+     ;; if we had a skolem in the input, test its generation count to avoid
+     ;; infinite forward skolemization - make sure to check `arguments' here,
+     ;; since those were evaluated to potentially dereference skolems:
+     (foreach arg in arguments
+         where (and (skolem? arg)
+                    ;; don't need to check the type of skolem here, since only
+                    ;; bonafide ones will have counts greater than zero:
+                    (> (skolem-generation-count (cast arg SKOLEM))
+                       skolemGenerationCount))
+         do (setq skolemGenerationCount (skolem-generation-count (cast arg SKOLEM)))
+            (when (>= skolemGenerationCount *max-skolem-generation-count*)
+              (trace-if :PROPAGATE
+                        "*** cutting off forward skolemization on: "
+                        triggerProposition EOL)
+              (return)))
+     (special ((*queryIterator* NULL)
+               ;; in case somebody disabled duplicate checking in a `load' we
+               ;; still want to avoid inferring duplicates during forward inference:
+               (*dont-check-for-duplicate-propositions?* FALSE))
+       (inherit-description arguments consequent touchedDefaultKnowledge?))
+     (when (trace-keyword? :PROPAGATE)
+       (trace-forward-rule rule triggerProposition *collectForwardPropositions*))
+     (foreach p in *collectForwardPropositions*
+         do ;; if we generated a skolem in the output, set its generation
+           ;; count to avoid infinite forward skolemization:
+           (setq skolem (some arg in (arguments p) where (skolem? arg)))
+           (when (and (defined? skolem)
+                      (null? (defining-proposition skolem))
+                      (not (hypothesized-instance? skolem)))
+             (setf (skolem-generation-count skolem)
+               (max (1+ skolemGenerationCount) (skolem-generation-count skolem))))
+           ;; THIS MAY NOT BE APPROPRIATE IF 'rule' IS A :FORALL?:  -rmm
+           (record-forward-goal rule arguments p)
+           (record-forward-rule-justification 
+            (cons-list triggerProposition) rule arguments p bc-justification)))))
+
+(defun trace-forward-rule ((rule PROPOSITION)
+                           (trigger PROPOSITION)
+                           (consequents (CONS OF PROPOSITION)))
+  ;; Trace the forward application of `rule' to `trigger' which
+  ;; resulted in one or more `consequents'.  Note that complex
+  ;; forward rules might have proven additional antecedent goals
+  ;; to satisfy the rule application.  We don't (yet) report those.
+  (when (and (defined? consequents)
+             (non-empty? consequents)
+             ;; TO DO: temporary debugging kludge, maybe make this officially switchable
+             ;(exists c in consequents
+             ;  where (eql? (operator c) PL-KERNEL/@EQUIVALENT))
+             )
+    (let ((indent 11))
+      (print "RUNNING FORWARD RULE:" EOL
+             "  TRIGGER: ")
+      (print-formula trigger indent)
+      (when (false? trigger)
+        (print ")"))
+      (print EOL "  RULE:    ")
+      (print-formula rule indent)
+      (print EOL "  RESULT:  ")
+      (when (non-empty? (rest consequents))
+        (print "(" (stringified-surrogate PL-KERNEL-KB/@AND) " ")
+        (++ indent 5))
+      (foreach c in consequents
+          as i in (interval 1 NULL)
+          do (when (> i 1)
+               (print EOL)
+               (print-spaces indent))
+             (print-formula c indent))
+      (when (non-empty? (rest consequents))
+        (print ")")
+        (-- indent 5))
+      (print EOL))))
+
+(defun apply-forward-rules-to-vector
+       ((triggerDescription DESCRIPTION) (arguments ARGUMENTS-VECTOR)
+        (triggerProposition PROPOSITION))
+  ;; Called by 'execute-forward-rules'.
+  ;; Foreach forward :IMPLIES proposition attached to 'triggerDescription',
+  ;;    inherit its consequent onto 'arguments'.
+  ;; Note: 'triggerDescription' has a name unless it is a complement.
+  ;;
+  ;; Method:  Forward rules with a simple (atomic) antecedent are handled
+  ;;          by just applying the consequent, since they are trivially
+  ;;          satisfied by having the trigger description satisfied.
+  ;;       Forward rules that have a complex antecedent are evaluated whenever
+  ;;          one of the trigger clauses is true.  But then a cached query
+  ;;          has to be run to see if the remaining clauses of the complex
+  ;;          antecedent are also satisifed.  This may involve a small amount
+  ;;          of backchaining.  The results are a set of bindings from the cached
+  ;;          query.
+  (let ((evaluatedArgs arguments))
+    (foreach arg in arguments
+        as i in (interval 0 NULL)
+        do (cond ((deleted? arg)
+                  (return))
+                 ((not (eql? arg (value-of arg)))
+                  ;; dereference skolems to avoid creation of infinite
+                  ;;    function terms:
+                  (when (eql? arguments evaluatedArgs)
+                    (setq evaluatedArgs (copy arguments)))
+                  (setf (nth evaluatedArgs i) (value-of arg)))))
+    (setq arguments evaluatedArgs))
+  ;; NOTE: Should `collect-forward-chaining-rules' test for `true?' instead?
+  (mv-bind (rules indices)
+      (collect-forward-chaining-rules triggerDescription)
+    ;; Handle simple forward chaining rules
+   (foreach (r touchedDefault?) in rules
+       where (applicable-forward-rule? r arguments)
+       do (apply-rule-consequent-to-vector
+           (nth (arguments r) 1) arguments r 
+           triggerDescription triggerProposition touchedDefault?
+           NULL))
+    ;; Handle complex forward chaining rules, where a query for
+    ;; the residuals is used.
+   (foreach (fwdIndex touchedDefault?) in indices
+       do (let ((inputArgs NIL))
+            ;; check -- variable arity relation may allow mismatch:
+            (when (not (eql? (length arguments)
+                             (length (arguments (forward-goal fwdIndex)))))
+              (continue))
+            (foreach arg in arguments
+                as goalArg in (arguments (forward-goal fwdIndex))
+                do (cond
+                    ((variable? goalArg)
+                     (pushq inputArgs arg))
+                    ((not (eql? arg (value-of goalArg)))
+                     ;; clash with original goal argument; skip rule - somewhat
+                     ;;    kludgy, since we can't `continue' the outer loop:
+                     (setq inputArgs NULL)
+                     (break))))
+            (when (null? inputArgs)
+              (continue))
+            (foreach it on (input-bindings fwdIndex)
+                as arg in (reverse inputArgs)
+                do (progn (safety 3 (defined? arg) "BUG - Null input binding"))
+                   (setf (value it) arg)))
+          (let ((outputBindings CONS NULL)
+                (truthValues CONS NULL)
+                (justifications CONS NULL)
+                (traceForwardInference? (trace-keyword? :PROPAGATE))
+                (traceGoalTree? (and traceForwardInference?
+                                     (trace-keyword? :GOAL-TREE)))
+                (oldTraceKeywords *traced-keywords*))
+            (cond (traceForwardInference?
+                   (when traceGoalTree?
+                     (print "Proving forward goal: " (query-body fwdIndex) EOL)))
+                  ((trace-keyword? :GOAL-TREE)
+                   ;; if we are not tracing forward inference but goal tracing is
+                   ;; on, turn it off temporarily since the output can be distracting:
+                   (setq *traced-keywords*
+                     (remove (copy *traced-keywords*) :GOAL-TREE))))
+            ;; IMPORTANT: disable recursive forward inference/elaboration, since
+            ;; it could destructively modify the cached query run here in a recursive
+            ;; call - this is seriously not thread safe:
+            (special ((*fillingConstraintPropagationQueues?* TRUE))
+              (mv-setq (outputBindings truthValues justifications)
+                (apply-cached-retrieve
+                 (io-variables fwdIndex)
+                 (query-body fwdIndex)
+                 (input-bindings fwdIndex)
+                 ;; Run backward goals in shallow mode only; if somebody needs
+                 ;; deep inference they can explicitly wrap a `query' around a goal:
+                 (cons-list :singletons? FALSE :inference-level :shallow)
+                 (cache-id fwdIndex))))
+            (when traceGoalTree?
+              (print "Done proving forward goal: " (query-body fwdIndex) EOL EOL))
+            (setq *traced-keywords* oldTraceKeywords)
+            ;; NOTE:  We currently build the justification inside the 
+	    ;;        APPLY-RULE-CONSEQUENT-TO-VECTOR? function by passing down
+	    ;;        any backward-chaining justification from a complex antecedent.
+	    ;;        An alternative method would be to build the justification at
+	    ;;        this level.  If here, then the simple antecedent case also needs
+	    ;;        the justification raised to this level.
+            (foreach ob in outputBindings
+                as tv in truthValues
+                do (let ((justification (popq justifications)))
+                     (apply-rule-consequent-to-vector
+                      (consequent fwdIndex)
+                      (copy-list-to-arguments-vector (listify (cast ob CONS)))
+                      (master-rule fwdIndex)
+                      triggerDescription 
+		      triggerProposition
+                      (or touchedDefault? (eql? tv DEFAULT-TRUE-TRUTH-VALUE))
+                      justification))))) ))
+
+(defun (applicable-forward-rule? BOOLEAN)
+       ((rule PROPOSITION) (arguments ARGUMENTS-VECTOR))
+  ;; Return TRUE if the forward-rule `rule' is applicable to `arguments'.
+  ;; Checks whether `rule' is true in the current context, and whether
+  ;;    the number of arguments matches the number of variables in the
+  ;;    antecedent (needed only for variable-arity relations).
+  (let ((antecedentDescription DESCRIPTION (first (arguments rule))))
+    ;; REMOVE THIS SAFETY WHEN WE LEARN TO FORWARD CHAIN ON RULES WITH
+    ;;    COMPLEX (UNNAMED) ANTECEDENTS:  -rmm
+    (safety 3 (or (eql? (length arguments) (length (io-variables antecedentDescription)))
+                  (variable-arity? antecedentDescription))
+            "Bug in checking arity of forward chaining rule")
+    (return (and (true? rule)
+                 (eql? (length arguments)
+                       (length (io-variables antecedentDescription))))) ))
+
+
+  ;;
+;;;;;; Triggering evaluation of propositions
+  ;;
+
+(defmethod react-to-inference-update ((self SKOLEM) )
+  ;; Called by 'react-to-kb-update'.
+  ;; Propagate constraints in reaction to the binding of a skolem to a value.
+  ;; Currently called for assertions but not for retractions (until we learn
+  ;;    how to perform truth maintenance in the face of retractions).
+  ;; Tricky: We compute both the asserted and derived values, and look
+  ;;    for a clash.
+  ;;    RMM: I HAVE NO RECOLLECTION OF HOW THAT SITUATION MANIFESTS, SO
+  ;;       WE HAVE A BREAK HERE TO DETECT IT, SO THAT WE CAN ADD AN
+  ;;       EXPLANATORY COMMENT (OR MAYBE IT WILL NEVER TRIGGER):
+  ;;    (EXCEPT THAT A HIDDEN RELATION CACHE IS TRIGGERING IT, SO I
+  ;;       HAVE TURNED IT OFF)
+  (let ((derivedValue (value-of self))
+        (assertedValue OBJECT NULL))
+    (within-module (base-module *context*)
+      (setq assertedValue (value-of self)))
+    ;; possible clash if derived value does not equal asserted value:
+    (when (and (defined? assertedValue)
+               (not (eql? assertedValue derivedValue)))
+;      (print "Infered value " derivedValue "   clashes with asserted value "
+;             assertedValue EOL
+;             "   but somehow they are both attached to the skolem " self EOL)
+;      (yes-or-no? "STOP AND SEE HOW THIS CAME ABOUT, AND TELL BOB.")
+      ;; NOTE: Should this use (defining-proposition self) instead of NULL?
+      (equate-values NULL (value-of assertedValue) derivedValue))
+    ;; Note, we include unknown propositions below, since they might
+    ;;    depend on `self', and, hence, change their assertion status:
+    (foreach prop in (unfiltered-dependent-propositions self NULL)
+        do (post-for-evaluation prop *context*))
+    ;; TO DO: figure out, should we also do this for all equivalent skolems?
+    (when *fillingConstraintPropagationQueues?*
+      (let ((definingProposition (defining-proposition self)))
+        (when (defined? definingProposition)
+          (post-to-forward-chaining-queue definingProposition *context*)))) ))
+
+(defmethod react-to-inference-update ((self PROPOSITION))
+  ;; The truth value of 'self' has changed in the middle of
+  ;;    constraint propagation.  Evaluate neighbors of 'self'
+  ;;    and possibly post it to the forward chaining queue.
+  ;; Called by 'react-to-kb-update'.
+  ;; Propagate constraints in reaction to the assignment of a truth value.
+  ;; Currently called for assertions but not for retractions (until we learn
+  ;;    how to perform truth maintenance in the face of retractions).
+  (safety 3 (or (not (isa? *context* @MODULE)) (description-mode?))
+          "BUG: Propagating in module.")
+  (safety 3 (not (deleted? *context*)) "BUG: Deleted cache world: " *context*)
+  ;; propagate inference down to arguments:
+  (post-for-evaluation self *context*)
+  ;; propagate inference up:
+  (foreach prop in (dependent-propositions self)
+      do (post-for-evaluation prop *context*))
+  ;; trigger forward inference:
+  (when *fillingConstraintPropagationQueues?*
+    (post-to-forward-chaining-queue self *context*)))
+
+(defun react-to-kb-update ((context CONTEXT) (object OBJECT))
+  ;; 'object' is a proposition or a skolem.
+  ;; Trigger constraint propagation and inference demons in response to a truth
+  ;;    value update.
+  ;; Currently called for assertions but not for retractions (unless we learn
+  ;;    how to perform truth maintenance in the face of retractions).
+  (let ((skolem? FALSE)
+        (proposition? FALSE)
+        (metaProposition? FALSE))
+    (typecase object
+      (SKOLEM (setq skolem? TRUE))
+      (PROPOSITION (setq proposition? TRUE)))
+    (when (and proposition?
+               (meta-proposition? object))
+      (setq metaProposition? TRUE))
+    ;; Every truth value change (be it hidden or not) bumps this timestamp, since
+    ;;    memoized functions such as `test-isa?' might otherwise not work right:
+    (bump-memoization-timestamp :KB-UPDATE)
+    (when metaProposition?
+      ;; This timestamp fluctuates more slowly for the benefit of functions such
+      ;;    as `class?' or `relation?'.
+      (bump-memoization-timestamp :META-KB-UPDATE))
+    (cond
+     ;; NOT CLEAR THAT THIS SHOULD BE HERE (PROBABLY IS HARMLESS THOUGH): -rmm
+     (*invisibleAssertion?* (return))
+     ((description-mode?)
+      ;; tricky: we are in description mode, where we don't bother with queues.
+      ;;    Instead we stay outside of *fillingConstraintPropagationQueues?* 
+      ;;    mode and all evaluation is immediate:
+      (special ((*fillingConstraintPropagationQueues?* FALSE))
+        (cond (proposition? (react-to-inference-update (cast object PROPOSITION)))
+              (skolem? (react-to-inference-update (cast object SKOLEM)))))
+      (return))
+     (*fillingConstraintPropagationQueues?*
+      ;; we are inside of a nested call to 'react-to-kb-update' and
+      ;;    we are filling up queues
+      (cond (proposition? (react-to-inference-update (cast object PROPOSITION)))
+            (skolem? (react-to-inference-update (cast object SKOLEM))))
+      (return)))
+    ;; initialize a constraint propagation activity
+    (let ((world
+           (choose metaProposition?
+                   (lookup-inference-cache context :META)
+                   (lookup-constraint-propagation-world context))))
+      (when (defined? world)
+        (safety 3 (not (world-state? world))
+               "INTERNAL ERROR: `react-to-kb-update' encountered bad cache state.")
+        (within-context world
+          (special ((*fillingConstraintPropagationQueues?* TRUE))
+            ;; a single update triggers the constraint process, possibly
+            ;;    filling up the queues:
+            (cond (proposition?
+                   (react-to-inference-update (cast object PROPOSITION)))
+                  (skolem?
+                   (react-to-inference-update (cast object SKOLEM))))
+            (execute-constraint-propagation-queues)))))
+    (when (isa? context @MODULE)
+      ;; inherit the update response to children:
+      (foreach child in (child-contexts context)
+          where (isa? child @MODULE)
+          do (react-to-kb-update child object)))))
+
+(defmethod execute-propagation-queues ((self PROPAGATION-ENVIRONMENT))
+  ;; Alternately service the evaluation and forward chaining queues
+  ;;    until they are both empty.
+  (special ((*inhibitObjectFinalization?* TRUE))
+    (loop
+      (let ((queue (evaluation-queue self)))
+        (when (non-empty? queue)
+          (setf (evaluation-queue self) (new LIST))
+          (foreach p in queue
+              do (evaluate-proposition p))))
+      (let ((queue (forward-chaining-queue self))
+            (description DESCRIPTION NULL))
+        (when (non-empty? queue)
+          (setf (forward-chaining-queue self) (new LIST))
+          (foreach proposition in queue
+              do (progn
+                   (safety 3 (not (deleted? proposition))
+                           "INTERNAL ERROR: Somehow a queued proposition got deleted.")
+                   (safety 3 (or (true? proposition)
+                                 (false? proposition)
+                                 (eql? (kind proposition) :FUNCTION))
+                           "INTERNAL ERROR: Somehow a queued proposition got retracted."
+                           EOL "   Offending proposition: " proposition))
+                 (setq description (get-description (relationRef proposition)))
+                 (when (and (defined? description)
+                            (false? proposition))
+                   (setq description
+                     (get-inferable-complement-description description)))
+                 (when (defined? description)
+                   (apply-forward-rules-to-vector 
+                    description (arguments proposition) proposition)))))
+      (when (and (empty? (evaluation-queue self))
+                 (empty? (forward-chaining-queue self)))
+        (return)))))
+
+(defun execute-constraint-propagation-queues ()
+  ;; Alternately service the evaluation and forward chaining queues
+  ;;    until they are both empty.
+  (execute-propagation-queues (get-propagation-environment *context*)))
+
+(defun evaluate-new-proposition ((self PROPOSITION))
+  ;; Called immediately after 'self' is fastened down, or (if operator
+  ;;    resolution was delayed) after its operator reference was resolved.
+  ;; Evaluate the truth of 'self' if all of its arguments are known.
+  ;; Propagate a newly-inferred value to any dependent propositions.
+  ;; Strategy: With regard to parsing, we avoid calling 
+  ;;    'evaluate-new-proposition' for other than the first time that
+  ;;    a proposition is conceived.
+  (when (or (description-mode?)
+            (descriptive? self))
+    (return))
+  (let ((world (lookup-constraint-propagation-world *context*)))
+    (when (defined? world)
+      ;; 'self' should not have a truth value yet:
+      (safety 3 (or (unknown? self)
+                    (eql? (kind self) :CONSTANT))
+              "INTERNAL ERROR: Bad call to 'evaluate-new-proposition'")
+      (special ((*context* world))
+        (evaluate-proposition self)
+        (when (not (unknown? self))
+          (trace-if :PROPAGATE "evaluate-new-proposition:  " self EOL)
+          ;; propagate inference up:
+          (foreach prop in (dependent-propositions self)
+              do (evaluate-proposition prop)))))))
+
+#|
+;;; EXPERIMENTAL FIX to deal with an issue with the RDBMS store, where new euqiv
+;;; propositions are built during forward inference which shouldn't be marked as
+;;; evaluated at the point where they don't have a truth value yet.  It seems,
+;;; this problem should also affect us in certain cases during regular forward
+;;; inference.
+
+(defun evaluate-new-proposition ((self PROPOSITION))
+  ;; Called immediately after 'self' is fastened down, or (if operator
+  ;;    resolution was delayed) after its operator reference was resolved.
+  ;; Evaluate the truth of 'self' if all of its arguments are known.
+  ;; Propagate a newly-inferred value to any dependent propositions.
+  ;; Strategy: With regard to parsing, we avoid calling 
+  ;;    'evaluate-new-proposition' for other than the first time that
+  ;;    a proposition is conceived.
+  (when (or (description-mode?)
+            (descriptive? self))
+    (return))
+  (let ((world (lookup-constraint-propagation-world *context*)))
+    (when (defined? world)
+      ;; 'self' should not have a truth value yet:
+      (safety 3 (or (unknown? self)
+                    (eql? (kind self) :CONSTANT))
+              "INTERNAL ERROR: Bad call to 'evaluate-new-proposition'")
+      (special ((*context* world))
+        (evaluate-proposition self)
+        (when (and (unknown? self)
+                   (eql? (evaluation-state self) :EVALUATED))
+          (setf (evaluation-state self) NULL))
+        (when (not (unknown? self))
+          (trace-if :PROPAGATE "evaluate-new-proposition:  " self EOL)
+          ;; propagate inference up:
+          (foreach prop in (dependent-propositions self)
+              do (evaluate-proposition prop)))))))
+|#
+
+
+  ;;
+;;;;;; Evaluation of propositions
+  ;;
+
+(defun evaluate-AND-proposition ((self PROPOSITION))
+  ;; Evaluate the truth of 'self', and propagate any changes in truth value.
+  ;; QUESTION: PROBLEM -- DOESN'T USE SUBSUMPTION OR CLASH PROOFS, MAKING THE
+  ;;    EVALUATION RATHER WEAK.  TOO WEAK?
+  (let ((arguments (VECTOR OF PROPOSITION) (arguments self)))
+    (cond
+     ((true? self)
+      ;; bind every argument of 'self' to TRUE (or default true):
+      (foreach arg in arguments
+               do (assign-truth-value arg (truth-value self))))
+     ((false? self)
+      ;; if all but one argument is TRUE, make that one FALSE:
+      (let ((onlyUnboundArg PROPOSITION NULL)
+            (touchedDefault? (default-false? self)))
+        (foreach arg in arguments
+                 do
+                 (cond
+                  ((false? arg)
+                   (return))              ; exit if FALSE argument
+                  ((unknown? arg)     ; unbound?
+                   (when (defined? onlyUnboundArg)
+                     (return))            ; exit if more than one unbound argument
+                   (setq onlyUnboundArg arg))
+                  ;; 'arg' is FALSE; see if it is false by default:
+                  ((default-true? arg)
+                   (setq touchedDefault? TRUE))))
+        (if (defined? onlyUnboundArg)
+          (assign-truth-value
+           onlyUnboundArg (defaultify-truth-value FALSE touchedDefault?))
+          ;; all arguments are TRUE -- generate a clash:
+          (assign-truth-value self (defaultify-truth-value TRUE touchedDefault?)))))
+     ;; 'self' is unknown?:
+     (otherwise
+      (let ((unboundArg? FALSE)
+            (touchedDefault? FALSE))
+        (foreach arg in arguments
+                 do
+                 (cond
+                  ((false? arg)
+                   (if (default-false? arg)
+                     (assign-truth-value self DEFAULT-FALSE-TRUTH-VALUE)
+                     (progn
+                       (assign-truth-value self FALSE)
+                       (return))))
+                  ((unknown? arg)    ; unbound?
+                   (setq unboundArg? TRUE))
+                  ((default-true? arg)
+                   (setq touchedDefault? TRUE))))
+        (when (and (not unboundArg?)
+                   (not (default-false? self)))
+          ;; all arguments are bound to TRUE:
+          (assign-truth-value self (defaultify-truth-value TRUE touchedDefault?)))))) ))
+
+(defun evaluate-OR-proposition ((self PROPOSITION))
+  ;; Evaluate the truth of 'self', and propagate any changes in truth value.
+  (let ((arguments (VECTOR OF PROPOSITION) (arguments self)))
+    (cond
+     ((false? self)
+      ;; bind every argument of 'self' to FALSE or default false:
+      (foreach arg in arguments
+               do (assign-truth-value arg (truth-value self))))
+     ((true? self)
+      ;; if all but one argument is FALSE, make that one TRUE:
+      (let ((onlyUnboundArg PROPOSITION NULL)
+            (touchedDefault? (default-true? self)))
+        (foreach arg in arguments
+                 do
+                 (cond
+                  ((true? arg)
+                   (return))              ; exit if TRUE argument
+                  ((unknown? arg)     ; unbound?
+                   (when (defined? onlyUnboundArg)
+                     (return))            ; exit if more than one unbound argument
+                   (setq onlyUnboundArg arg))
+                  ;; 'arg' is FALSE; see if it is false by default:
+                  ((default-false? arg)
+                   (setq touchedDefault? TRUE))))
+        (if (defined? onlyUnboundArg)
+          (assign-truth-value
+           onlyUnboundArg (defaultify-truth-value TRUE touchedDefault?))
+          ;; all arguments are FALSE -- generate a clash:
+          (assign-truth-value self (defaultify-truth-value FALSE touchedDefault?)))))
+     ;; 'self' is unknown?:
+     (otherwise
+      (let ((unboundArg? FALSE)
+            (touchedDefault? FALSE))
+        (foreach arg in arguments
+                 do
+                 (cond
+                  ((true? arg)
+                   (if (default-true? arg)
+                     (assign-truth-value self DEFAULT-TRUE-TRUTH-VALUE)
+                     (progn
+                       (assign-truth-value self TRUE)
+                       (return))))
+                  ((unknown? arg)    ; unbound?
+                   (setq unboundArg? TRUE))
+                  ((default-false? arg)
+                   (setq touchedDefault? TRUE))))
+        (when (and (not unboundArg?)
+                   ;; tricky -- we might have bound 'self' during the loop:
+                   (not (default-true? self)))
+          ;; all arguments are bound to FALSE:
+          (assign-truth-value self (defaultify-truth-value FALSE touchedDefault?)))))) ))
+
+(defun evaluate-NOT-proposition ((self PROPOSITION))
+  ;; Evaluate the truth of 'self', and propagate any changes in truth value.
+  (let ((argument PROPOSITION (nth (arguments self) 0)))
+    (when (or (true? argument)
+              (false? argument))
+      (assign-truth-value self (invert-truth-value (truth-value argument))))
+    (when (or (true? self)
+              (false? self))
+      (assign-truth-value argument (invert-truth-value (truth-value self)))) ))
+
+(defun evaluate-EQUIVALENT-proposition ((self PROPOSITION))
+  ;; Evaluate the truth of 'self', and propagate any changes in truth value.
+  ;; Tricky: We call 'innermost-of' instead of 'value-of' to insure that
+  ;;    a null-valued surrogate returns itself instead of NULL:
+  (let ((arguments (arguments self))
+        (firstArg (innermost-of (nth arguments 0)))
+        (secondArg (innermost-of (nth arguments 1))))
+    (cond
+     ((true? self)
+      (when (default-true? self)
+        (warn "INTERNAL ERROR: DON'T KNOW YET HOW TO EQUATE THINGS BY DEFAULT."))
+      #|
+      ;; TRY NEW SCHEME: NOT READY YET
+      ;; NOTE: ONCE WE KNOW HOW TO DO THIS RIGHT, `all-clashing-propositions'
+      ;;    AND ITS CALLERS NEED TO BE FIXED ACCORDINGLY!!!!
+      (when (unequate-conflicting-default-values? self)
+        (equate-values self firstArg secondArg))
+      |#
+
+      ;#|
+      ;; Disjointness testing: this is generally the right thing to do, but we
+      ;; need to make things more efficient with respect to type lookup and
+      ;; disjointness testing; in particular, we need to memoize types as well
+      ;; as disjointness tests; maybe we should also have a cheap test for classes
+      ;; to see whether they participate in any partitions or not.  Conceivably,
+      ;; this machinery could move into `bind-skolem-to-value', since there we
+      ;; already do some type checking.
+      (let ((firstArgTypes (all-asserted-types firstArg))
+            (secondArgTypes (all-asserted-types secondArg)))
+        (foreach type1 in firstArgTypes
+            where (exists type2 in secondArgTypes
+                    where (disjoint-terms? type1 type2))
+            do (signal-unification-clash self firstArg secondArg)))
+      ;|#
+      
+      (equate-values self firstArg secondArg))
+     ((eql? firstArg secondArg)
+      (assign-truth-value self TRUE))
+     ((and (not (skolem? firstArg))
+           (not (skolem? secondArg)))
+      (assign-truth-value self FALSE))) ))
+  
+(defun equate-equivalent-FUNCTION-propositions ((self PROPOSITION))
+  ;; Find extensional or intensional function propositions that are
+  ;;    equivalent to `self' and equate their output values.
+  ;; This handles problems like this:
+  ;;
+  ;;    (assert (= (son Fred) Joe))
+  ;;    (assert (= (age Joe) 12))
+  ;;    (assert (= (golf-handicap Fred) (age (son Fred))))
+  ;;    (retrieve (?x integer) (= (golf-handicap Fred) ?x))
+  ;;
+  ;; NOTE: THIS WON'T WORK WELL FOR DESCRIPTIONS, SINCE THEY HAVE
+  ;;    SURROGATE CONSTANTS WHICH DON'T HAVE BACKPOINTERS.
+  ;; TO DO: FIGURE OUT WHETHER WE NEED TO ENABLE A SIMILAR INFERENCE
+  ;;    FOR SINGLE-VALUED RELATIONS, WHERE WE ASSERT EQUALITY BETWEEN
+  ;;    OUTPUTS IF ALL INTPUT ARGUMENTS ARE EQUAL - SOMETHING LIKE
+  ;;    THIS IS DONE VIA `clip-or-clash-with-old-predicate-value'
+  ;;    DURING ASSERTIONS
+  (let ((relationRef (relationRef self))
+        (nofArgs (length (arguments self)))
+        (candidatePropositions (new (LIST OF PROPOSITION))))
+    (foreach arg in (arguments self)
+        as i in (interval 1 NULL)
+        where (not (eql? i nofArgs))
+        do (typecase arg
+             (SKOLEM
+              ;; First look down:
+              (when (and (defined? (variable-value arg))
+                         (isa? (variable-value arg) @LOGIC-OBJECT))
+                (foreach prop in (unfiltered-dependent-propositions 
+                                  (variable-value arg) relationRef)
+                    where (and (eql? (relationRef prop) relationRef)
+                               (not (eql? prop self)))
+                    do (insert-new candidatePropositions prop)))
+              ;; Then look up:
+              (foreach invArg in (variable-value-inverse arg)
+                  do (foreach prop in (unfiltered-dependent-propositions
+                                       invArg relationRef)
+                         where (and (eql? (relationRef prop) relationRef)
+                                    (not (eql? prop self)))
+                         do (insert-new candidatePropositions prop))))
+             (LOGIC-OBJECT
+              ;; Look up only:
+              (foreach invArg in (variable-value-inverse arg)
+                  do (foreach prop in (unfiltered-dependent-propositions
+                                       invArg relationRef)
+                         where (and (eql? (relationRef prop) relationRef)
+                                    (not (eql? prop self)))
+                         do (insert-new candidatePropositions prop))))
+             (otherwise NULL)))
+    ;; DO WE HAVE TO WORRY ABOUT THE TRUTH OF THESE CANDIDATES?
+    (foreach prop in candidatePropositions
+        where (forall arg1 in (arguments self)
+                  as arg2 in (arguments prop)
+                  as i in (interval 1 NULL)
+                  where (not (eql? i nofArgs))
+                  always (eql? (innermost-of arg1) (innermost-of arg2)))
+        do (equate-values self
+                          (innermost-of (last (arguments self)))
+                          (innermost-of (last (arguments prop)))))
+    (free candidatePropositions)))
+
+;(defmethod evaluate-slot-permutations ((self SLOT) (arguments (VECTOR OF OBJECT)))
+;  ;; Helping method for 'evaluate-FUNCTION-proposition'.
+;  ;; Default method does nothing, because storage slots don't have permuations.
+;  (ignore arguments)
+;  NULL )
+
+;(defmethod evaluate-slot-permutations 
+;           ((self METHOD-SLOT) (originalArguments (VECTOR OF OBJECT)))
+;  ;; Helping method for 'evaluate-FUNCTION-proposition'.
+;  ;; Try applying computed functions to permutations of 'originalArguments'.
+;  (when (null? (permutation-table self))
+;    (return))
+;  (let ((lastIndex (1- (length originalArguments)))
+;        (nonNativeArgCount 0))
+;    ;; before trying permutations, count number of non-native arguments:
+;    (foreach i in (interval 0 lastIndex)
+;             where (not (defined? (native-value-of (nth originalArguments i))))
+;             do (setq nonNativeArgCount (1+ nonNativeArgCount)))
+;    (when (> nonNativeArgCount 1)
+;      (return))
+;    ;; all but one argument is bound to a native object:
+;    (let ((permutedArguments (new ARGUMENTS-VECTOR :array-size (1+ lastIndex)))
+;          (computedValue OBJECT NULL))
+;      (foreach (permutation permutationSlot) in (permutation-table self)
+;               do
+;               ;; generate argument permutation:
+;               ;; note: copying the last argument is unnecessary:
+;               (foreach i in (interval 0 lastIndex)
+;                        do
+;                        (setf (nth permutedArguments i)
+;                              (nth originalArguments
+;                                   (1- (cast (nth permutation i) INTEGER-WRAPPER)))))
+;               ;; compute value using permutation slot:
+;               (setq computedValue
+;                     (apply-slot-to-arguments permutationSlot permutedArguments))
+;               (when (not (bottom? computedValue))
+;                 ;; computation succeeded:
+;                 (let ((storedValue (value-of (nth permutedArguments lastIndex))))
+;                   (when (not (eql? computedValue storedValue))
+;                     (equate-values NULL computedValue storedValue)))
+;                 ;; successful exit:
+;                 (break)))) ))
+
+(defun evaluate-FUNCTION-proposition ((self PROPOSITION))
+  :public? TRUE
+  ;; There are two inferences that can happen here:
+  ;;    (1) If one or more input arguments in 'self' are bound, then
+  ;;        the output skolem of 'self' is equated with the output skolem
+  ;;        of the function applied to equivalent arguments (if such exists).
+  ;;    (2) The proposition 'self' may or may not have unbound arguments.
+  ;;        If enough arguments are bound, evaluate 'self'.  Test for clash
+  ;;        with stored output value.
+  (when (isa? (operator self) @SYMBOL)   ; exit if relationRef is unresolved
+    (return))
+  ;; TO DO: currently we need this to make the golf handicap example work, but
+  ;;    it seems like a kludge; figure out whether we can do it more elegantly:
+  (equate-equivalent-FUNCTION-propositions self)
+  (let ((description (get-description (relationRef self)))
+	(computation (lookup-constraint-function description))
+        (storedValue OBJECT NULL)
+        (computedValue OBJECT NULL)
+	(missingValueIndex -1))
+    (when (defined? computation)
+      (mv-setq (computedValue missingValueIndex)
+        (compute-simple-relation-constraint self computation FALSE))
+      (when (defined? computedValue)
+        (when (= missingValueIndex -1)
+          ;; this seems to do the right thing for assertions like (+ 1 2 4),
+          ;; but maybe we should assign truth to the equating prop instead?
+          (assign-truth-value self computedValue)
+          (return))
+        (setq storedValue (value-of (nth (arguments self) missingValueIndex)))
+        (when (not (eql? computedValue storedValue))
+          (equate-values self computedValue storedValue)))
+      (return))
+    (setq computation (lookup-computation-function description))
+    (when (defined? computation)
+      (setq computedValue (compute-relation-value self computation FALSE))
+      (when (defined? computedValue)
+        ;; If we are in description mode, we must make sure to not bind
+        ;;    to the actual object (which would then point back to a
+        ;;    description proposition), but instead bind to the surrogate;
+        ;;    this is the reason why we call `evaluate-term' here:
+        (setq computedValue (evaluate-term computedValue)))
+      (setq storedValue (value-of (last-argument self)))
+      (when (and (not (eql? computedValue storedValue))
+                 (defined? computedValue))
+        (equate-values self computedValue storedValue)))) )
+
+(defun evaluate-PREDICATE-proposition ((self PROPOSITION))
+  ;; The proposition 'self' may or may not have unbound arguments.
+  ;; If enough arguments are bound, test for possible clash, or for
+  ;;    possibility of binding the remaining unbound argument.
+  ;; NOTE: none of the kernel computations or constraints excercise
+  ;;    this, since they are all defined on functions.
+  :public? TRUE
+  (let ((description (get-description (relationRef self)))
+	(computation (lookup-constraint-function description))
+        (success? BOOLEAN NULL))
+    (when (defined? computation)
+      (setq success?
+        (eql? (compute-simple-relation-constraint self computation FALSE) TRUE-WRAPPER))
+      (assign-truth-value self success?)
+      (return))
+    (setq computation (lookup-computation-function description))
+    (when (defined? computation)
+      (setq success?
+        (eql? (compute-relation-value self computation FALSE) TRUE-WRAPPER))
+      (assign-truth-value self success?)) ))
+
+(defun evaluate-proposition ((self PROPOSITION))
+  :documentation "Evaluate 'self' against its arguments, possibly resulting in
+the setting or changing of its truth value."
+  :public? TRUE
+  (setf (evaluation-state self) :EVALUATED)
+  (case (kind self)
+    (:AND (evaluate-AND-proposition self))
+    (:OR (evaluate-OR-proposition self))
+    (:NOT (evaluate-NOT-proposition self))
+    (:EQUIVALENT (evaluate-EQUIVALENT-proposition self))
+    (:ISA NULL)
+    ((:FUNCTION :PREDICATE)
+     (let ((description (get-description (relationRef self)))
+           (evaluator (lookup-evaluator description)))
+       (cond
+        ((defined? evaluator)
+         (funcall evaluator self))
+        ((eql? (kind self) :PREDICATE)
+         (evaluate-PREDICATE-proposition self))
+        (otherwise
+         (evaluate-FUNCTION-proposition self)))))
+    (otherwise NULL)) )
+
+(defmethod mark-as-incoherent ((self LOGIC-OBJECT))
+  ;; Mark 'self' as incoherent.
+  "NOT YET IMPLEMENTED" )
+
+(defmethod mark-as-incoherent ((self SKOLEM))
+  ;; Mark 'self' as incoherent.
+  ;; If 'self' is the output of a function, mark the input
+  ;;    as incoherent rather than 'self':
+  (when (defined? (defining-proposition self))
+    (let ((firstArg (first (arguments (defining-proposition self)))))
+      (typecase firstArg
+        (LOGIC-OBJECT
+         (mark-as-incoherent firstArg)
+         (return))
+        (otherwise
+         NULL))))
+  ;; mark 'self' as incoherent:
+  "NOT YET IMPLEMENTED" )
+
+
+  ;;
+;;;;;; Just-in-time propagation
+  ;;
+
+(defglobal *just-in-time-forward-inference?* BOOLEAN TRUE
+  :public? TRUE
+  :documentation "If TRUE, ensures that forward propagation has
+been applied to each instance 'touched' during a query.")
+
+;; TODO: Figure out when to reset this.
+(defglobal *clash-exceptions* (LIST OF EXCEPTION-RECORD) (new LIST)
+  :public? TRUE
+  :documentation "Collects clash exceptions that occur during inference.")
+
+(defun reset-clash-exceptions ()
+  :public? TRUE
+  :documentation "Resets the collection of clash exceptions"
+  (setq *clash-exceptions* (new LIST)))
+
+(defun (exception-record-matches-context? BOOLEAN) ((record EXCEPTION-RECORD))
+  (return (eql? (context record) *context*)))
+
+(defun cull-clash-exceptions ((self CONTEXT))
+  ;; Clear clash exceptions belonging to 'self'.
+  (within-context self
+     (remove-if *clash-exceptions* 
+                (the-code :function exception-record-matches-context?))))
+
+(startup-time-progn
+  (add-hook *destroy-context-hooks* (quote cull-clash-exceptions)))
+
+
+(defun recursively-react-to-inference-update ((self PROPOSITION))
+  ;; Helping function for 'elaborate-instance'.  Call 
+  ;;    'react-to-inference-update' on 'self' and all propositions
+  ;;    within it, so that each is evaluated.
+  (react-to-inference-update self)
+  (foreach arg in (arguments self)
+           where (isa? arg @PROPOSITION)
+           do (recursively-react-to-inference-update arg)) )
+
+(defun elaborate-meta-instance ((self OBJECT))
+  ;; Call 'elaborate-instance' inside of a meta-inference cache.
+  (let ((worldState (get-world-state *context*))
+        (metaWorld (get-inference-cache worldState :META)))
+    (special ((*context* metaWorld))
+      (elaborate-instance self)) ))
+
+(defun elaborate-instance ((self OBJECT))
+  ;; Check if forward propagation has been applied to 'self' in the current
+  ;;    constraint propagation world; if not, apply forward inference.
+  (when *fillingConstraintPropagationQueues?*
+    (return))
+  (when *just-in-time-forward-inference?*
+    (typecase self
+      (LOGIC-OBJECT
+       (let ((environment (get-propagation-environment *context*)))
+         (when (member? (elaborated-objects environment) self)
+             (return))
+         (trace-if :elaborate " ELABORATING:  " self " in world " *context* EOL)
+         (special ((*evaluationMode* :EXTENSIONAL-ASSERTION)
+                   (*inhibitObjectFinalization?* TRUE)
+                   (*queryIterator* NULL))
+           (exception-case                 
+               (progn
+                 (special ((*fillingConstraintPropagationQueues?* TRUE))
+                   ;; this marks 'self' as elaborated and prevents recursive elaboration:
+                   (post-related-facts self environment)
+                   ;; testing kludge to test evaluation order independence:
+                   ;(reverse (evaluation-queue environment))
+                   ;; evaluate paths of inequalities (the leaves are
+                   ;;    the ones we really want to evaluate:
+                   (evaluate-reachable-inequalities self (list))
+                   (special ((*deferingDefaultForwardInferences?* TRUE))
+                     (execute-constraint-propagation-queues))
+                   (foreach p in (deferred-default-propositions environment)
+                       do (assign-truth-value p DEFAULT-TRUE-TRUTH-VALUE))
+                   (clear (deferred-default-propositions environment))
+                   (execute-constraint-propagation-queues)))
+             (CLASH (e)
+               (push *clash-exceptions* (new EXCEPTION-RECORD
+                                              :exception e
+                                              :context *context*
+                                              :module *module*))
+               (print-stream STANDARD-ERROR (exception-message e) EOL))))))
+       ;; don't elaborate non-LOGIC-OBJECT:
+      (otherwise NULL))) )
+
+(defun evaluate-reachable-inequalities ((self LOGIC-OBJECT) (visitedList LIST))
+  ;; Situation: 'self' is being elaborated.  A chain of inequalities
+  ;;    ending in a number could constrain 'self', so we need to
+  ;;    run down these chains, and then evaluate our way back.
+  (foreach p in (all-true-dependent-propositions
+                 self PL-KERNEL/@INEQUALITY TRUE)
+      do ;; note: we call 'post-for-evaluation' here rather than
+         ;;    'react-to-inference-update' because all we intend to
+         ;;    trigger are interval constraints:
+        (post-for-evaluation p *context*)
+        (push visitedList self)
+        (foreach arg in (arguments p)
+            where (and (not (member? visitedList arg))
+                       (isa? arg @LOGIC-OBJECT))
+            do (evaluate-reachable-inequalities arg visitedList))))
+
+(defun elaborate-surrogates-in-proposition ((proposition PROPOSITION))
+  ;; Called by 'overlay-with-pattern-frame?'.
+  ;; When just-in-time inference is enabled, visit all surrogates in
+  ;;    a proposition about to be used as a subgoal, and ensure that
+  ;;    each of the instances they reference has been elaborated.
+  ;; Also elaborate the relation.
+  (when *just-in-time-forward-inference?*
+    (case (kind proposition)
+      ((:PREDICATE :FUNCTION :ISA)
+       (elaborate-meta-instance (get-description (relationRef proposition)))
+       (foreach arg in (arguments proposition)
+                where (isa? arg @SURROGATE)
+                do (let ((value (value-of arg)))
+                     (when (defined? value)
+                       (elaborate-instance value)))))
+      ((:AND :OR :NOT :EXISTS :FORALL)
+       (foreach p in (arguments proposition)
+                do (elaborate-surrogates-in-proposition p)))
+      (otherwise NULL))) )
+
+
+  ;;
+;;;;;; 'all-facts-of-instance' and friends
+  ;;
+
+(defun (follow-dependent-proposition-argument? BOOLEAN) ((proposition PROPOSITION)
+                                                         (argument OBJECT))
+  ;; Helper function for `post-related-facts'.
+  ;; `proposition' is a dependent proposition of the currently elaborated object.
+  ;; Return TRUE if related facts of `argument' need to be posted also.
+  ;; The reason we might to do this is to get proper evaluation of function
+  ;; terms that are nested within another; otherwise, values computed by the nested
+  ;; term won't be available to evaluate the current function term.
+  (when (eql? (kind proposition) :EQUIVALENT)
+    (return TRUE))
+  (typecase argument
+    (SKOLEM
+     (when (function-output-skolem? argument)
+       (return TRUE))
+     (let ((relation (get-description (operator proposition))))
+       (when (defined? relation)
+         (when (or (computed-term? relation)
+                   ;; let's assume for now that relations are always marked as computed:
+                   ;(access-binary-value relation PL-KERNEL/@relation-computation)
+                   ;(access-binary-value relation  PL-KERNEL/@relation-constraint)
+                   )
+           (return TRUE))))
+     (return (not (empty? (unfiltered-dependent-propositions argument PL-KERNEL/@EQUIVALENT)))))
+    (otherwise NULL))
+  (return FALSE))
+
+;;; Experimental support to block elaboration for certain objects (e.g., document IDs coming from
+;;; an MRP persistent store which have a tendency to bring in the whole KB).  Maybe we can have a
+;;; more general scheme that looks at object backlinks relative to KB size or whatever.  For now,
+;;; we need to define a class DO-NOT-ELABORATE in PL-KERNEL and then make objects an instance or
+;;; one of their types a subset of that class.  Once this has proven its merit, we should clean
+;;; up the API for it and make it official, maybe add a couple of convenience commands.
+
+(defun (do-not-elaborate? BOOLEAN) ((self OBJECT) (environment PROPAGATION-ENVIRONMENT))
+  ;; Return TRUE if `self' should not be elaborated in `environment'.
+  (ignore environment)
+  (let ((doNotElaborateSurrogate
+         (lookup-surrogate-in-module "DO-NOT-ELABORATE" *pl-kernel-module* FALSE)))
+    (return (and (defined? doNotElaborateSurrogate)
+                 (test-isa? self doNotElaborateSurrogate)))))
+
+(defun post-related-facts ((self OBJECT) (environment PROPAGATION-ENVIRONMENT))
+  ;; Post facts related to `self' to the evaluation and forward-chaining queues
+  ;;    of `environment' (using `recursively-react-to-inference-update').
+  ;; This is a mirror image of `help-collect-facts' that uses `environment'
+  ;;    to keep track of what has or hasn't been processed yet and
+  ;;    `recursively-react-to-inference-update' to do the posting.
+  ;; This is much more efficient than the old version using `all-facts-of',
+  ;;    since (1) propositions linked to multiple objects will only be posted
+  ;;    once, and (2) the sets of `environment' are hash sets instead of lists.
+  (typecase self
+    (LOGIC-OBJECT
+     (when (member? (elaborated-objects environment) self)
+       (return))
+     (insert (elaborated-objects environment) self)
+     (when (do-not-elaborate? self environment)
+       (return))
+     (foreach p in (unfiltered-dependent-propositions self NULL)
+         do (post-related-facts p environment)
+            (foreach arg in (arguments p)
+                where (and (not (eql? arg self))
+                           (follow-dependent-proposition-argument? p arg))
+                do (post-related-facts arg environment)))
+     ;; note: this will be mostly redundant now, since we are already
+     ;; collecting all equivalence propositions asserted about skolems:
+     (foreach equivalent in (variable-value-inverse self)
+         do (post-related-facts equivalent environment)))
+    (PROPOSITION
+     (when (defined? (lookup (evaluation-states environment) self))
+       ;; already :POSTED or :EVALUATED:
+       (return))
+     (let ((asserted? (not (unknown? self)))
+           (outputSkolem SKOLEM NULL))
+       (when (and (not asserted?)
+                  (eql? (kind self) :FUNCTION))
+         ;; check whether the function has an actual value:
+         ;(setq outputSkolem (last-argument self))
+         ;(setq asserted? (not (eql? outputSkolem (value-of outputSkolem))))
+         ;; problem: at this point we are still trying to establish value-of links
+         ;; via evaluation, hence the test above might fail since it is run too early:
+         (setq asserted? (function-with-defined-value? self)))
+       ;; minor performance issue: unknown propositions will not be recorded
+       ;; in the evaluation set and might be processed here multiple times:
+       (when asserted?
+         ;; posting to the evaluation queue will add self to the
+         ;; `(evaluation-states environment)':
+         (recursively-react-to-inference-update self))
+       ;; even if `self' is unknown, we'll still look at its dependent props:
+       (foreach p in (dependent-propositions self)
+           do (post-related-facts p environment))))
+    (SURROGATE
+     (when (defined? (surrogate-value self))
+       (post-related-facts (surrogate-value self) environment)))
+    ((CLASS SLOT)
+     (when (defined? (description self))
+       (post-related-facts (description self) environment)))
+    (otherwise NULL)))
+
+(defun help-collect-facts ((self OBJECT)
+                           (facts (LIST OF PROPOSITION))
+                           (beenThere HASH-SET)
+                           (includeUnknown? BOOLEAN))
+  ;; Helping function for 'all-facts-of-instance'.
+  ;; Note that this is more restrictive than `post-related-facts', since it
+  ;; (1) assumes that evaluation/elaboration is complete, and (2) wants to
+  ;; ensure that all returned facts are directly about `self' or any of its
+  ;; equivalents.
+  (typecase self
+    (LOGIC-OBJECT
+     (if (member? beenThere self)
+         (return)
+       (insert beenThere self))
+     (foreach p in (unfiltered-dependent-propositions self NULL)
+         do (help-collect-facts p facts beenThere includeUnknown?))
+     ;; oops (small bug): picks up redundant ISA propositions:
+     (foreach equivalent in (variable-value-inverse self)
+         do (help-collect-facts equivalent facts beenThere includeUnknown?)))
+    (PROPOSITION
+     (if (member? beenThere self)
+         (return)
+       (insert beenThere self))
+     (let ((asserted?
+            (or includeUnknown? (not (unknown? self))))
+           (outputSkolem SKOLEM NULL))
+       (when (and (not asserted?)
+                  (eql? (kind self) :FUNCTION))
+         ;; check whether the function has an actual value - we assume here that
+         ;; evaluation/elaboration is complete, so this test should suffice:
+         (setq outputSkolem (last-argument self))
+         (setq asserted? (not (eql? outputSkolem (value-of outputSkolem)))))
+       (when asserted?
+         (insert facts self))
+       (foreach p in (dependent-propositions self)
+           do (help-collect-facts p facts beenThere includeUnknown?))))
+    (SURROGATE
+     (when (defined? (surrogate-value self))
+       (help-collect-facts (surrogate-value self) facts beenThere includeUnknown?)))
+    ((CLASS SLOT)
+     (when (defined? (description self))
+       (help-collect-facts (description self) facts beenThere includeUnknown?)))
+    (otherwise NULL)))
+
+(defun (all-facts-of-instance (LIST OF PROPOSITION))
+       ((self OBJECT) (includeUnknownFacts? BOOLEAN) (elaborate? BOOLEAN))
+  :documentation "Return a list of all definite (TRUE or FALSE) propositions
+attached to `self'."
+  :public? TRUE
+  (let ((facts (new (LIST OF PROPOSITION))))
+    (within-context (get-query-context)
+      (when elaborate?
+        (elaborate-instance self))
+      (help-collect-facts self facts (new HASH-SET) includeUnknownFacts?))
+    (return facts) ))
+
+(defun (all-facts-of (CONS OF PROPOSITION)) ((instanceRef OBJECT))
+  :command? TRUE :public? TRUE :evaluate-arguments? FALSE
+  :documentation
+  "Return a cons list of all definite (TRUE or FALSE) propositions
+that reference the instance `instanceRef'.  This includes propositions
+asserted to be true by default, but it does not include propositions
+that are found to be TRUE only by running the query engine.  Facts
+inferred to be TRUE by the forward chainer will be included.
+Hence, the returned list of facts may be longer in a context where the
+forward chainer has been run then in one where it has not (see
+`run-forward-rules').  `instanceRef' can be a regular name such as
+`fred' as well as a function term such as `(father fred)'."
+  (let ((instance (coerce-to-instance instanceRef NULL)))
+    (if (defined? instance)
+      (return (the-cons-list (all-facts-of-instance instance FALSE TRUE)))
+      (return NULL))))
+
+(defun print-facts ((instanceRef OBJECT))
+  :documentation "Like `all-facts-of', but sorts and prints each fact
+on a separate line on the standard output stream."
+  :command? TRUE :public? TRUE :evaluate-arguments? FALSE
+  (let ((instance (coerce-to-instance instanceRef NULL)))
+    (foreach fact in (sort (all-facts-of-instance instance false false)
+                           (the-code :function proposition-less-than?))
+	do (pretty-print-logical-form fact STANDARD-OUTPUT)
+           (print EOL))))
+
+(defun (call-all-facts-of (LIST OF PROPOSITION)) ((instanceRef OBJECT))
+  :command? TRUE :public? TRUE :evaluate-arguments? TRUE
+  :documentation "Return a list of all definite (TRUE or FALSE) propositions
+that reference the instance `instanceRef'."
+  (let ((instance (coerce-to-instance instanceRef NULL)))
+    (if (defined? instance)
+      (return (all-facts-of-instance instance FALSE TRUE))
+      (return NULL))))
+
+(defun retract-facts-of-instance ((self LOGIC-OBJECT))
+  :documentation
+  "Retract all definite (TRUE or FALSE) propositions attached to `self'."
+  :public? TRUE
+  (when (null? self)
+    (return))
+  (foreach p in (all-facts-of-instance self FALSE TRUE)
+      do (case (kind p)
+           (:FUNCTION 
+            (let ((skolem SKOLEM (last (arguments p))))
+              (when (eql? skolem self)
+                ;; avoid infinite recursion:
+                (continue))
+              (when (and (defined? skolem)
+                         (defined? (variable-value skolem)))
+                ;; remove value that skolem is bound to:
+                (unassert-proposition p))
+              ;; remove facts attached to skolem:
+              (retract-facts-of-instance skolem)))
+           (otherwise (unassert-proposition p)))))
+
+(defun retract-facts-of ((instanceRef OBJECT))
+  :command? TRUE :public? TRUE :evaluate-arguments? FALSE
+  :documentation "Retract all definite (TRUE or FALSE) propositions
+that reference the instance `instanceRef'."
+  (let ((instance (coerce-to-instance instanceRef NULL)))
+    (when (defined? instance)
+      (retract-facts-of-instance instance))))
+
+(defun (explode-variablized-string LIST) ((string STRING))
+  ;; Return a list of strings and symbols where each symbol
+  ;;    is a variable that has been extracted from 'string'.
+  (let ((list (new LIST))
+        (endOfString (length string))
+        (begin 0)
+        (end INTEGER NULL)
+        (substring STRING NULL)
+        (symbol SYMBOL NULL))
+    (loop
+      (when (>= begin endOfSTring)
+        (return list))
+      (setq end (position string #\? begin))
+      (cond
+       ((null? end)
+        (setq substring (subsequence string begin endOfString))
+        (insert-last list substring)
+        (return list))
+       ((> end begin)
+        (setq substring (subsequence string begin end))
+        (insert-last list substring)))
+      (setq begin end)
+      (setq end (position string #\  begin))
+      (when (null? end)
+        (setq end endOfString))
+      (setq substring (subsequence string begin end))
+      ;; convert substring reprenting a variable into a symbol;
+      ;;    upcase it to match io variables in description:
+      (setq symbol (intern-symbol (string-upcase substring)))
+      (insert-last list symbol)
+      (setq begin end))))
+
+(defun (fact-to-sentence STRING) ((self PROPOSITION) (period? BOOLEAN))
+  ;; Return a sentence (a string) representing the meaning
+  ;;    of the proposition 'self'.
+  ;; Assumes that 'self' is a ground fact or a rule.
+  ;; Possible only if the relevant relation or rule is
+  ;;    documented as a variablized string.
+  ;; QUESTION: SHOULD WE USE STRING STREAMS HERE???
+  (case (kind self)
+    ((:PREDICATE :FUNCTION :ISA)
+     (let ((relation NAMED-DESCRIPTION (surrogate-value (relationRef self)))
+           (phrase (access-binary-value relation PL-KERNEL/@PHRASE))
+           (explodedString (only-if (defined? phrase)
+                                    (explode-variablized-string phrase))))
+       (when (defined? explodedString)
+         (let ((table (new KEY-VALUE-LIST))
+               (sentence ""))
+           (foreach vbl in (io-variable-names relation)
+                    as arg in (arguments self)
+                    do 
+                    (insert-at table vbl arg))
+           (foreach
+            item in explodedString
+            do
+            (let ((value OBJECT NULL)
+                  (stringValue STRING NULL))
+              (typecase item
+                (SYMBOL
+                 (setq value (lookup table item))
+                 (when (defined? value)
+                   (typecase value
+                     (SKOLEM
+                      (let ((surrogate (surrogate-value-inverse
+                                        (cast value LOGIC-OBJECT)))
+                            (definingProposition (defining-proposition value)))
+                        (cond
+                         ((defined? definingProposition)
+                          (setq stringValue (fact-to-sentence definingProposition FALSE)))
+                         ((defined? surrogate)          ; never happens?
+                          (setq stringValue (symbol-name surrogate)))
+                         (otherwise
+                          (setq stringValue (skolem-name (cast value SKOLEM)))))))
+                     (LOGIC-OBJECT
+                      (let ((surrogate (surrogate-value-inverse
+                                        (cast value LOGIC-OBJECT))))
+                        (when (defined? surrogate)
+                          (setq stringValue (symbol-name surrogate)))))
+                     (STRING
+                      (setq stringValue 
+                            (concatenate "'" value "'")))
+                     (INTEGER
+                      (setq stringValue (integer-to-string value)))
+                     (FLOAT-WRAPPER
+                      (setq stringValue (float-to-string value)))
+                     (otherwise
+                      NULL)))
+                 (if (defined? stringValue)
+                   (setq sentence
+                         (concatenate sentence stringValue))
+                   (setq sentence
+                         (concatenate sentence (symbol-name item)))))
+                (STRING
+                 (setq sentence (concatenate sentence item))))))
+           (when period?
+             (setq sentence (concatenate sentence ".")))
+           (return sentence)))
+       (return NULL)))
+    (:IMPLIES
+     (return "rules not yet implemented"))
+    (otherwise (return "???"))) )
+
+(defun (all-sentences-of (CONS OF STRING-WRAPPER)) ((instanceRef OBJECT))
+  :command? TRUE :public? TRUE :evaluate-arguments? TRUE
+  :documentation "Return a list of sentences describing facts about 'instanceRef'."
+  (let ((instance (coerce-to-instance instanceRef NULL))
+        (sentence STRING NULL))
+    (if (defined? instance)
+      (let ((list NIL))
+        (foreach fact in (all-facts-of-instance instance FALSE TRUE)
+                 do
+                 (progn
+                   (setq sentence (fact-to-sentence fact TRUE))
+                   (when (null? sentence)
+                     (continue)))
+                 collect sentence into list)
+        (return list))
+      (return NULL)) ))
+
+(defun (call-all-facts-of-n (LIST OF PROPOSITION)) ((n INTEGER)
+                                                    (seedRefs CONS))
+  ;; Callable version of `all-facts-of-n' (which see).
+  (let ((visited (new (HASH-TABLE OF OBJECT OBJECT)))
+        (facts (new (HASH-TABLE OF PROPOSITION PROPOSITION)))
+        (factList (new (LIST OF PROPOSITION)))
+        (seeds (new LIST))
+        (newSeeds (new LIST))
+        (instance OBJECT NULL))
+    (foreach seedRef in seedRefs
+        do (setq instance (coerce-to-instance seedRef NULL))
+           (when (defined? instance)
+             (insert-new seeds instance)))
+    (foreach i in (interval 0 (first-defined n 0))
+        do (ignore i)
+	   (foreach seed in seeds
+               do (insert-at visited seed seed))
+           (foreach seed in seeds
+               do (foreach prop in (all-facts-of-instance seed FALSE TRUE)
+                      do (when (defined? (lookup facts prop))
+                           (continue))
+                         (insert-at facts prop prop)
+                         (insert factList prop)
+                         (foreach arg in (arguments prop)
+                             where (null? (lookup visited arg))
+                             do (insert-new newSeeds arg))))
+           (setq seeds newSeeds)
+           (setq newSeeds (new LIST)))
+    (return (reverse factList))))
+
+(defun (filtered-all-facts-of-n (LIST OF PROPOSITION)) ((n INTEGER)
+                                                        (seedRefs CONS)
+                                                        (filter FUNCTION-CODE))
+  ;; Filtered version of `all-facts-of-n'.
+  ;; Applies `filter' to each newly considered proposition <prop> which is
+  ;;    expected to return a list of the following form:
+  ;;       ((<prop1> ... <propN>) (<seed1> ... <seedM>))
+  ;;    where the list of propositions will be added to the list of collected
+  ;;    facts and the list of seeds will be considered as seeds in the next
+  ;;    round.  In the simplest case, the filter could return
+  ;;       ((<prop>) (<arg1> ... <argN>))
+  ;;    which would produce the same behavior as the unfiltered
+  ;;    `all-facts-of-n'.
+  (let ((visited (new (HASH-TABLE OF OBJECT OBJECT)))
+        (facts (new (HASH-TABLE OF PROPOSITION PROPOSITION)))
+        (factList (new (LIST OF PROPOSITION)))
+        (seeds (new LIST))
+        (newSeeds (new LIST))
+        (instance OBJECT NULL))
+    (foreach seedRef in seedRefs
+        do (setq instance (coerce-to-instance seedRef NULL))
+           (when (defined? instance)
+             (insert-new seeds instance)))
+    (foreach i in (interval 0 (first-defined n 0))
+        do (ignore i)
+	   (foreach seed in seeds
+               do (insert-at visited seed seed))
+           (foreach seed in seeds
+               do (foreach prop in (all-facts-of-instance seed FALSE TRUE)
+                      do (when (defined? (lookup facts prop))
+                           (continue))
+                         (let ((filterOutput CONS (funcall filter prop))
+                               (factProps (CONS OF PROPOSITION)
+                                          (first filterOutput))
+                               (propSeeds CONS (second filterOutput)))
+                           (foreach factProp in factProps
+                               do (insert-at facts factProp factProp)
+                                  (insert factList factProp))
+                           (foreach arg in propSeeds
+                               where (null? (lookup visited arg))
+                               do (insert-new newSeeds arg)))))
+           (setq seeds newSeeds)
+           (setq newSeeds (new LIST)))
+    (return (reverse factList))))
+
+(defun (all-facts-of-n (CONS OF PROPOSITION)) ((n INTEGER)
+                                               &rest (instanceRefs NAME))
+  :command? TRUE :public? TRUE :evaluate-arguments? FALSE
+  :documentation 
+  "This is a generalization of `all-facts-of' (which see).  With `n' = 0
+and only one instance this command behaves just like `all-facts-of'.
+Otherwise, returns a cons list of all definite (TRUE or FALSE) propositions
+that reference any of the instances listed in `instanceRefs', plus if `n' >= 1
+all propositions that reference any instances that are arguments of
+propositions collected in the previous step, plus if `n' >= 2... and so on.
+That is, if we only consider binary propositions, this can be viewed as
+growing a graph with instances as its nodes and predicates as its arcs
+starting from the set of seed `instanceRefs' to depth `n'-1.
+Caution: with a fully connected KB and large enough `n' this could return
+the whole knowledge base.
+
+The returned propositions include those asserted to be true or false by
+default, but it does not include propositions that are found to be
+true only by running the query engine.  Facts inferred to be true by
+the forward chainer will be included.  Hence, the returned list of
+facts may be longer in a context where the forward chainer has been
+run then in one where it has not (see `run-forward-rules')."
+  (return
+    (the-cons-list
+     (call-all-facts-of-n n (coerce-&rest-to-cons instanceRefs)))))

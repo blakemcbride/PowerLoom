@@ -1,0 +1,414 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;; BEGIN LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                            ;
+; Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          ;
+;                                                                            ;
+; The contents of this file are subject to the Mozilla Public License        ;
+; Version 1.1 (the "License"); you may not use this file except in           ;
+; compliance with the License. You may obtain a copy of the License at       ;
+; http://www.mozilla.org/MPL/                                                ;
+;                                                                            ;
+; Software distributed under the License is distributed on an "AS IS" basis, ;
+; WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   ;
+; for the specific language governing rights and limitations under the       ;
+; License.                                                                   ;
+;                                                                            ;
+; The Original Code is the STELLA Programming Language.                      ;
+;                                                                            ;
+; The Initial Developer of the Original Code is                              ;
+; UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          ;
+; 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               ;
+;                                                                            ;
+; Portions created by the Initial Developer are Copyright (C) 2009-2017      ;
+; the Initial Developer. All Rights Reserved.                                ;
+;                                                                            ;
+; Contributor(s):                                                            ;
+;                                                                            ;
+; Alternatively, the contents of this file may be used under the terms of    ;
+; either the GNU General Public License Version 2 or later (the "GPL"), or   ;
+; the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   ;
+; in which case the provisions of the GPL or the LGPL are applicable instead ;
+; of those above. If you wish to allow use of your version of this file only ;
+; under the terms of either the GPL or the LGPL, and not to allow others to  ;
+; use your version of this file under the terms of the MPL, indicate your    ;
+; decision by deleting the provisions above and replace them with the notice ;
+; and other provisions required by the GPL or the LGPL. If you do not delete ;
+; the provisions above, a recipient may use your version of this file under  ;
+; the terms of any one of the MPL, the GPL or the LGPL.                      ;
+;                                                                            ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; END LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; Version: $Id$
+
+;;; HTTP API implementation for a generic HTTP server running in a C environment
+;;; (e.g., to support HTTP servers running in Python).
+
+(in-package "STELLA")
+
+(in-module "HTTP/CSERVE")
+
+
+  ;;
+;;;;;; Server operations
+  ;;
+
+(defclass HTTP-SERVER-CSERVE (HTTP-SERVER)
+  :public? TRUE
+  :slots ((server-address :type STRING)
+          (server-port :type INTEGER)))
+
+(startup-time-progn
+  (if (and (defined? *http-server-implementation*)
+           (not (isa? *http-server-implementation* @HTTP-SERVER-CSERVE)))
+      (error "Conflicting HTTP server implementation already loaded")
+    (setq *http-server-implementation* (new HTTP-SERVER-CSERVE))))
+
+
+(defmethod (start-http-server-impl STRING) ((server HTTP-SERVER-CSERVE) (port INTEGER))
+  ;; This is a no-op.
+  (ignore port)
+  (print "start-http-server: you cannot start/stop or change the port of this server")
+  (return (server-address server)))
+
+(defmethod stop-http-server-impl ((server HTTP-SERVER-CSERVE))
+  ;; This is a no-op.
+  NULL)
+
+(defun (create-http-server HTTP-SERVER-CSERVE) ((host STRING) (port INTEGER))
+  :documentation "C-callable constructor which also initializes the current server implementation."
+  :public? TRUE :c-callable? TRUE
+  (setq *http-server-implementation* (new HTTP-SERVER-CSERVE :server-address host :server-port port))
+  (publish-registered-http-handlers)
+  (return *http-server-implementation*))
+
+
+  ;;
+;;;;;; Server exchange API
+  ;;
+
+(defclass HTTP-EXCHANGE-CSERVE (HTTP-EXCHANGE)
+  :slots ((protocol :type STRING :initially "HTTP/1.1")
+          (request-method :type KEYWORD :initially NULL)
+          (request-headers :type HTTP-HEADERS :initially NULL)
+          (request-uri :type STRING :initially NULL)
+          (request-body :type STRING :initially NULL)
+          (remote-address :type STRING :initially NULL)
+          (reply-headers :type HTTP-HEADERS :initially NULL)
+          (reply-stream :type NATIVE-OUTPUT-STREAM :initially NULL)
+          (response-code :type INTEGER :initially (get-http-response-code :OK NULL))
+          (handler-options :type PROPERTY-LIST :initially NULL)))
+
+(defun (create-http-exchange HTTP-EXCHANGE-CSERVE) ()
+  :documentation "C-callable constructor."
+  :public? TRUE :c-callable? TRUE
+  (return (new HTTP-EXCHANGE-CSERVE)))
+
+(defun (get-http-exchange-protocol STRING) ((xchg HTTP-EXCHANGE-CSERVE))
+  :documentation "C-callable getter method."
+  :public? TRUE :c-callable? TRUE
+  (return (protocol xchg)))
+
+(defun set-http-exchange-protocol ((xchg HTTP-EXCHANGE-CSERVE) (protocol STRING))
+  :documentation "C-callable setter method."
+  :public? TRUE :c-callable? TRUE
+  (setf (protocol xchg) protocol))
+
+(defun (get-http-exchange-request-method STRING) ((xchg HTTP-EXCHANGE-CSERVE))
+  :documentation "C-callable getter method."
+  :public? TRUE :c-callable? TRUE
+  (return (symbol-name (request-method xchg))))
+
+(defun set-http-exchange-request-method ((xchg HTTP-EXCHANGE-CSERVE) (method STRING))
+  :documentation "C-callable setter method."
+  :public? TRUE :c-callable? TRUE
+  (setf (request-method xchg) (intern-keyword method)))
+
+(defun (get-http-header-value STRING) ((headers HTTP-HEADERS) (key STRING))
+  :documentation "C-callable accessor method."
+  :public? TRUE :c-callable? TRUE
+  (if (defined? headers)
+      (return (unwrap-string (lookup headers (string-upcase key))))
+    (return NULL)))
+
+(defun (get-http-header-count INTEGER) ((headers HTTP-HEADERS))
+  :documentation "C-callable accessor method.  Return the number of key-value pairs in `headers'."
+  :public? TRUE :c-callable? TRUE
+  (if (defined? headers)
+      (return (length headers))
+    (return 0)))
+
+(defun (get-nth-http-header STRING) ((headers HTTP-HEADERS) (n INTEGER))
+  :documentation "C-callable accessor method.  Returns the `n'-the key-value pair in `headers'
+as a tab-separated key-value string.  `n' is zero-based."
+  :public? TRUE :c-callable? TRUE
+  (when (defined? headers)
+    (foreach (key value) in headers
+        as i in (interval 0 n)
+        where (= i n)
+        do (return (concatenate (unwrap-string key) (make-string 1 #\tab) value))))
+  (return NULL))
+
+(defun (get-http-exchange-request-headers HTTP-HEADERS) ((xchg HTTP-EXCHANGE-CSERVE))
+  :documentation "C-callable getter method."
+  :public? TRUE :c-callable? TRUE
+  (return (request-headers xchg)))
+
+(defun (get-http-exchange-request-header STRING) ((xchg HTTP-EXCHANGE-CSERVE) (key STRING))
+  :documentation "C-callable getter method."
+  :public? TRUE :c-callable? TRUE
+  (let ((headers (request-headers xchg)))
+    (if (defined? headers)
+        (return (unwrap-string (lookup headers (string-upcase key))))
+      (return NULL))))
+
+(defun set-http-exchange-request-header ((xchg HTTP-EXCHANGE-CSERVE) (key STRING) (value STRING))
+  :documentation "C-callable setter method."
+  :public? TRUE :c-callable? TRUE
+  (let ((headers (request-headers xchg)))
+    (when (null? headers)
+      (setq headers (new HTTP-HEADERS))
+      (setf (request-headers xchg) headers))
+    (insert-at headers (string-upcase key) value)))
+
+(defun (get-http-exchange-request-uri STRING) ((xchg HTTP-EXCHANGE-CSERVE))
+  :documentation "C-callable getter method."
+  :public? TRUE :c-callable? TRUE
+  (return (request-uri xchg)))
+
+(defun set-http-exchange-request-uri ((xchg HTTP-EXCHANGE-CSERVE) (uri STRING))
+  :documentation "C-callable setter method."
+  :public? TRUE :c-callable? TRUE
+  (setf (request-uri xchg) uri))
+
+(defun (get-http-exchange-request-body STRING) ((xchg HTTP-EXCHANGE-CSERVE))
+  :documentation "C-callable getter method."
+  :public? TRUE :c-callable? TRUE
+  (return (request-body xchg)))
+
+(defun set-http-exchange-request-body ((xchg HTTP-EXCHANGE-CSERVE) (body STRING))
+  :documentation "C-callable setter method."
+  :public? TRUE :c-callable? TRUE
+  (setf (request-body xchg) body))
+
+(defun (get-http-exchange-remote-address STRING) ((xchg HTTP-EXCHANGE-CSERVE))
+  :documentation "C-callable getter method."
+  :public? TRUE :c-callable? TRUE
+  (return (remote-address xchg)))
+
+(defun set-http-exchange-remote-address ((xchg HTTP-EXCHANGE-CSERVE) (addr STRING))
+  :documentation "C-callable setter method."
+  :public? TRUE :c-callable? TRUE
+  (setf (remote-address xchg) addr))
+
+(defun (get-http-exchange-reply-headers HTTP-HEADERS) ((xchg HTTP-EXCHANGE-CSERVE))
+  :documentation "C-callable getter method."
+  :public? TRUE :c-callable? TRUE
+  (return (reply-headers xchg)))
+
+(defun (get-http-exchange-reply-header STRING) ((xchg HTTP-EXCHANGE-CSERVE) (key STRING))
+  :documentation "C-callable getter method."
+  :public? TRUE :c-callable? TRUE
+  (let ((headers (reply-headers xchg)))
+    (if (defined? headers)
+        (return (unwrap-string (lookup headers (string-upcase key))))
+      (return NULL))))
+
+(defun set-http-exchange-reply-header ((xchg HTTP-EXCHANGE-CSERVE) (key STRING) (value STRING))
+  :documentation "C-callable setter method."
+  :public? TRUE :c-callable? TRUE
+  (let ((headers (reply-headers xchg)))
+    (when (null? headers)
+      (setq headers (new HTTP-HEADERS))
+      (setf (reply-headers xchg) headers))
+    (insert-at headers (string-upcase key) value)))
+
+(defun (get-http-exchange-reply STRING) ((xchg HTTP-EXCHANGE-CSERVE))
+  :documentation "C-callable getter method."
+  :public? TRUE :c-callable? TRUE
+  (let ((reply (reply-stream xchg)))
+    (if (defined? reply)
+        (return (the-string (new STRING-OUTPUT-STREAM :native-stream reply)))
+      (return NULL))))
+
+(defun set-http-exchange-reply-stream ((xchg HTTP-EXCHANGE-CSERVE) (reply STRING))
+  :documentation "C-callable setter method."
+  :public? TRUE :c-callable? TRUE
+  (setf (reply-stream xchg) (native-stream (new STRING-OUTPUT-STREAM)))
+  (when (defined? reply)
+    (print-stream (reply-stream xchg) reply)))
+
+(defun (get-http-exchange-response-code INTEGER) ((xchg HTTP-EXCHANGE-CSERVE))
+  :documentation "C-callable getter method."
+  :public? TRUE :c-callable? TRUE
+  (return (response-code xchg)))
+
+(defun set-http-exchange-response-code ((xchg HTTP-EXCHANGE-CSERVE) (code INTEGER))
+  :documentation "C-callable setter method."
+  :public? TRUE :c-callable? TRUE
+  (setf (response-code xchg) code))
+
+(defun (get-http-exchange-handler-options PROPERTY-LIST) ((xchg HTTP-EXCHANGE-CSERVE))
+  :documentation "C-callable getter method."
+  :public? TRUE :c-callable? TRUE
+  (return (handler-options xchg)))
+
+(defun set-http-exchange-handler-options ((xchg HTTP-EXCHANGE-CSERVE) (options PROPERTY-LIST))
+  :documentation "C-callable setter method."
+  :public? TRUE :c-callable? TRUE
+  (setf (handler-options xchg) options))
+
+
+;;; Header accessors:
+
+(defmethod (get-header-value-impl STRING) ((server HTTP-SERVER-CSERVE) (xchg HTTP-EXCHANGE) (key KEYWORD))
+  (let ((cxchg HTTP-EXCHANGE-CSERVE xchg)
+        (headers (request-headers cxchg))
+        (ckey (symbol-name key))) ;; keys are case-insensitive
+    (if (null? headers)
+        (return NULL)
+      (return (unwrap-string (lookup headers ckey))))))
+
+(defmethod (get-reply-header-value-impl STRING) ((server HTTP-SERVER-CSERVE) (xchg HTTP-EXCHANGE) (key KEYWORD))
+  (let ((cxchg HTTP-EXCHANGE-CSERVE xchg)
+        (headers (reply-headers cxchg))
+        (ckey (symbol-name key))) ;; keys are case-insensitive
+    (if (null? headers)
+        (return NULL)
+      (return (unwrap-string (lookup headers ckey))))))
+
+(defmethod set-reply-header-value-impl ((server HTTP-SERVER-CSERVE)
+                                        (xchg HTTP-EXCHANGE)
+                                        (key KEYWORD)
+                                        (value STRING))
+  (let ((cxchg HTTP-EXCHANGE-CSERVE xchg)
+        (headers (reply-headers cxchg))
+        (ckey (symbol-name key))) ;; keys are case-insensitive
+    (when (null? headers)
+      (setq headers (new HTTP-HEADERS))
+      (setf (reply-headers cxchg) headers))
+    (insert-at headers ckey value)))
+
+
+;;; Request accessors:
+
+(defmethod (get-request-uri-impl STRING) ((server HTTP-SERVER-CSERVE) (xchg HTTP-EXCHANGE))
+  (let ((cxchg HTTP-EXCHANGE-CSERVE xchg))
+    (return (request-uri cxchg))))
+
+(defmethod (get-request-uri-query-impl STRING) ((server HTTP-SERVER-CSERVE) (xchg HTTP-EXCHANGE))
+  (let ((cxchg HTTP-EXCHANGE-CSERVE xchg))
+    (mv-bind (protocol user-info host port path query fragment)
+      (decompose-internet-url (request-uri cxchg))
+      (ignore protocol user-info host port path fragment)
+      (return query))))
+
+(defmethod (get-request-uri-path-impl STRING) ((server HTTP-SERVER-CSERVE) (xchg HTTP-EXCHANGE))
+  (let ((cxchg HTTP-EXCHANGE-CSERVE xchg))
+    (mv-bind (protocol user-info host port path query fragment)
+      (decompose-internet-url (request-uri cxchg))
+      (ignore protocol user-info host port query fragment)
+      (return path))))
+
+(defmethod (get-request-method-impl KEYWORD) ((server HTTP-SERVER-CSERVE) (xchg HTTP-EXCHANGE))
+  (let ((cxchg HTTP-EXCHANGE-CSERVE xchg))
+    (return (request-method cxchg))))
+
+(defmethod (get-request-protocol-impl STRING) ((server HTTP-SERVER-CSERVE) (xchg HTTP-EXCHANGE))
+  (let ((cxchg HTTP-EXCHANGE-CSERVE xchg))
+    (return (protocol cxchg))))
+
+(defmethod (get-request-body-impl STRING) ((server HTTP-SERVER-CSERVE) (xchg HTTP-EXCHANGE))
+  (let ((cxchg HTTP-EXCHANGE-CSERVE xchg))
+    (return (request-body cxchg))))
+
+(defmethod (get-request-local-address-impl STRING) ((server HTTP-SERVER-CSERVE) (xchg HTTP-EXCHANGE))
+  (let ((cxchg HTTP-EXCHANGE-CSERVE xchg))
+    (mv-bind (protocol user-info host port path query fragment)
+      (decompose-internet-url (request-uri cxchg))
+      (ignore protocol user-info path query fragment)
+      (return (concatenate host ":" port)))))
+
+(defmethod (get-request-remote-address-impl STRING) ((server HTTP-SERVER-CSERVE) (xchg HTTP-EXCHANGE))
+  (let ((cxchg HTTP-EXCHANGE-CSERVE xchg))
+    (return (remote-address cxchg))))
+
+
+;;; Reply accessors:
+
+(defmethod (get-reply-stream-impl NATIVE-OUTPUT-STREAM) ((server HTTP-SERVER-CSERVE) (xchg HTTP-EXCHANGE))
+  ;; Similar to Lisp, we have to buffer any output, since we have to wait for the handler method to
+  ;; finish and generate all its output before we can send out the reply headers which might have
+  ;; been affected by the handler.
+  (let ((cxchg HTTP-EXCHANGE-CSERVE xchg)
+        (cstream (reply-stream cxchg)))
+    (when (null? cstream)
+      (setq cstream (native-stream (new STRING-OUTPUT-STREAM)))
+      (setf (reply-stream cxchg) cstream))
+    (return cstream)))
+
+(defmethod set-response-code-impl ((server HTTP-SERVER-CSERVE) (xchg HTTP-EXCHANGE) (code KEYWORD))
+  (let ((cxchg HTTP-EXCHANGE-CSERVE xchg))
+    (setf (response-code cxchg) (get-http-response-code code NULL))))
+
+
+  ;;
+;;;;;; Publishing URLs and response handlers
+  ;;
+
+(defmethod publish-file-impl ((server HTTP-SERVER-CSERVE)
+                              (path STRING)
+                              (file STRING)
+                              (options PROPERTY-LIST))
+  (ignore file)
+  (publish-handler-impl server path (the-code :function file-handler) options))
+
+(defmethod publish-directory-impl ((server HTTP-SERVER-CSERVE)
+                                   (path STRING)
+                                   (directory STRING)
+                                   (options PROPERTY-LIST))
+  (ignore directory)
+  (publish-handler-impl server path (the-code :function directory-handler) options))
+
+(defmethod publish-handler-impl ((server HTTP-SERVER-CSERVE)
+                                 (path STRING)
+                                 (handler FUNCTION-CODE)
+                                 (options PROPERTY-LIST))
+  ;; This simply registers the handler in the global registry where we access it
+  ;; via `call-handler-code' and friends.
+  (setq options (copy options))
+  (insert-at options :handler handler)
+  (insert-at *http-handler-registry* path options))
+
+(defun (lookup-handler-options PROPERTY-LIST) ((server HTTP-SERVER-CSERVE) (path STRING))
+  :documentation "C-callable accessor for the options of the handler handling `path'."
+  :public? TRUE :c-callable? TRUE
+  (return (lookup-handler server path)))
+
+(defun (lookup-handler-code FUNCTION-CODE) ((server HTTP-SERVER-CSERVE) (path STRING))
+  :documentation "C-callable accessor for the handler code handling `path'."
+  :public? TRUE :c-callable? TRUE
+  (let ((options (lookup-handler server path)))
+    (if (defined? options)
+        (return (unwrap-function-code (lookup options :handler)))
+      (return NULL))))
+
+(defun (call-handler-code BOOLEAN) ((server HTTP-SERVER-CSERVE) (path STRING) (xchg HTTP-EXCHANGE-CSERVE))
+  :documentation "C-callable wrapper for calling the handler code handling `path' that also supports
+exceptions raised during handler execution.  Copies handler options into `xchg' and returns TRUE if
+the handler was found and successfully executed, FALSE otherwise."
+  :public? TRUE :c-callable? TRUE :throws-exceptions? TRUE
+  (let ((options (lookup-handler server path))
+        (code FUNCTION-CODE NULL))
+    (when (defined? options)
+      (setq code (unwrap-function-code (lookup options :handler)))
+      (when (defined? code)
+        (setf (handler-options xchg) options)
+        (funcall code xchg)
+        (return TRUE)))
+    (return FALSE)))
+
+(defmethod (get-handler-options-impl PROPERTY-LIST) ((server HTTP-SERVER-CSERVE) (xchg HTTP-EXCHANGE))
+  (let ((cxchg HTTP-EXCHANGE-CSERVE xchg))
+    (return (handler-options cxchg))))

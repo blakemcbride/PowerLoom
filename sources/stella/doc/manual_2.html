@@ -1,0 +1,476 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html401/loose.dtd">
+<html>
+<!-- Created on January 5, 2023 by texi2html 1.82
+texi2html was written by: 
+            Lionel Cons <Lionel.Cons@cern.ch> (original author)
+            Karl Berry  <karl@freefriends.org>
+            Olaf Bachmann <obachman@mathematik.uni-kl.de>
+            and many others.
+Maintained by: Many creative people.
+Send bugs and suggestions to <texi2html-bug@nongnu.org>
+-->
+<head>
+<title>STELLA Manual: 3. Installation</title>
+
+<meta name="description" content="STELLA Manual: 3. Installation">
+<meta name="keywords" content="STELLA Manual: 3. Installation">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="texi2html 1.82">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+<!--
+a.summary-letter {text-decoration: none}
+blockquote.smallquotation {font-size: smaller}
+pre.display {font-family: serif}
+pre.format {font-family: serif}
+pre.menu-comment {font-family: serif}
+pre.menu-preformatted {font-family: serif}
+pre.smalldisplay {font-family: serif; font-size: smaller}
+pre.smallexample {font-size: smaller}
+pre.smallformat {font-family: serif; font-size: smaller}
+pre.smalllisp {font-size: smaller}
+span.roman {font-family:serif; font-weight:normal;}
+span.sansserif {font-family:sans-serif; font-weight:normal;}
+ul.toc {list-style: none}
+-->
+</style>
+
+
+</head>
+
+<body lang="en" bgcolor="#FFFFFF" text="#000000" link="#0000FF" vlink="#800080" alink="#FF0000">
+
+<a name="Installation"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="manual_1.html#Credits-and-History" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#System-Requirements" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual_1.html#Overview" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_3.html#The-STELLA-Language" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="Installation-1"></a>
+<h1 class="chapter">3. Installation</h1>
+
+
+<table class="menu" border="0" cellspacing="0">
+<tr><td align="left" valign="top"><a href="#System-Requirements">3.1 System Requirements</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">         
+</td></tr>
+<tr><td align="left" valign="top"><a href="#Unpacking-the-Sources">3.2 Unpacking the Sources</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">       
+</td></tr>
+<tr><td align="left" valign="top"><a href="#Lisp-Installation">3.3 Lisp Installation</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">           
+</td></tr>
+<tr><td align="left" valign="top"><a href="#C_002b_002b-Installation">3.4 C++ Installation</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">            
+</td></tr>
+<tr><td align="left" valign="top"><a href="#Java-Installation">3.5 Java Installation</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">           
+</td></tr>
+<tr><td align="left" valign="top"><a href="#X_002fEmacs-Setup">3.6 X/Emacs Setup</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">               
+</td></tr>
+<tr><td align="left" valign="top"><a href="#Removing-Unneeded-Files">3.7 Removing Unneeded Files</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">     
+</td></tr>
+</table>
+
+<hr size="6">
+<a name="System-Requirements"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#Installation" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Unpacking-the-Sources" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#Installation" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Installation" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_3.html#The-STELLA-Language" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="System-Requirements-1"></a>
+<h2 class="section">3.1 System Requirements</h2>
+
+<p>To install and use STELLA you&rsquo;ll approximately need the following amounts of
+disk space:
+</p>
+<ul>
+<li> 
+8 MB for the tar-red or zip-ped archive file
+
+</li><li> 
+35 MB for the untarred sources, tanslations, compiled Java files and
+documentation
+
+</li><li> 
+8 MB to compile a Lisp version
+
+</li><li> 
+11 MB to compile the C++ version (without -g)
+
+</li><li> 
+3 MB to compile the Java version (already included)
+
+</li></ul>
+
+<p>This means that you will need approximately 55 MB to work with one Lisp,
+one C++ and one Java version of STELLA in parallel.  If you also want to
+experiment with the Lisp translation variant that uses structures
+instead of CLOS instances to implement STELLA objects, then you will
+need an extra 8 MB to compile that.
+</p>
+<p>The full STELLA development tree is quite large, since for every STELLA
+source file there are three to four translated versions and as many
+compiled versions thereof.  The actual STELLA libraries that you have to
+ship with an application, however, are quite small.  For example, the
+Java jar file &lsquo;<tt>stella.jar</tt>&rsquo; is only about 1.3 MB in size.  The
+dynamic C++ library &lsquo;<tt>libstella.so</tt>&rsquo; compiled on a Linux platform is
+about 4 MB.  Additionally, if you don&rsquo;t need all the different
+translations of STELLA, you can delete some of the versions to keep your
+development tree smaller (See section <a href="#Removing-Unneeded-Files">Removing Unneeded Files</a>).
+</p>
+<p>To run the Lisp version of STELLA you need an ANSI Common-Lisp (or at
+least one that supports CLOS and logical pathnames).  We have
+successfully tested STELLA with Allegro-CL 4.2, 4.3, 5.0, 6.0 and 7.0,
+Macintosh MCL 3.0, 4.0 and 5.1, OpenMCL 1.0, SBCL 0.9.4, CMUCL 19c,
+LispWorks 4.4.6, CLisp 2.37, Lucid CL 4.1 (plus the necessary ANSI
+extensions and Mark Kantrowitz&rsquo;s logical pathnames implementation) and
+various others.  Our main development platform is Allegro CL running
+under Sun Solaris and Linux, so, the closer your environment is to ours,
+the higher are the chances that everything will work right out of the
+box.  Lisp development under Windows should also be no problem.
+</p>
+<p>To run the C++ version of STELLA you need a C++ compiler such as g++
+that supports templates and exception handling.  We have successfully
+compiled and run STELLA with g++ 3.2 and later under Linux Redhat 8.0 &amp;
+9.0, SunOS and MacOS X, and with CygWin 5.0 and MinGW 5.0 under Windows
+2000 and XP.  Both CygWin and MinGW provide a GNU Unix environment, but
+MinGW can generate Windows executables that are fully standalone.  We&rsquo;ve
+also managed to compile STELLA under MS Visual C++, however, we never
+got the Boehm garbage collector to work.  The GC claims to be very
+portable, so this should be solvable for somebody with good knowledge of
+MS Visual C++.
+</p>
+<p>For the Java version you will need Java JDK 1.2 or later. To get
+reasonable performance, you should use J2SDK 1.4 or 1.5.  We&rsquo;ve run the
+Java version of STELLA on a variety of platforms without any problems.
+</p>
+<p>Any one of the Lisp, C++ or Java implementations of STELLA can be used
+to develop your own STELLA code and translate it into all three languages,
+but the most convenient development environment is the one based on
+Lisp.  If you use the C++ or Java version, translating and using your
+own STELLA macros is possible but not yet very well supported.
+</p>
+
+<hr size="6">
+<a name="Unpacking-the-Sources"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#System-Requirements" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Lisp-Installation" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#Installation" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Installation" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_3.html#The-STELLA-Language" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="Unpacking-the-Sources-1"></a>
+<h2 class="section">3.2 Unpacking the Sources</h2>
+
+<p>Uncompress and untar the file &lsquo;<tt>stella-X.Y.Z.tar.gz</tt>&rsquo; (or unzip the
+file &lsquo;<tt>stella-X.Y.Z.zip</tt>&rsquo;) in the parent directory of where you want
+to install STELLA (&lsquo;X.Y.Z&rsquo; are place holders for the actual version
+numbers).  This will create the STELLA tree in the directory
+&lsquo;<tt>stella-X.Y.Z/</tt>&rsquo;.  All pathnames mentioned below will be relative to that
+directory which we will usually refer to as the &quot;STELLA directory&quot;.
+</p>
+
+<hr size="6">
+<a name="Lisp-Installation"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#Unpacking-the-Sources" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#C_002b_002b-Installation" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#Installation" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Installation" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_3.html#The-STELLA-Language" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="Lisp-Installation-1"></a>
+<h2 class="section">3.3 Lisp Installation</h2>
+
+<p>To install the Lisp version startup Lisp and load the file
+&lsquo;<tt>load-stella.lisp</tt>&rsquo; with:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">(CL:load &quot;load-stella.lisp&quot;)
+</pre></td></tr></table>
+
+<p>The first time around this will compile all Lisp-translated STELLA files
+before they are loaded.  During subsequent sessions the compiled files
+will be loaded right away.
+</p>
+<p>If you want to use the version that uses Lisp structs instead of CLOS
+objects to implement STELLA objects do the following:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">(CL:setq cl-user::*load-cl-struct-stella?* CL:t)
+(CL:load &quot;load-stella.lisp&quot;)
+</pre></td></tr></table>
+
+<p>Alternatively, you can edit the initial value of the variable
+<code>*load-cl-struct-stella?*</code> in the file &lsquo;<tt>load-stella.lisp</tt>&rsquo;.
+Using structs instead of CLOS objects greatly improves slot access
+speed, however, it may cause problems with incremental re-definition
+of STELLA classes.  It is therefore recommended to only use this for
+systems that are in or near the production stage.
+</p>
+<p>Once all the files are loaded, you should see a message like this:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">Initializing STELLA...
+STELLA 3.4.0 loaded.
+Type `(in-package &quot;STELLA&quot;)' to execute STELLA commands.
+USER(2): 
+</pre></td></tr></table>
+
+<p>To reduce startup time, you might want to create a Lisp image that has
+all of STELLA preloaded.
+</p>
+<p>Now type
+</p><table><tr><td>&nbsp;</td><td><pre class="example">(in-package &quot;STELLA&quot;)
+</pre></td></tr></table>
+
+<p>to enter the <code>STELLA</code> Lisp package where all the STELLA code resides.
+</p>
+<p><strong>IMPORTANT</strong>: All unqualified Lisp symbols in this document are
+assumed to be in the <code>STELLA</code> Lisp package.  Moreover, the
+<code>STELLA</code> package does <strong>NOT</strong> inherit anything from the
+<code>COMMON-LISP</code> package (see the file
+&lsquo;<tt>sources/stella/cl-lib/cl-setup.lisp</tt>&rsquo; for the few exceptions),
+hence, you have to explicitly qualify every Lisp symbol you want to use
+with <code>CL:</code>.  For example, to get the result of the previous evaluation you
+have to type <code>CL:*</code> instead of <code>*</code>.
+</p>
+
+<hr size="6">
+<a name="C_002b_002b-Installation"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#Lisp-Installation" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Java-Installation" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#Installation" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Installation" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_3.html#The-STELLA-Language" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="C_002b_002b-Installation-1"></a>
+<h2 class="section">3.4 C++ Installation</h2>
+
+<p>To compile the C++ version of STELLA change to the native C++ directory
+and run <code>make</code>:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">% cd native/cpp/stella
+% make
+</pre></td></tr></table>
+
+<p>This will compile all STELLA files, the garbage collector and generate a
+static or dynamic &lsquo;<tt>libstella</tt>&rsquo; library file in the directory
+&lsquo;<tt>native/cpp/lib</tt>&rsquo; which can later be linked with your own
+C++-translated STELLA (or other) code.  To test whether the compilation
+was successful you can run STELLA from the top-level STELLA directory
+using the <code>stella</code> script (or <code>stella.bat</code> under a Windows
+command prompt):
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">% stella c++
+Running C++ version of STELLA...
+Welcome to STELLA 3.4.0
+Running kernel startup code...
+Initializing symbol tables...
+Initializing quoted constants...
+Initializing global variables...
+Creating class objects...
+Finalizing classes...
+Creating method objects...
+Finalizing methods...
+Running non-phased startup code...
+Starting up translators...
+Bye!
+</pre></td></tr></table>
+
+<p>This will simply run various STELLA startup code and exit.  See section <a href="manual_4.html#Hello-World-in-C_002b_002b">Hello World in C++</a>, to see how you can use the STELLA C++ executable to
+translate STELLA code.  The <code>c++</code> argument tells the script to run
+the C++ version of STELLA.  If the argument is omitted and the C++
+version is installed, it will be run automatically.  Otherwise, the Java
+version will be run.
+</p>
+
+<hr size="6">
+<a name="Java-Installation"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#C_002b_002b-Installation" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#X_002fEmacs-Setup" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#Installation" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Installation" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_3.html#The-STELLA-Language" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="Java-Installation-1"></a>
+<h2 class="section">3.5 Java Installation</h2>
+
+<p>Nothing needs to be done to install the Java version.  Since Java class
+files are platform independent, they are already shipped with the STELLA
+distribution and can be found in the directory &lsquo;<tt>native/java</tt>&rsquo; and
+its subdirectories.  Additionally, they have been collected into the
+file &lsquo;<tt>native/java/lib/stella.jar</tt>&rsquo;.  To try out the Java version of
+STELLA run the <code>stella</code> script in the STELLA directory:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">% stella java
+Running Java version of STELLA...
+Welcome to STELLA 3.4.0
+Running kernel startup code...
+Initializing symbol tables...
+Initializing quoted constants...
+Initializing global variables...
+Creating class objects...
+Finalizing classes...
+Creating method objects...
+Finalizing methods...
+Running non-phased startup code...
+Starting up translators...
+Bye!
+</pre></td></tr></table>
+
+<p>Similar to the C++ executable, this will simply run various STELLA
+startup code and exit.  See section <a href="manual_4.html#Hello-World-in-Java">Hello World in Java</a>, to see how you can
+use the STELLA Java executable to translate STELLA code.
+</p>
+
+<hr size="6">
+<a name="X_002fEmacs-Setup"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#Java-Installation" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Removing-Unneeded-Files" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#Installation" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Installation" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_3.html#The-STELLA-Language" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="X_002fEmacs-Setup-1"></a>
+<h2 class="section">3.6 X/Emacs Setup</h2>
+
+<p>STELLA development is very similar to Lisp development, and it is best
+done in an X/Emacs-based Lisp development environment such as the
+Allegro-CL Emacs interface plus Allegro Composer, or ILISP.  If you do
+use X/Emacs with the Allegro CL interface, add the following to your
+&lsquo;<tt>.emacs</tt>&rsquo; or &lsquo;<tt>.xemacs/init.el</tt>&rsquo; file:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">(setq auto-mode-alist
+      (cons '(&quot;\\.ste$&quot; . fi:common-lisp-mode) auto-mode-alist))
+</pre></td></tr></table>
+
+<p>If you are using the Allegro CL interface, you might want to install the
+file &lsquo;<tt>emacs/fi-stella.el</tt>&rsquo;, since it sets up proper indentation for
+STELLA code and makes looking up STELLA definitions via the <kbd>C-c .</kbd> 
+or <kbd>M-.</kbd> commands work better.  Look at the file
+&lsquo;<tt>emacs/fi-stella.el</tt>&rsquo; for specific installation instructions.
+</p>
+
+<hr size="6">
+<a name="Removing-Unneeded-Files"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#X_002fEmacs-Setup" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="manual_3.html#The-STELLA-Language" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#Installation" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Installation" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_3.html#The-STELLA-Language" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="Removing-Unneeded-Files-1"></a>
+<h2 class="section">3.7 Removing Unneeded Files</h2>
+
+<p>To save disk space you can remove files that you don&rsquo;t need.  For
+example, if you are not interested in the C++ version of STELLA, you can
+delete the directory &lsquo;<tt>native/cpp</tt>&rsquo;.  Similarly, you can remove
+&lsquo;<tt>native/java</tt>&rsquo; to eliminate all Java-related files.  You could do
+the same thing for the Lisp directory &lsquo;<tt>native/lisp</tt>&rsquo;, but (in our
+opinion) that would make it less convenient for you to develop new STELLA
+code.  Finally, if you don&rsquo;t need any of the STELLA sources, you can
+delete the directory &lsquo;<tt>sources/stella</tt>&rsquo;.  If you don&rsquo;t need local
+copies of the STELLA documentation, you can delete parts or all of the
+&lsquo;<tt>sources/stella/doc</tt>&rsquo; directory.
+</p>
+
+<hr size="6">
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#Installation" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="manual_3.html#The-STELLA-Language" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<p>
+ <font size="-1">
+  This document was generated by <em>Hans Chalupsky</em> on <em>January 5, 2023</em> using <a href="http://www.nongnu.org/texi2html/"><em>texi2html 1.82</em></a>.
+ </font>
+ <br>
+
+</p>
+</body>
+</html>

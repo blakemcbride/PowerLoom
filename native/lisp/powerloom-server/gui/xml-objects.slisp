@@ -1,0 +1,1767 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;; xml-objects.slisp
+
+#|
+ +---------------------------- BEGIN LICENSE BLOCK ---------------------------+
+ |                                                                            |
+ | Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          |
+ |                                                                            |
+ | The contents of this file are subject to the Mozilla Public License        |
+ | Version 1.1 (the "License"); you may not use this file except in           |
+ | compliance with the License. You may obtain a copy of the License at       |
+ | http://www.mozilla.org/MPL/                                                |
+ |                                                                            |
+ | Software distributed under the License is distributed on an "AS IS" basis, |
+ | WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   |
+ | for the specific language governing rights and limitations under the       |
+ | License.                                                                   |
+ |                                                                            |
+ | The Original Code is the PowerLoom KR&R System.                            |
+ |                                                                            |
+ | The Initial Developer of the Original Code is                              |
+ | UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          |
+ | 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               |
+ |                                                                            |
+ | Portions created by the Initial Developer are Copyright (C) 2002-2023      |
+ | the Initial Developer. All Rights Reserved.                                |
+ |                                                                            |
+ | Contributor(s):                                                            |
+ |                                                                            |
+ | Alternatively, the contents of this file may be used under the terms of    |
+ | either the GNU General Public License Version 2 or later (the "GPL"), or   |
+ | the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   |
+ | in which case the provisions of the GPL or the LGPL are applicable instead |
+ | of those above. If you wish to allow use of your version of this file only |
+ | under the terms of either the GPL or the LGPL, and not to allow others to  |
+ | use your version of this file under the terms of the MPL, indicate your    |
+ | decision by deleting the provisions above and replace them with the notice |
+ | and other provisions required by the GPL or the LGPL. If you do not delete |
+ | the provisions above, a recipient may use your version of this file under  |
+ | the terms of any one of the MPL, the GPL or the LGPL.                      |
+ |                                                                            |
+ +----------------------------- END LICENSE BLOCK ----------------------------+
+|#
+
+(CL:IN-PACKAGE "STELLA")
+
+;;; Auxiliary variables:
+
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLString| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-Value| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLSurrogate| NULL)
+(CL:DEFVAR SYM-XML-OBJECTS-LOGIC-ID NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-ServerException| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-Type| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-Message| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLModuleContainer| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PLModule| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLModule| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-ModuleName| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-SourceString| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-CppPackage| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-LispPackage| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-JavaPackage| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-JavaCatchallClass| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-Documentation| NULL)
+(CL:DEFVAR SYM-XML-OBJECTS-GUI-SERVER-API NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-CaseSensitive| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PLSurrogate| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLConcept| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-ConceptName| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-Module| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PLConcept| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLConceptContainer| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLRelation| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-RelationName| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-IsFunction| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-IsClosed| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PLRelation| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLRelationContainer| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLInstance| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-InstanceName| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLInstanceContainer| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PLInstance| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLProposition| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PropositionName| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-IsStrict| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-IsAsserted| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-IsRule| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLPropositionContainer| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PLProposition| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLRule| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-RuleName| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLVariable| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-VariableName| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-VariableType| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLVariableList| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PLVariable| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLModuleFileList| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PLModuleFile| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLModuleFile| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-KBName| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-KBDescription| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-FileName| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLFile| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PLFileContent| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLFileContent| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLDirectory| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-DirectoryName| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLDirectoryContents| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PLDirectory| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PLFile| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLSurrogateCollection| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLObjectUnion| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-LiteralValue| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLTuple| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PLObjectUnion| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLQuery| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-IsAsk| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-QueryName| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-Query| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-InferenceLevel| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-Timeout| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-Moveout| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-MatchMode| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-NumResults| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-MinScore| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-MaxUnknowns| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-MaximizeScore| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-DontOptimize| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLQueryResult| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PLTuple| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLSearchParameter| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-SearchString| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-SearchConcept| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-SearchRelation| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-SearchInstance| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLSearchResult| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-PLSearchResultItem| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLSearchResultItem| NULL)
+(CL:DEFVAR |SGT-XML-OBJECTS-GUI-SERVER-PLServerInfo| NULL)
+(CL:DEFVAR |SYM-XML-OBJECTS-GUI-SERVER-AllowRemoteFileBrowsing| NULL)
+(CL:DEFVAR SYM-XML-OBJECTS-GUI-SERVER-STARTUP-XML-OBJECTS NULL)
+(CL:DEFVAR SYM-XML-OBJECTS-STELLA-METHOD-STARTUP-CLASSNAME NULL)
+
+;;; Forward declarations:
+
+(CL:DECLAIM (CL:SPECIAL *STARTUP-TIME-PHASE* *MODULE*))
+
+(CL:DEFUN |new-PLString| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLString|))
+   (CL:SETF (|%PLString.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLString.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLString.Value| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLString|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLString|)
+
+(CL:DEFUN |access-PLString-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-Value|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLString.Value| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLString.Value| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLSurrogate| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLSurrogate|))
+   (CL:SETF (|%PLSurrogate.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLSurrogate.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLSurrogate.ID| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLSurrogate|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLSurrogate|)
+
+(CL:DEFUN |access-PLSurrogate-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME SYM-XML-OBJECTS-LOGIC-ID)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLSurrogate.ID| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLSurrogate.ID| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-ServerException| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-ServerException|))
+   (CL:SETF (|%ServerException.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%ServerException.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%ServerException.Message| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%ServerException.Type| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |ServerException|))
+  |SGT-XML-OBJECTS-GUI-SERVER-ServerException|)
+
+(CL:DEFUN |access-ServerException-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-Type|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%ServerException.Type| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%ServerException.Type| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-Message|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%ServerException.Message| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%ServerException.Message| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLModuleContainer| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLModuleContainer|))
+   (CL:SETF (|%PLModuleContainer.cdataContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLModuleContainer.textContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLModuleContainer.PLModule| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLModuleContainer|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLModuleContainer|)
+
+(CL:DEFUN |access-PLModuleContainer-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLModule|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModuleContainer.PLModule| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLModuleContainer.PLModule| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLModule| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLModule|))
+   (CL:SETF (|%PLModule.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModule.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModule.PLSurrogate| SELF) NULL)
+   (CL:SETF (|%PLModule.PLModule| SELF) NULL)
+   (CL:SETF (|%PLModule.CaseSensitive| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModule.API| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModule.Documentation| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModule.JavaCatchallClass| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModule.JavaPackage| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModule.LispPackage| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModule.CppPackage| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModule.SourceString| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModule.ModuleName| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLModule|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLModule|)
+
+(CL:DEFUN |access-PLModule-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-ModuleName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModule.ModuleName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLModule.ModuleName| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-SourceString|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModule.SourceString| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLModule.SourceString| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-CppPackage|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModule.CppPackage| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLModule.CppPackage| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-LispPackage|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModule.LispPackage| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLModule.LispPackage| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-JavaPackage|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModule.JavaPackage| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLModule.JavaPackage| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-JavaCatchallClass|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModule.JavaCatchallClass| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE
+      (WRAP-STRING (|%PLModule.JavaCatchallClass| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-Documentation|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModule.Documentation| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLModule.Documentation| SELF)))))
+   ((CL:EQ SLOTNAME SYM-XML-OBJECTS-GUI-SERVER-API)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModule.API| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLModule.API| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-CaseSensitive|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModule.CaseSensitive| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLModule.CaseSensitive| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLModule|)
+    (CL:IF SETVALUE? (CL:SETF (|%PLModule.PLModule| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLModule.PLModule| SELF))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLSurrogate|)
+    (CL:IF SETVALUE? (CL:SETF (|%PLModule.PLSurrogate| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLModule.PLSurrogate| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLConcept| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLConcept|))
+   (CL:SETF (|%PLConcept.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLConcept.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLConcept.PLSurrogate| SELF) NULL)
+   (CL:SETF (|%PLConcept.PLConcept| SELF) NULL)
+   (CL:SETF (|%PLConcept.SourceString| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLConcept.Module| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLConcept.ConceptName| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLConcept|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLConcept|)
+
+(CL:DEFUN |access-PLConcept-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-ConceptName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLConcept.ConceptName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLConcept.ConceptName| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-Module|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLConcept.Module| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLConcept.Module| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-SourceString|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLConcept.SourceString| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLConcept.SourceString| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLConcept|)
+    (CL:IF SETVALUE? (CL:SETF (|%PLConcept.PLConcept| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLConcept.PLConcept| SELF))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLSurrogate|)
+    (CL:IF SETVALUE? (CL:SETF (|%PLConcept.PLSurrogate| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLConcept.PLSurrogate| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLConceptContainer| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLConceptContainer|))
+   (CL:SETF (|%PLConceptContainer.cdataContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLConceptContainer.textContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLConceptContainer.PLConcept| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLConceptContainer|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLConceptContainer|)
+
+(CL:DEFUN |access-PLConceptContainer-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLConcept|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLConceptContainer.PLConcept| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLConceptContainer.PLConcept| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLRelation| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLRelation|))
+   (CL:SETF (|%PLRelation.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLRelation.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLRelation.PLSurrogate| SELF) NULL)
+   (CL:SETF (|%PLRelation.PLRelation| SELF) NULL)
+   (CL:SETF (|%PLRelation.IsClosed| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLRelation.IsFunction| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLRelation.Module| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLRelation.SourceString| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLRelation.RelationName| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLRelation|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLRelation|)
+
+(CL:DEFUN |access-PLRelation-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-RelationName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLRelation.RelationName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLRelation.RelationName| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-SourceString|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLRelation.SourceString| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLRelation.SourceString| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-Module|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLRelation.Module| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLRelation.Module| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-IsFunction|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLRelation.IsFunction| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLRelation.IsFunction| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-IsClosed|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLRelation.IsClosed| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLRelation.IsClosed| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLRelation|)
+    (CL:IF SETVALUE? (CL:SETF (|%PLRelation.PLRelation| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLRelation.PLRelation| SELF))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLSurrogate|)
+    (CL:IF SETVALUE? (CL:SETF (|%PLRelation.PLSurrogate| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLRelation.PLSurrogate| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLRelationContainer| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLRelationContainer|))
+   (CL:SETF (|%PLRelationContainer.cdataContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLRelationContainer.textContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLRelationContainer.PLRelation| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLRelationContainer|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLRelationContainer|)
+
+(CL:DEFUN |access-PLRelationContainer-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLRelation|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLRelationContainer.PLRelation| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLRelationContainer.PLRelation| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLInstance| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLInstance|))
+   (CL:SETF (|%PLInstance.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLInstance.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLInstance.SourceString| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLInstance.Module| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLInstance.InstanceName| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLInstance|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLInstance|)
+
+(CL:DEFUN |access-PLInstance-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-InstanceName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLInstance.InstanceName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLInstance.InstanceName| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-Module|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLInstance.Module| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLInstance.Module| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-SourceString|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLInstance.SourceString| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLInstance.SourceString| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLInstanceContainer| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLInstanceContainer|))
+   (CL:SETF (|%PLInstanceContainer.cdataContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLInstanceContainer.textContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLInstanceContainer.PLInstance| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLInstanceContainer|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLInstanceContainer|)
+
+(CL:DEFUN |access-PLInstanceContainer-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLInstance|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLInstanceContainer.PLInstance| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLInstanceContainer.PLInstance| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLProposition| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLProposition|))
+   (CL:SETF (|%PLProposition.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLProposition.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLProposition.IsRule| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLProposition.IsAsserted| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLProposition.IsStrict| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLProposition.PropositionName| SELF)
+    STELLA::NULL-STRING)
+   SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLProposition|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLProposition|)
+
+(CL:DEFUN |access-PLProposition-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PropositionName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLProposition.PropositionName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE
+      (WRAP-STRING (|%PLProposition.PropositionName| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-IsStrict|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLProposition.IsStrict| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLProposition.IsStrict| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-IsAsserted|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLProposition.IsAsserted| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLProposition.IsAsserted| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-IsRule|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLProposition.IsRule| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLProposition.IsRule| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLPropositionContainer| ()
+  (CL:LET* ((SELF NULL))
+   (CL:SETQ SELF (|%MAKE-PLPropositionContainer|))
+   (CL:SETF (|%PLPropositionContainer.cdataContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLPropositionContainer.textContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLPropositionContainer.PLProposition| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLPropositionContainer|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLPropositionContainer|)
+
+(CL:DEFUN |access-PLPropositionContainer-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLProposition|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLPropositionContainer.PLProposition| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLPropositionContainer.PLProposition| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLRule| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLRule|))
+   (CL:SETF (|%PLRule.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLRule.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLRule.RuleName| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLRule|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLRule|)
+
+(CL:DEFUN |access-PLRule-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-RuleName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLRule.RuleName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLRule.RuleName| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLVariable| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLVariable|))
+   (CL:SETF (|%PLVariable.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLVariable.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLVariable.VariableType| SELF) NULL)
+   (CL:SETF (|%PLVariable.VariableName| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLVariable|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLVariable|)
+
+(CL:DEFUN |access-PLVariable-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-VariableName|)
+    (CL:IF SETVALUE? (CL:SETF (|%PLVariable.VariableName| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLVariable.VariableName| SELF))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-VariableType|)
+    (CL:IF SETVALUE? (CL:SETF (|%PLVariable.VariableType| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLVariable.VariableType| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLVariableList| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLVariableList|))
+   (CL:SETF (|%PLVariableList.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLVariableList.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLVariableList.PLVariable| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLVariableList|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLVariableList|)
+
+(CL:DEFUN |access-PLVariableList-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLVariable|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLVariableList.PLVariable| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLVariableList.PLVariable| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLModuleFileList| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLModuleFileList|))
+   (CL:SETF (|%PLModuleFileList.cdataContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLModuleFileList.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModuleFileList.PLModuleFile| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLModuleFileList|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLModuleFileList|)
+
+(CL:DEFUN |access-PLModuleFileList-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLModuleFile|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModuleFileList.PLModuleFile| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLModuleFileList.PLModuleFile| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLModuleFile| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLModuleFile|))
+   (CL:SETF (|%PLModuleFile.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModuleFile.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModuleFile.FileName| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModuleFile.KBDescription| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModuleFile.ModuleName| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLModuleFile.KBName| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLModuleFile|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLModuleFile|)
+
+(CL:DEFUN |access-PLModuleFile-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-KBName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModuleFile.KBName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLModuleFile.KBName| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-ModuleName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModuleFile.ModuleName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLModuleFile.ModuleName| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-KBDescription|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModuleFile.KBDescription| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE
+      (WRAP-STRING (|%PLModuleFile.KBDescription| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-FileName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLModuleFile.FileName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLModuleFile.FileName| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLFile| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLFile|))
+   (CL:SETF (|%PLFile.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLFile.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLFile.PLFileContent| SELF) NULL)
+   (CL:SETF (|%PLFile.FileName| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLFile|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLFile|)
+
+(CL:DEFUN |access-PLFile-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-FileName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLFile.FileName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLFile.FileName| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLFileContent|)
+    (CL:IF SETVALUE? (CL:SETF (|%PLFile.PLFileContent| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLFile.PLFileContent| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLFileContent| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLFileContent|))
+   (CL:SETF (|%PLFileContent.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLFileContent.textContent| SELF) STELLA::NULL-STRING)
+   SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLFileContent|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLFileContent|)
+
+(CL:DEFUN |new-PLDirectory| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLDirectory|))
+   (CL:SETF (|%PLDirectory.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLDirectory.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLDirectory.DirectoryName| SELF) STELLA::NULL-STRING)
+   SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLDirectory|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLDirectory|)
+
+(CL:DEFUN |access-PLDirectory-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-DirectoryName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLDirectory.DirectoryName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE
+      (WRAP-STRING (|%PLDirectory.DirectoryName| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLDirectoryContents| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLDirectoryContents|))
+   (CL:SETF (|%PLDirectoryContents.cdataContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLDirectoryContents.textContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLDirectoryContents.PLFile| SELF) NULL)
+   (CL:SETF (|%PLDirectoryContents.PLDirectory| SELF) NULL)
+   (CL:SETF (|%PLDirectoryContents.DirectoryName| SELF)
+    STELLA::NULL-STRING)
+   SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLDirectoryContents|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLDirectoryContents|)
+
+(CL:DEFUN |access-PLDirectoryContents-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-DirectoryName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLDirectoryContents.DirectoryName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE
+      (WRAP-STRING (|%PLDirectoryContents.DirectoryName| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLDirectory|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLDirectoryContents.PLDirectory| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLDirectoryContents.PLDirectory| SELF))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLFile|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLDirectoryContents.PLFile| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLDirectoryContents.PLFile| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLSurrogateCollection| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLSurrogateCollection|))
+   (CL:SETF (|%PLSurrogateCollection.cdataContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLSurrogateCollection.textContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLSurrogateCollection.PLSurrogate| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLSurrogateCollection|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLSurrogateCollection|)
+
+(CL:DEFUN |access-PLSurrogateCollection-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLSurrogate|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLSurrogateCollection.PLSurrogate| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLSurrogateCollection.PLSurrogate| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLObjectUnion| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLObjectUnion|))
+   (CL:SETF (|%PLObjectUnion.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLObjectUnion.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLObjectUnion.LiteralValue| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLObjectUnion.PLSurrogate| SELF) NULL)
+   (CL:SETF (|%PLObjectUnion.Type| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLObjectUnion|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLObjectUnion|)
+
+(CL:DEFUN |access-PLObjectUnion-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-Type|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLObjectUnion.Type| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLObjectUnion.Type| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLSurrogate|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLObjectUnion.PLSurrogate| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLObjectUnion.PLSurrogate| SELF))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-LiteralValue|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLObjectUnion.LiteralValue| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE
+      (WRAP-STRING (|%PLObjectUnion.LiteralValue| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLTuple| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLTuple|))
+   (CL:SETF (|%PLTuple.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLTuple.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLTuple.PLObjectUnion| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLTuple|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLTuple|)
+
+(CL:DEFUN |access-PLTuple-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLObjectUnion|)
+    (CL:IF SETVALUE? (CL:SETF (|%PLTuple.PLObjectUnion| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLTuple.PLObjectUnion| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLQuery| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLQuery|))
+   (CL:SETF (|%PLQuery.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQuery.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQuery.DontOptimize| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQuery.MaximizeScore| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQuery.MaxUnknowns| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQuery.MinScore| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQuery.NumResults| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQuery.MatchMode| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQuery.Moveout| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQuery.Timeout| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQuery.InferenceLevel| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQuery.Module| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQuery.Query| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQuery.QueryName| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQuery.IsAsk| SELF) STELLA::NULL-STRING) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLQuery|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLQuery|)
+
+(CL:DEFUN |access-PLQuery-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-IsAsk|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLQuery.IsAsk| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLQuery.IsAsk| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-QueryName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLQuery.QueryName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLQuery.QueryName| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-Query|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLQuery.Query| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLQuery.Query| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-Module|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLQuery.Module| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLQuery.Module| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-InferenceLevel|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLQuery.InferenceLevel| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLQuery.InferenceLevel| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-Timeout|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLQuery.Timeout| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLQuery.Timeout| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-Moveout|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLQuery.Moveout| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLQuery.Moveout| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-MatchMode|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLQuery.MatchMode| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLQuery.MatchMode| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-NumResults|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLQuery.NumResults| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLQuery.NumResults| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-MinScore|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLQuery.MinScore| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLQuery.MinScore| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-MaxUnknowns|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLQuery.MaxUnknowns| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLQuery.MaxUnknowns| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-MaximizeScore|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLQuery.MaximizeScore| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLQuery.MaximizeScore| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-DontOptimize|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLQuery.DontOptimize| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE (WRAP-STRING (|%PLQuery.DontOptimize| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLQueryResult| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLQueryResult|))
+   (CL:SETF (|%PLQueryResult.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQueryResult.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLQueryResult.PLTuple| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLQueryResult|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLQueryResult|)
+
+(CL:DEFUN |access-PLQueryResult-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLTuple|)
+    (CL:IF SETVALUE? (CL:SETF (|%PLQueryResult.PLTuple| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLQueryResult.PLTuple| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLSearchParameter| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLSearchParameter|))
+   (CL:SETF (|%PLSearchParameter.cdataContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLSearchParameter.textContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLSearchParameter.CaseSensitive| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLSearchParameter.SearchInstance| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLSearchParameter.SearchRelation| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLSearchParameter.SearchConcept| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLSearchParameter.SearchString| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLSearchParameter.ModuleName| SELF) STELLA::NULL-STRING)
+   SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLSearchParameter|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLSearchParameter|)
+
+(CL:DEFUN |access-PLSearchParameter-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-ModuleName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLSearchParameter.ModuleName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE
+      (WRAP-STRING (|%PLSearchParameter.ModuleName| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-SearchString|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLSearchParameter.SearchString| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE
+      (WRAP-STRING (|%PLSearchParameter.SearchString| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-SearchConcept|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLSearchParameter.SearchConcept| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE
+      (WRAP-STRING (|%PLSearchParameter.SearchConcept| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-SearchRelation|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLSearchParameter.SearchRelation| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE
+      (WRAP-STRING (|%PLSearchParameter.SearchRelation| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-SearchInstance|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLSearchParameter.SearchInstance| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE
+      (WRAP-STRING (|%PLSearchParameter.SearchInstance| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-CaseSensitive|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLSearchParameter.CaseSensitive| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE
+      (WRAP-STRING (|%PLSearchParameter.CaseSensitive| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLSearchResult| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLSearchResult|))
+   (CL:SETF (|%PLSearchResult.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLSearchResult.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLSearchResult.PLSearchResultItem| SELF) NULL) SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLSearchResult|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLSearchResult|)
+
+(CL:DEFUN |access-PLSearchResult-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLSearchResultItem|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLSearchResult.PLSearchResultItem| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLSearchResult.PLSearchResultItem| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLSearchResultItem| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLSearchResultItem|))
+   (CL:SETF (|%PLSearchResultItem.cdataContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLSearchResultItem.textContent| SELF)
+    STELLA::NULL-STRING)
+   (CL:SETF (|%PLSearchResultItem.PLObjectUnion| SELF) NULL)
+   (CL:SETF (|%PLSearchResultItem.ModuleName| SELF)
+    STELLA::NULL-STRING)
+   SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLSearchResultItem|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLSearchResultItem|)
+
+(CL:DEFUN |access-PLSearchResultItem-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-ModuleName|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLSearchResultItem.ModuleName| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE
+      (WRAP-STRING (|%PLSearchResultItem.ModuleName| SELF)))))
+   ((CL:EQ SLOTNAME |SYM-XML-OBJECTS-GUI-SERVER-PLObjectUnion|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLSearchResultItem.PLObjectUnion| SELF) VALUE)
+     (CL:SETQ VALUE (|%PLSearchResultItem.PLObjectUnion| SELF))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+(CL:DEFUN |new-PLServerInfo| ()
+  (CL:LET* ((SELF NULL)) (CL:SETQ SELF (|%MAKE-PLServerInfo|))
+   (CL:SETF (|%PLServerInfo.cdataContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLServerInfo.textContent| SELF) STELLA::NULL-STRING)
+   (CL:SETF (|%PLServerInfo.AllowRemoteFileBrowsing| SELF)
+    STELLA::NULL-STRING)
+   SELF))
+
+(CL:DEFMETHOD PRIMARY-TYPE ((SELF |PLServerInfo|))
+  |SGT-XML-OBJECTS-GUI-SERVER-PLServerInfo|)
+
+(CL:DEFUN |access-PLServerInfo-Slot-Value| (SELF SLOTNAME VALUE SETVALUE?)
+  (CL:COND
+   ((CL:EQ SLOTNAME
+     |SYM-XML-OBJECTS-GUI-SERVER-AllowRemoteFileBrowsing|)
+    (CL:IF SETVALUE?
+     (CL:SETF (|%PLServerInfo.AllowRemoteFileBrowsing| SELF)
+      (%STRING-WRAPPER.WRAPPER-VALUE VALUE))
+     (CL:SETQ VALUE
+      (WRAP-STRING (|%PLServerInfo.AllowRemoteFileBrowsing| SELF)))))
+   (CL:T
+    (CL:LET* ((STREAM-000 (NEW-OUTPUT-STRING-STREAM)))
+     (%%PRINT-STREAM (%OUTPUT-STRING-STREAM.NATIVE-STREAM STREAM-000)
+      "`" SLOTNAME "' is not a valid case option")
+     (CL:ERROR (NEW-STELLA-EXCEPTION (THE-STRING-READER STREAM-000))))))
+  VALUE)
+
+;;; (DEFMETHOD (OBJECT-EQL? BOOLEAN) ...)
+
+(CL:DEFMETHOD OBJECT-EQL? ((X |PLConcept|) Y)
+  "Return TRUE if `x' and `y' represent the same Concept"
+  (CL:COND
+   ((SUBTYPE-OF? (SAFE-PRIMARY-TYPE Y)
+     |SGT-XML-OBJECTS-GUI-SERVER-PLConcept|)
+    (CL:PROGN
+     (CL:WHEN
+      (STRING-EQL? (|%PLConcept.ConceptName| X)
+       (|%PLConcept.ConceptName| Y))
+      (CL:RETURN-FROM OBJECT-EQL? CL:T))))
+   (CL:T))
+  CL:NIL)
+
+;;; (DEFMETHOD (OBJECT-EQL? BOOLEAN) ...)
+
+(CL:DEFMETHOD OBJECT-EQL? ((X |PLRelation|) Y)
+  "Return TRUE if `x' and `y' represent the same Relation"
+  (CL:COND
+   ((SUBTYPE-OF? (SAFE-PRIMARY-TYPE Y)
+     |SGT-XML-OBJECTS-GUI-SERVER-PLRelation|)
+    (CL:PROGN
+     (CL:WHEN
+      (STRING-EQL? (|%PLRelation.RelationName| X)
+       (|%PLRelation.RelationName| Y))
+      (CL:RETURN-FROM OBJECT-EQL? CL:T))))
+   (CL:T))
+  CL:NIL)
+
+;;; (DEFMETHOD (OBJECT-EQL? BOOLEAN) ...)
+
+(CL:DEFMETHOD OBJECT-EQL? ((X |PLInstance|) Y)
+  "Return TRUE if `x' and `y' represent the same Instance"
+  (CL:COND
+   ((SUBTYPE-OF? (SAFE-PRIMARY-TYPE Y)
+     |SGT-XML-OBJECTS-GUI-SERVER-PLInstance|)
+    (CL:PROGN
+     (CL:WHEN
+      (STRING-EQL? (|%PLInstance.InstanceName| X)
+       (|%PLInstance.InstanceName| Y))
+      (CL:RETURN-FROM OBJECT-EQL? CL:T))))
+   (CL:T))
+  CL:NIL)
+
+;;; (DEFMETHOD (OBJECT-EQL? BOOLEAN) ...)
+
+(CL:DEFMETHOD OBJECT-EQL? ((X |PLProposition|) Y)
+  "Return TRUE if `x' and `y' represent the same Propositions"
+  (CL:COND
+   ((SUBTYPE-OF? (SAFE-PRIMARY-TYPE Y)
+     |SGT-XML-OBJECTS-GUI-SERVER-PLProposition|)
+    (CL:PROGN
+     (CL:WHEN
+      (STRING-EQL? (|%PLProposition.PropositionName| X)
+       (|%PLProposition.PropositionName| Y))
+      (CL:RETURN-FROM OBJECT-EQL? CL:T))))
+   (CL:T))
+  CL:NIL)
+
+;;; (DEFUN (|PLSurrogate<| BOOLEAN) ...)
+
+(CL:DEFUN |PLSurrogate<| (INST1 INST2)
+  (STRING< (|%PLSurrogate.ID| INST1) (|%PLSurrogate.ID| INST2)))
+
+;;; (DEFUN (|PLModule<| BOOLEAN) ...)
+
+(CL:DEFUN |PLModule<| (INST1 INST2)
+  (STRING< (|%PLModule.ModuleName| INST1)
+   (|%PLModule.ModuleName| INST2)))
+
+;;; (DEFUN (|PLInstance<| BOOLEAN) ...)
+
+(CL:DEFUN |PLInstance<| (INST1 INST2)
+  (STRING< (|%PLInstance.InstanceName| INST1)
+   (|%PLInstance.InstanceName| INST2)))
+
+;;; (DEFUN (|PLConcept<| BOOLEAN) ...)
+
+(CL:DEFUN |PLConcept<| (INST1 INST2)
+  (STRING< (|%PLConcept.ConceptName| INST1)
+   (|%PLConcept.ConceptName| INST2)))
+
+;;; (DEFUN (|PLRelation<| BOOLEAN) ...)
+
+(CL:DEFUN |PLRelation<| (INST1 INST2)
+  (STRING< (|%PLRelation.RelationName| INST1)
+   (|%PLRelation.RelationName| INST2)))
+
+(CL:DEFUN HELP-STARTUP-XML-OBJECTS1 ()
+  (CL:PROGN
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLString|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLString" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-Value|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "Value" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLSurrogate|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLSurrogate" NULL 1))
+   (CL:SETQ SYM-XML-OBJECTS-LOGIC-ID
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "ID"
+     (GET-STELLA-MODULE "/LOGIC" CL:T) 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-ServerException|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "ServerException" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-Type|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "Type" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-Message|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "Message" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLModuleContainer|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLModuleContainer" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PLModule|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLModule" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLModule|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLModule" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-ModuleName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "ModuleName" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-SourceString|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "SourceString" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-CppPackage|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "CppPackage" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-LispPackage|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "LispPackage" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-JavaPackage|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "JavaPackage" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-JavaCatchallClass|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "JavaCatchallClass" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-Documentation|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "Documentation" NULL 0))
+   (CL:SETQ SYM-XML-OBJECTS-GUI-SERVER-API
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "API" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-CaseSensitive|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "CaseSensitive" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PLSurrogate|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLSurrogate" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLConcept|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLConcept" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-ConceptName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "ConceptName" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-Module|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "Module" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PLConcept|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLConcept" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLConceptContainer|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLConceptContainer" NULL 1))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLRelation|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLRelation" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-RelationName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "RelationName" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-IsFunction|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "IsFunction" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-IsClosed|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "IsClosed" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PLRelation|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLRelation" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLRelationContainer|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLRelationContainer" NULL 1))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLInstance|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLInstance" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-InstanceName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "InstanceName" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLInstanceContainer|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLInstanceContainer" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PLInstance|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLInstance" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLProposition|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLProposition" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PropositionName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PropositionName" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-IsStrict|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "IsStrict" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-IsAsserted|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "IsAsserted" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-IsRule|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "IsRule" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLPropositionContainer|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLPropositionContainer" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PLProposition|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLProposition" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLRule|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLRule" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-RuleName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "RuleName" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLVariable|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLVariable" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-VariableName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "VariableName" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-VariableType|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "VariableType" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLVariableList|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLVariableList" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PLVariable|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLVariable" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLModuleFileList|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLModuleFileList" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PLModuleFile|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLModuleFile" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLModuleFile|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLModuleFile" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-KBName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "KBName" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-KBDescription|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "KBDescription" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-FileName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "FileName" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLFile|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLFile" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PLFileContent|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLFileContent" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLFileContent|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLFileContent" NULL 1))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLDirectory|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLDirectory" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-DirectoryName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "DirectoryName" NULL 0))))
+
+(CL:DEFUN HELP-STARTUP-XML-OBJECTS2 ()
+  (CL:PROGN
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLDirectoryContents|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLDirectoryContents" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PLDirectory|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLDirectory" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PLFile|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLFile" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLSurrogateCollection|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLSurrogateCollection" NULL 1))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLObjectUnion|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLObjectUnion" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-LiteralValue|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "LiteralValue" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLTuple|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLTuple" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PLObjectUnion|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLObjectUnion" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLQuery|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLQuery" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-IsAsk|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "IsAsk" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-QueryName|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "QueryName" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-Query|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "Query" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-InferenceLevel|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "InferenceLevel" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-Timeout|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "Timeout" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-Moveout|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "Moveout" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-MatchMode|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "MatchMode" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-NumResults|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "NumResults" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-MinScore|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "MinScore" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-MaxUnknowns|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "MaxUnknowns" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-MaximizeScore|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "MaximizeScore" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-DontOptimize|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "DontOptimize" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLQueryResult|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLQueryResult" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PLTuple|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLTuple" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLSearchParameter|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLSearchParameter" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-SearchString|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "SearchString" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-SearchConcept|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "SearchConcept" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-SearchRelation|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "SearchRelation" NULL 0))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-SearchInstance|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "SearchInstance" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLSearchResult|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLSearchResult" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-PLSearchResultItem|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLSearchResultItem" NULL 0))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLSearchResultItem|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLSearchResultItem" NULL 1))
+   (CL:SETQ |SGT-XML-OBJECTS-GUI-SERVER-PLServerInfo|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "PLServerInfo" NULL 1))
+   (CL:SETQ |SYM-XML-OBJECTS-GUI-SERVER-AllowRemoteFileBrowsing|
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "AllowRemoteFileBrowsing" NULL 0))
+   (CL:SETQ SYM-XML-OBJECTS-GUI-SERVER-STARTUP-XML-OBJECTS
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "STARTUP-XML-OBJECTS" NULL 0))
+   (CL:SETQ SYM-XML-OBJECTS-STELLA-METHOD-STARTUP-CLASSNAME
+    (INTERN-RIGID-SYMBOL-WRT-MODULE "METHOD-STARTUP-CLASSNAME"
+     (GET-STELLA-MODULE "/STELLA" CL:T) 0))))
+
+(CL:DEFUN STARTUP-XML-OBJECTS ()
+  (CL:LET*
+   ((*MODULE*
+     (GET-STELLA-MODULE "/POWERLOOM-SERVER/GUI-SERVER"
+      (> *STARTUP-TIME-PHASE* 1)))
+    (*CONTEXT* *MODULE*))
+   (CL:DECLARE (CL:SPECIAL *MODULE* *CONTEXT*))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 2) (HELP-STARTUP-XML-OBJECTS1)
+    (HELP-STARTUP-XML-OBJECTS2))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 5)
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLString"
+        "(DEFCLASS |PLString| (|XMLObject|) :PUBLIC-SLOTS ((|Value| :TYPE STRING)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLString|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLString-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLSurrogate"
+        "(DEFCLASS |PLSurrogate| (|XMLObject|) :PUBLIC-SLOTS ((ID :TYPE STRING)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLSurrogate|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLSurrogate-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "ServerException"
+        "(DEFCLASS |ServerException| (|XMLObject|) :PUBLIC-SLOTS ((|Type| :TYPE STRING) (|Message| :TYPE STRING)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-ServerException|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-ServerException-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLModuleContainer"
+        "(DEFCLASS |PLModuleContainer| (|XMLObject|) :PUBLIC-SLOTS ((|PLModule| :TYPE (LIST OF |PLModule|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLModuleContainer|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLModuleContainer-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLModule"
+        "(DEFCLASS |PLModule| (|XMLObject|) :PUBLIC-SLOTS ((|ModuleName| :TYPE STRING) (|SourceString| :TYPE STRING) (|CppPackage| :TYPE STRING) (|LispPackage| :TYPE STRING) (|JavaPackage| :TYPE STRING) (|JavaCatchallClass| :TYPE STRING) (|Documentation| :TYPE STRING) (API :TYPE STRING) (|CaseSensitive| :TYPE STRING) (|PLModule| :TYPE (LIST OF |PLModule|)) (|PLSurrogate| :TYPE (LIST OF |PLSurrogate|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLModule|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLModule-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLConcept"
+        "(DEFCLASS |PLConcept| (|XMLObject|) :PUBLIC-SLOTS ((|ConceptName| :TYPE STRING) (|Module| :TYPE STRING) (|SourceString| :TYPE STRING) (|PLConcept| :TYPE (LIST OF |PLConcept|)) (|PLSurrogate| :TYPE (LIST OF |PLSurrogate|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLConcept|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLConcept-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLConceptContainer"
+        "(DEFCLASS |PLConceptContainer| (|XMLObject|) :PUBLIC-SLOTS ((|PLConcept| :TYPE (LIST OF |PLConcept|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLConceptContainer|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLConceptContainer-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLRelation"
+        "(DEFCLASS |PLRelation| (|XMLObject|) :PUBLIC-SLOTS ((|RelationName| :TYPE STRING) (|SourceString| :TYPE STRING) (|Module| :TYPE STRING) (|IsFunction| :TYPE STRING) (|IsClosed| :TYPE STRING) (|PLRelation| :TYPE (LIST OF |PLRelation|)) (|PLSurrogate| :TYPE (LIST OF |PLSurrogate|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLRelation|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLRelation-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLRelationContainer"
+        "(DEFCLASS |PLRelationContainer| (|XMLObject|) :PUBLIC-SLOTS ((|PLRelation| :TYPE (LIST OF |PLRelation|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLRelationContainer|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLRelationContainer-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLInstance"
+        "(DEFCLASS |PLInstance| (|XMLObject|) :PUBLIC-SLOTS ((|InstanceName| :TYPE STRING) (|Module| :TYPE STRING) (|SourceString| :TYPE STRING)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLInstance|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLInstance-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLInstanceContainer"
+        "(DEFCLASS |PLInstanceContainer| (|XMLObject|) :PUBLIC-SLOTS ((|PLInstance| :TYPE (LIST OF |PLInstance|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLInstanceContainer|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLInstanceContainer-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLProposition"
+        "(DEFCLASS |PLProposition| (|XMLObject|) :PUBLIC-SLOTS ((|PropositionName| :TYPE STRING) (|IsStrict| :TYPE STRING) (|IsAsserted| :TYPE STRING) (|IsRule| :TYPE STRING)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLProposition|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLProposition-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLPropositionContainer"
+        "(DEFCLASS |PLPropositionContainer| (|XMLObject|) :PUBLIC-SLOTS ((|PLProposition| :TYPE (LIST OF |PLProposition|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLPropositionContainer|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLPropositionContainer-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLRule"
+        "(DEFCLASS |PLRule| (|XMLObject|) :PUBLIC-SLOTS ((|RuleName| :TYPE STRING)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLRule|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLRule-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLVariable"
+        "(DEFCLASS |PLVariable| (|XMLObject|) :PUBLIC-SLOTS ((|VariableName| :TYPE |PLString|) (|VariableType| :TYPE |PLSurrogate|)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLVariable|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLVariable-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLVariableList"
+        "(DEFCLASS |PLVariableList| (|XMLObject|) :PUBLIC-SLOTS ((|PLVariable| :TYPE (LIST OF |PLVariable|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLVariableList|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLVariableList-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLModuleFileList"
+        "(DEFCLASS |PLModuleFileList| (|XMLObject|) :PUBLIC-SLOTS ((|PLModuleFile| :TYPE (LIST OF |PLModuleFile|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLModuleFileList|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLModuleFileList-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLModuleFile"
+        "(DEFCLASS |PLModuleFile| (|XMLObject|) :PUBLIC-SLOTS ((|KBName| :TYPE STRING) (|ModuleName| :TYPE STRING) (|KBDescription| :TYPE STRING) (|FileName| :TYPE STRING)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLModuleFile|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLModuleFile-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLFile"
+        "(DEFCLASS |PLFile| (|XMLObject|) :PUBLIC-SLOTS ((|FileName| :TYPE STRING) (|PLFileContent| :TYPE |PLFileContent|)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLFile|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLFile-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLFileContent"
+        "(DEFCLASS |PLFileContent| (|XMLObject|) :PUBLIC-SLOTS ((|textContent| :ENCODING-SCHEME :BASE64)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLFileContent|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLDirectory"
+        "(DEFCLASS |PLDirectory| (|XMLObject|) :PUBLIC-SLOTS ((|DirectoryName| :TYPE STRING)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLDirectory|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLDirectory-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLDirectoryContents"
+        "(DEFCLASS |PLDirectoryContents| (|XMLObject|) :PUBLIC-SLOTS ((|DirectoryName| :TYPE STRING) (|PLDirectory| :TYPE (LIST OF |PLDirectory|)) (|PLFile| :TYPE (LIST OF |PLFile|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLDirectoryContents|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLDirectoryContents-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLSurrogateCollection"
+        "(DEFCLASS |PLSurrogateCollection| (|XMLObject|) :PUBLIC-SLOTS ((|PLSurrogate| :TYPE (LIST OF |PLSurrogate|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLSurrogateCollection|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLSurrogateCollection-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLObjectUnion"
+        "(DEFCLASS |PLObjectUnion| (|XMLObject|) :PUBLIC-SLOTS ((|Type| :TYPE STRING) (|PLSurrogate| :TYPE |PLSurrogate|) (|LiteralValue| :TYPE STRING)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLObjectUnion|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLObjectUnion-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLTuple"
+        "(DEFCLASS |PLTuple| (|XMLObject|) :PUBLIC-SLOTS ((|PLObjectUnion| :TYPE (LIST OF |PLObjectUnion|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLTuple|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLTuple-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLQuery"
+        "(DEFCLASS |PLQuery| (|XMLObject|) :PUBLIC-SLOTS ((|IsAsk| :TYPE STRING) (|QueryName| :TYPE STRING) (|Query| :TYPE STRING) (|Module| :TYPE STRING) (|InferenceLevel| :TYPE STRING) (|Timeout| :TYPE STRING) (|Moveout| :TYPE STRING) (|MatchMode| :TYPE STRING) (|NumResults| :TYPE STRING) (|MinScore| :TYPE STRING) (|MaxUnknowns| :TYPE STRING) (|MaximizeScore| :TYPE STRING) (|DontOptimize| :TYPE STRING)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLQuery|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLQuery-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLQueryResult"
+        "(DEFCLASS |PLQueryResult| (|XMLObject|) :PUBLIC-SLOTS ((|PLTuple| :TYPE (LIST OF |PLTuple|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLQueryResult|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLQueryResult-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLSearchParameter"
+        "(DEFCLASS |PLSearchParameter| (|XMLObject|) :PUBLIC-SLOTS ((|ModuleName| :TYPE STRING) (|SearchString| :TYPE STRING) (|SearchConcept| :TYPE STRING) (|SearchRelation| :TYPE STRING) (|SearchInstance| :TYPE STRING) (|CaseSensitive| :TYPE STRING)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLSearchParameter|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLSearchParameter-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLSearchResult"
+        "(DEFCLASS |PLSearchResult| (|XMLObject|) :PUBLIC-SLOTS ((|PLSearchResultItem| :TYPE (LIST OF |PLSearchResultItem|))))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLSearchResult|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLSearchResult-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLSearchResultItem"
+        "(DEFCLASS |PLSearchResultItem| (|XMLObject|) :PUBLIC-SLOTS ((|ModuleName| :TYPE STRING) (|PLObjectUnion| :TYPE |PLObjectUnion|)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLSearchResultItem|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLSearchResultItem-Slot-Value|)))
+    (CL:LET*
+     ((CLASS
+       (DEFINE-CLASS-FROM-STRINGIFIED-SOURCE "PLServerInfo"
+        "(DEFCLASS |PLServerInfo| (|XMLObject|) :PUBLIC-SLOTS ((|AllowRemoteFileBrowsing| :TYPE STRING)))")))
+     (CL:SETF (%CLASS.CLASS-CONSTRUCTOR-CODE CLASS)
+      (CL:FUNCTION |new-PLServerInfo|))
+     (CL:SETF (%CLASS.CLASS-SLOT-ACCESSOR-CODE CLASS)
+      (CL:FUNCTION |access-PLServerInfo-Slot-Value|))))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 6) (FINALIZE-CLASSES))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 7)
+    (DEFINE-METHOD-OBJECT
+     "(DEFMETHOD (OBJECT-EQL? BOOLEAN) ((X |PLConcept|) (Y OBJECT)) :DOCUMENTATION \"Return TRUE if `x' and `y' represent the same Concept\" :PUBLIC? TRUE)"
+     (WRAP-METHOD-CODE (CL:FUNCTION OBJECT-EQL?)) NULL)
+    (DEFINE-METHOD-OBJECT
+     "(DEFMETHOD (OBJECT-EQL? BOOLEAN) ((X |PLRelation|) (Y OBJECT)) :DOCUMENTATION \"Return TRUE if `x' and `y' represent the same Relation\" :PUBLIC? TRUE)"
+     (WRAP-METHOD-CODE (CL:FUNCTION OBJECT-EQL?)) NULL)
+    (DEFINE-METHOD-OBJECT
+     "(DEFMETHOD (OBJECT-EQL? BOOLEAN) ((X |PLInstance|) (Y OBJECT)) :DOCUMENTATION \"Return TRUE if `x' and `y' represent the same Instance\" :PUBLIC? TRUE)"
+     (WRAP-METHOD-CODE (CL:FUNCTION OBJECT-EQL?)) NULL)
+    (DEFINE-METHOD-OBJECT
+     "(DEFMETHOD (OBJECT-EQL? BOOLEAN) ((X |PLProposition|) (Y OBJECT)) :DOCUMENTATION \"Return TRUE if `x' and `y' represent the same Propositions\" :PUBLIC? TRUE)"
+     (WRAP-METHOD-CODE (CL:FUNCTION OBJECT-EQL?)) NULL)
+    (DEFINE-FUNCTION-OBJECT " |PLSurrogate<|"
+     "(DEFUN (|PLSurrogate<| BOOLEAN) ((INST1 |PLSurrogate|) (INST2 |PLSurrogate|)))"
+     (CL:FUNCTION |PLSurrogate<|) NULL)
+    (DEFINE-FUNCTION-OBJECT " |PLModule<|"
+     "(DEFUN (|PLModule<| BOOLEAN) ((INST1 |PLModule|) (INST2 |PLModule|)))"
+     (CL:FUNCTION |PLModule<|) NULL)
+    (DEFINE-FUNCTION-OBJECT " |PLInstance<|"
+     "(DEFUN (|PLInstance<| BOOLEAN) ((INST1 |PLInstance|) (INST2 |PLInstance|)))"
+     (CL:FUNCTION |PLInstance<|) NULL)
+    (DEFINE-FUNCTION-OBJECT " |PLConcept<|"
+     "(DEFUN (|PLConcept<| BOOLEAN) ((INST1 |PLConcept|) (INST2 |PLConcept|)))"
+     (CL:FUNCTION |PLConcept<|) NULL)
+    (DEFINE-FUNCTION-OBJECT " |PLRelation<|"
+     "(DEFUN (|PLRelation<| BOOLEAN) ((INST1 |PLRelation|) (INST2 |PLRelation|)))"
+     (CL:FUNCTION |PLRelation<|) NULL)
+    (DEFINE-FUNCTION-OBJECT "STARTUP-XML-OBJECTS"
+     "(DEFUN STARTUP-XML-OBJECTS () :PUBLIC? TRUE)"
+     (CL:FUNCTION STARTUP-XML-OBJECTS) NULL)
+    (CL:LET*
+     ((FUNCTION
+       (LOOKUP-FUNCTION
+        SYM-XML-OBJECTS-GUI-SERVER-STARTUP-XML-OBJECTS)))
+     (SET-DYNAMIC-SLOT-VALUE (%METHOD-SLOT.DYNAMIC-SLOTS FUNCTION)
+      SYM-XML-OBJECTS-STELLA-METHOD-STARTUP-CLASSNAME
+      (WRAP-STRING "_StartupXmlObjects") NULL-STRING-WRAPPER)))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 8) (FINALIZE-SLOTS)
+    (CLEANUP-UNFINALIZED-CLASSES))
+   (CL:WHEN (CURRENT-STARTUP-TIME-PHASE? 9)
+    (%IN-MODULE (COPY-CONS-TREE (WRAP-STRING "GUI-SERVER"))))))

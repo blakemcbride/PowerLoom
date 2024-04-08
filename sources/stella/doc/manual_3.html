@@ -1,0 +1,571 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html401/loose.dtd">
+<html>
+<!-- Created on January 5, 2023 by texi2html 1.82
+texi2html was written by: 
+            Lionel Cons <Lionel.Cons@cern.ch> (original author)
+            Karl Berry  <karl@freefriends.org>
+            Olaf Bachmann <obachman@mathematik.uni-kl.de>
+            and many others.
+Maintained by: Many creative people.
+Send bugs and suggestions to <texi2html-bug@nongnu.org>
+-->
+<head>
+<title>STELLA Manual: 4. The STELLA Language</title>
+
+<meta name="description" content="STELLA Manual: 4. The STELLA Language">
+<meta name="keywords" content="STELLA Manual: 4. The STELLA Language">
+<meta name="resource-type" content="document">
+<meta name="distribution" content="global">
+<meta name="Generator" content="texi2html 1.82">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+<!--
+a.summary-letter {text-decoration: none}
+blockquote.smallquotation {font-size: smaller}
+pre.display {font-family: serif}
+pre.format {font-family: serif}
+pre.menu-comment {font-family: serif}
+pre.menu-preformatted {font-family: serif}
+pre.smalldisplay {font-family: serif; font-size: smaller}
+pre.smallexample {font-size: smaller}
+pre.smallformat {font-family: serif; font-size: smaller}
+pre.smalllisp {font-size: smaller}
+span.roman {font-family:serif; font-weight:normal;}
+span.sansserif {font-family:sans-serif; font-weight:normal;}
+ul.toc {list-style: none}
+-->
+</style>
+
+
+</head>
+
+<body lang="en" bgcolor="#FFFFFF" text="#000000" link="#0000FF" vlink="#800080" alink="#FF0000">
+
+<a name="The-STELLA-Language"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="manual_2.html#Removing-Unneeded-Files" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Language-Overview" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual_2.html#Installation" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_4.html#Programming-in-STELLA" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="The-STELLA-Language-1"></a>
+<h1 class="chapter">4. The STELLA Language</h1>
+
+<table class="menu" border="0" cellspacing="0">
+<tr><td align="left" valign="top"><a href="#Language-Overview">4.1 Language Overview</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">           
+</td></tr>
+<tr><td align="left" valign="top"><a href="#Basic-Data-Types">4.2 Basic Data Types (tbw)</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">            
+</td></tr>
+<tr><td align="left" valign="top"><a href="#Control-Structure">4.3 Control Structure (tbc)</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">           
+</td></tr>
+<tr><td align="left" valign="top"><a href="#Functions">4.4 Functions (tbw)</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">                   
+</td></tr>
+<tr><td align="left" valign="top"><a href="#Classes">4.5 Classes (tbw)</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">                     
+</td></tr>
+<tr><td align="left" valign="top"><a href="#Methods">4.6 Methods (tbw)</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">                     
+</td></tr>
+<tr><td align="left" valign="top"><a href="#Macros">4.7 Macros (tbw)</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">                      
+</td></tr>
+<tr><td align="left" valign="top"><a href="#Modules">4.8 Modules (tbw)</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">                     
+</td></tr>
+</table>
+
+<hr size="6">
+<a name="Language-Overview"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Basic-Data-Types" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_4.html#Programming-in-STELLA" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="Language-Overview-1"></a>
+<h2 class="section">4.1 Language Overview</h2>
+
+<p>STELLA is a strongly typed, object-oriented, Lisp-like language.  STELLA
+programs are first translated into either Common Lisp, C++, or Java, and then
+compiled with any conventional compiler for the chosen target language to
+generate executable code.  Over 95% of the STELLA system is written in STELLA
+itself, the rest is written in target-language-specific native code.
+</p>
+<p>The design of STELLA borrows from a variety of programming languages, most
+prominently from Common Lisp, and to a lesser degree from other
+object-oriented languages such as Eiffel, Sather, and Dylan.  Since STELLA has
+to be translatable into C++ and Java, various restrictions of these languages
+also influenced its design.
+</p>
+<p>In the following, we assume that the reader is familiar with basic Common Lisp
+concepts, and has at least some familiarity with C++ or Java.  Let us start
+with a cursory overview of STELLA&rsquo;s main features:
+</p>
+<p><strong>Syntax:</strong> STELLA uses a parenthesized, uniform expression syntax
+similar to Lisp.  Most definitional constructs and control structures
+are similar to their Common Lisp analogues with variations to support
+types.
+</p>
+<p><strong>Type system:</strong> STELLA is strongly typed and supports efficient
+static compilation similar to C++.  Types are required for the arguments
+and return values of functions and methods, for global variables, and
+for slot definitions.  Local, lexically scoped variables can be typed
+implicitly by relying on type inference.
+</p>
+<p><strong>Object system:</strong> Types are organized into a single inheritance
+class hierarchy.  Restricted multiple inheritance is allowed via mixin
+classes.  Dynamic method dispatch is based on the runtime type of the
+first argument (similar to C++ and Java).  Slots can be static (native)
+or dynamic.  Dynamic slots can be defined at runtime and do not occupy
+any space until they are filled.  Slots can have both initial and
+default values, and demons can be triggered by slot accesses.  A
+meta-object protocol allows the control of object creation,
+initialization, termination, and destruction.
+</p>
+<p><strong>Control structure:</strong> Functions and methods are distinguished.
+They can have multiple (zero or more) return values and a variable
+number of arguments.  Lisp-style macros are supported to facilitate
+syntax extensions.  Expressions and statements are distinguished.  Local
+variables are lexically scoped, but dynamically scoped variables
+(specials) are also supported.  STELLA has an elegant, uniform, and
+efficient iteration mechanism plus a built-in protocol for iterators.
+An exception mechanism can be used for error handling and non-local
+exits.
+</p>
+<p><strong>Symbolic programming:</strong> Symbols are first-class objects, and
+extensive support for dynamic datatypes such as cons-trees, lists, sets,
+association lists, hash tables, extensible vectors, etc., is available.
+A backquote mechanism facilitates macro writing and code generation.
+Interpreted function call, method call, slot access, and object creation
+is supported, and a restricted evaluator is also available.
+</p>
+<p><strong>Name spaces:</strong> Functions, methods, variables, and classes occupy
+separate name spaces (i.e., the same name can be used for a function and
+a class).  A hierarchical module system compartmentalizes symbol tables
+and supports large-scale programming.
+</p>
+<p><strong>Memory management:</strong> STELLA relies on automatic memory management
+via a garbage collector.  For Lisp and Java the native garbage collector
+is used.  For the C++ version of STELLA we use the Boehm- Weiser
+conservative garbage collector with good results.  Various built-in
+support for explicit memory management is also available.
+</p>
+<p>The Common Lisp features most prominently absent from STELLA are anonymous
+functions via lambda abstraction, lexical closures, multi-methods,
+full-fledged eval (a restricted evaluator is available), optional and keyword
+arguments, and a modifiable readtable.  STELLA does also not allow dynamic
+re/definition of functions and classes, even though the Lisp-based development
+environment provides this facility (similar to Dylan).  The main influences of
+C++ and Java onto STELLA are the strong typing, limited multiple inheritance,
+first-argument polymorphism, and the distinction between statements and
+expressions.
+</p>
+<hr size="6">
+<a name="Basic-Data-Types"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#Language-Overview" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Control-Structure" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_4.html#Programming-in-STELLA" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="Basic-Data-Types-_0028tbw_0029"></a>
+<h2 class="section">4.2 Basic Data Types (tbw)</h2>
+<p>To be written.
+</p>
+
+<hr size="6">
+<a name="Control-Structure"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#Basic-Data-Types" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Conditionals" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_4.html#Programming-in-STELLA" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="Control-Structure-_0028tbc_0029"></a>
+<h2 class="section">4.3 Control Structure (tbc)</h2>
+<p>To be completed.
+</p>
+<table class="menu" border="0" cellspacing="0">
+<tr><td align="left" valign="top"><a href="#Conditionals">4.3.1 Conditionals</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">                
+</td></tr>
+</table>
+
+<hr size="6">
+<a name="Conditionals"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#Control-Structure" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Functions" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Control-Structure" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_4.html#Programming-in-STELLA" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="Conditionals-1"></a>
+<h3 class="subsection">4.3.1 Conditionals</h3>
+
+<p>STELLA conditionals are very similar to those found in Common-Lisp.
+The main difference is that most STELLA conditionals are statements and
+therefore do not return a value.  For this reason, a C++-style
+<code>choose</code> directive has been added to the language to allow value
+conditionalization based on a boolean expression.
+</p>
+<dl>
+<dt><a name="index-if"></a><u>Statement:</u> <b>if</b><i> condition then-statement else-statement</i></dt>
+<dd><p>Evaluate the boolean expression <var>condition</var>.  If the result is true
+execute <var>then-statement</var>, otherwise, execute <var>else-statement</var>.
+Note that unlike the Common-Lisp version of <code>if</code> the
+<var>else-statement</var> is not optional in STELLA.  Example:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">(if (&gt; x y)
+    (print &quot;x is greater than y&quot; EOL)
+  (print &quot;x is less than or equal to y&quot; EOL))
+</pre></td></tr></table>
+</dd></dl>
+
+<dl>
+<dt><a name="index-when"></a><u>Statement:</u> <b>when</b><i> condition statement&hellip;</i></dt>
+<dd><p>Evaluate the boolean expression <var>condition</var>.  Only if the result is
+true execute the <var>statement&rsquo;</var>s in the body.  Example:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">(when (symbol? x)
+  (print &quot;x is a symbol, &quot;)
+  (print &quot;its name is &quot; (symbol-name (cast x SYMBOL)) EOL))
+</pre></td></tr></table>
+</dd></dl>
+
+<dl>
+<dt><a name="index-unless"></a><u>Statement:</u> <b>unless</b><i> condition statement&hellip;</i></dt>
+<dd><p>Evaluate the boolean expression <var>condition</var>.  Only if the result is
+false execute the <var>statement&rsquo;</var>s in the body.  Therefore,
+<code>(unless <var>test</var> &hellip;)</code> is equivalent to <code>(when (not
+<var>test</var>) &hellip;)</code>.  Example:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">(unless (symbol? x)
+  (print &quot;x is not a symbol, &quot;)
+  (print &quot;hence, its name is unknown&quot; EOL))
+</pre></td></tr></table>
+</dd></dl>
+
+<dl>
+<dt><a name="index-cond"></a><u>Statement:</u> <b>cond</b><i> clause&hellip;</i></dt>
+<dd><p><code>cond</code> is a conditional with an arbitrary number of conditions each
+represented by a <var>clause</var>.  Each <code>cond</code> clause has to be of the
+following form:
+</p><table><tr><td>&nbsp;</td><td><pre class="example">(<var>condition</var> <var>statement</var>&hellip;)
+</pre></td></tr></table>
+<p>The first <var>clause</var> whose <var>condition</var> evaluates to true will be
+selected and its <var>statement&rsquo;</var>s will be executed.  Each clause can
+have 0 or more statements.  The special condition <code>otherwise</code>
+always evaluates to true and can be used for the catch-all case.
+Example:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">(cond ((symbol? x)
+       (print &quot;x is a symbol&quot; EOL))
+      ((cons? x)
+       (print &quot;x is a cons&quot; EOL))
+      (otherwise
+       (print &quot;x is an object&quot; EOL)))
+</pre></td></tr></table>
+</dd></dl>
+
+<dl>
+<dt><a name="index-choose"></a><u>Expression:</u> <b>choose</b><i> condition true-expression false-expression</i></dt>
+<dd><p>Evaluate the boolean expression <var>condition</var>.  If the result is true
+return the value of <var>true-expression</var>, otherwise, return the value
+of <var>false-expression</var>.  STELLA computes the most specific common
+supertype of <var>true-expression</var> and <var>false-expression</var> and uses
+that as the type returned by the <code>choose</code> expression.  If no such
+type exists, a translation error will be signaled.  Example:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">(setq face (choose happy? :smile :frown))
+</pre></td></tr></table>
+</dd></dl>
+
+<dl>
+<dt><a name="index-case"></a><u>Statement:</u> <b>case</b><i> expression clause&hellip;</i></dt>
+<dd><p>Each <code>case</code> clause has to be of one of
+the following forms:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">(<var>key</var> <var>statement</var>&hellip;)
+((<var>key</var>&hellip;) <var>statement</var>&hellip;)
+</pre></td></tr></table>
+
+<p><code>case</code> selects the first <var>clause</var> whose <var>key</var> (or one of
+the listed <var>key&rsquo;</var>s) matches the result of <var>expression</var> and
+executes the clause&rsquo;s <var>statement&rsquo;</var>s.  Each <code>case</code> <var>key</var> has
+to be a constant such as a number, character, string, symbol, keyword or
+surrogate.  Keys are compared with <code>eql?</code> (or <code>string-eql?</code> 
+for strings).  All keys in a <code>case</code> statement have to be of the
+same type.  The special key <code>otherwise</code> can be used to catch
+everything.  It is a run-time error if no clause with a matching key
+exists.  Therefore, a STELLA <code>case</code> without an <code>otherwise</code>
+clause corresponds to a Common Lisp <code>ecase</code>.  An empty
+<code>otherwise</code> clause can always be specified via <code>(otherwise
+NULL)</code>.  Example:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">(case car-make
+  (&quot;Yugo&quot; 
+   (setq price :cheap))
+  (&quot;VW&quot;   
+   (setq price :medium))
+  ((&quot;Ferrari&quot; &quot;Rolls Royce&quot;)
+   (setq price :expensive))
+  (otherwise 
+   (setq price :unknown)))
+</pre></td></tr></table>
+</dd></dl>
+
+<dl>
+<dt><a name="index-typecase"></a><u>Statement:</u> <b>typecase</b><i> expression clause&hellip;</i></dt>
+<dd><p>Each <code>typecase</code> clause has to be of one of
+the following forms:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">(<var>type</var> <var>statement</var>&hellip;)
+((<var>type</var>&hellip;) <var>statement</var>&hellip;)
+</pre></td></tr></table>
+
+<p><code>typecase</code> selects the first <var>clause</var> whose <var>type</var> (or one
+of the listed <var>type&rsquo;</var>s) equals or is a supertype of the run-time
+type of the result of <var>expression</var> and then executes the clause&rsquo;s
+<var>statement&rsquo;</var>s.  Therefore, <code>typecase</code> can be used to implement
+a type dispatch for cases where the run-time type of an expression can
+be different from the static type known at translation time.  Currently,
+the static type of <var>expression</var> is required to be a subtype of
+<code>OBJECT</code>.
+</p>
+<p>Each <var>type</var> expression has to be a symbol describing a simple type
+(i.e., parametric or anchored types are not allowed).  Similar to
+<code>case</code>, the special key <code>otherwise</code> can be used to catch
+everything.  It is a run-time error if no clause with a matching type
+exists.  Therefore, a STELLA <code>typecase</code> without an <code>otherwise</code>
+clause corresponds to a Common Lisp <code>etypecase</code>.  An empty
+<code>otherwise</code> clause can always be specified via <code>(otherwise
+NULL)</code>.  <code>typecase</code> does allow the value of <var>expression</var> to be
+undefined, in which case the <code>otherwise</code> clause is selected.
+Example:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">(typecase (first list)
+  (CONS
+   (print &quot;it is a cons&quot;))
+  ((SYMBOL KEYWORD)
+   (print &quot;it is a symbol&quot;))
+  (STANDARD-OBJECT
+   (print &quot;it is a regular object&quot;))
+  (otherwise NULL))
+</pre></td></tr></table>
+
+<p>Note that in the example above it is important to list
+<code>STANDARD-OBJECT</code> after <code>SYMBOL</code> and <code>CONS</code>, since it
+subsumes the preceding types.  Otherwise, it would always shadow the
+clauses with the more specific types.
+</p>
+<p>The semantics of <code>typecase</code> is slightly extended for the case where
+<var>expression</var> is a local variable.  In that case each reference to
+the variable within a <code>typecase</code> clause is automatically casted to
+the appropriate narrower type.  For example, in the code snippet below
+method calls such as <code>first</code> or slot accesses such as
+<code>symbol-name</code> are translated correctly without needing to
+explicitly downcast <code>x</code> which is assumed to be of type
+<code>OBJECT</code>:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example">(typecase x
+  (CONS
+   (print &quot;it is a cons with value &quot; (first x)))
+  ((SYMBOL KEYWORD)
+   (print &quot;it is a symbol with name &quot; (symbol-name x)))
+  (STANDARD-OBJECT
+   (print &quot;it is a regular object&quot;))
+  (otherwise NULL))
+</pre></td></tr></table>
+</dd></dl>
+
+<p>Since the <code>typecase</code> <var>expression</var> has to be a subtype of
+<code>OBJECT</code>, a <code>typecase</code> cannot be used to test against literal
+types such as <code>STRING</code> or <code>INTEGER</code>.  If such type names are
+encountered as keys in a <code>typecase</code>, they are automatically
+converted to their wrapped version, e.g., <code>STRING-WRAPPER</code>,
+<code>INTEGER-WRAPPER</code>, etc.
+</p>
+
+<hr size="6">
+<a name="Functions"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#Conditionals" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Classes" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_4.html#Programming-in-STELLA" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="Functions-_0028tbw_0029"></a>
+<h2 class="section">4.4 Functions (tbw)</h2>
+<p>To be written.
+</p>
+
+<hr size="6">
+<a name="Classes"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#Functions" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Methods" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_4.html#Programming-in-STELLA" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="Classes-_0028tbw_0029"></a>
+<h2 class="section">4.5 Classes (tbw)</h2>
+<p>To be written.
+</p>
+
+<hr size="6">
+<a name="Methods"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#Classes" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Macros" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_4.html#Programming-in-STELLA" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="Methods-_0028tbw_0029"></a>
+<h2 class="section">4.6 Methods (tbw)</h2>
+<p>To be written.
+</p>
+
+<hr size="6">
+<a name="Macros"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#Methods" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#Modules" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_4.html#Programming-in-STELLA" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="Macros-_0028tbw_0029"></a>
+<h2 class="section">4.7 Macros (tbw)</h2>
+<p>To be written.
+</p>
+
+<hr size="6">
+<a name="Modules"></a>
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#Macros" title="Previous section in reading order"> &lt; </a>]</td>
+<td valign="middle" align="left">[<a href="manual_4.html#Programming-in-STELLA" title="Next section in reading order"> &gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Up section"> Up </a>]</td>
+<td valign="middle" align="left">[<a href="manual_4.html#Programming-in-STELLA" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<a name="Modules-_0028tbw_0029"></a>
+<h2 class="section">4.8 Modules (tbw)</h2>
+<p>To be written.
+</p>
+
+<hr size="6">
+<table cellpadding="1" cellspacing="1" border="0">
+<tr><td valign="middle" align="left">[<a href="#The-STELLA-Language" title="Beginning of this chapter or previous chapter"> &lt;&lt; </a>]</td>
+<td valign="middle" align="left">[<a href="manual_4.html#Programming-in-STELLA" title="Next chapter"> &gt;&gt; </a>]</td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left"> &nbsp; </td>
+<td valign="middle" align="left">[<a href="manual.html#Top" title="Cover (top) of document">Top</a>]</td>
+<td valign="middle" align="left">[<a href="manual_toc.html#SEC_Contents" title="Table of contents">Contents</a>]</td>
+<td valign="middle" align="left">[<a href="manual_7.html#Function-Index" title="Index">Index</a>]</td>
+<td valign="middle" align="left">[<a href="manual_abt.html#SEC_About" title="About (help)"> ? </a>]</td>
+</tr></table>
+<p>
+ <font size="-1">
+  This document was generated by <em>Hans Chalupsky</em> on <em>January 5, 2023</em> using <a href="http://www.nongnu.org/texi2html/"><em>texi2html 1.82</em></a>.
+ </font>
+ <br>
+
+</p>
+</body>
+</html>

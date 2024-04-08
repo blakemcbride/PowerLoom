@@ -1,0 +1,250 @@
+-*- Mode: Text -*-
+
+POWERLOOM INSTALLATION GUIDE
+
+Version: $Id$
+This document describes "PowerLoom 1.0.alpha" or later.
+
+Copyright (C) USC Information Sciences Institute, 1997
+See the file `COPYRIGHT' for detailed copyright information.
+
+
+GENERAL INFORMATION
+
+PowerLoom is the successor to the Loom knowledge representation system.
+It provides a language and environment for constructing intelligent
+applications.  PowerLoom uses a fully expressive, logic-based
+representation language (a variant of KIF). It uses a Prolog-technology
+backward chainer as its deductive component.
+
+
+DOCUMENTATION
+
+The directory `logic/doc/' (all pathnames are relative to the PowerLoom
+installation directory) contains the current PowerLoom manual in various
+different formats.  The manual is still very preliminary, and we
+apologize for that.  The latest information about PowerLoom, and the
+latest version of the manual can always be found at
+http://www.isi.edu/isd/LOOM/PowerLoom/.  The file `NEWS' contains release
+information and descriptions of user-visible changes as compared to
+previous releases.
+
+A good starting point for getting familiar with PowerLoom is to use the
+`(demo)' command in the PowerLoom listener, and to step through the
+various on-line example demos.  The demo files themselves are located in
+the `logic/demos/' directory.
+
+
+SYSTEM REQUIREMENTS
+
+To install and use PowerLoom you need the following amounts of disk space:
+
+  -   2 Meg for the tar file
+  -  11 Meg for the untarred sources
+  -   7 Meg to compile the Lisp version
+  -  18 Meg to compile the C++ version (about half of that without -g)
+
+This means that you will need approximately 38 Meg to build both the
+Lisp and the C++ version of PowerLoom in parallel.  There is support to
+build a Lisp or C++ version only.  A Lisp-only installation takes about
+13 Meg (sources plus binaries), and a C++-only installation takes
+between 9 and 12 Meg (sources plus binaries) depending on whether the
+compiled code contains debugging information or not.  A stripped C++
+PowerLoom executable (one that does not contain any debugging
+information) is about 3 Meg.
+
+To run a Lisp version of PowerLoom you need an ANSI Common-Lisp (or at least
+one that supports CLOS and logical pathnames).  We have successfully tested
+PowerLoom with Allegro-CL 4.2 and 4.3, and Macintosh CL 3.0 and 4.0.  Judging
+from previous experience with STELLA, it should not be too difficult to get
+PowerLoom running with Lucid CL 4.1 (plus the necessary ANSI extensions and
+Mark Kantrowitz's logical pathnames implementation).  However, we haven't
+actually done it, so, there could be problems.  Our main Lisp development
+platforms are Allegro-CL 4.3 running under Unix (Solaris 5.4) on Suns, and Mac
+Common-Lisp 4.0, so, the closer your environment is to ours, the higher are
+the chances that everything will work right out of the box.
+
+To compile the C++ version of PowerLoom you need a C++ compiler such as the
+FSF's g++ or Sun's C++.  We have successfully compiled and run PowerLoom with
+g++ 2.7.2 and Sun C++ 4.1 under Solaris 5.4.  Running the C++ version of
+PowerLoom on a non-Unix platform will probably take some work, since our
+current version uses a Unix-specific longjump implementation to implement
+exceptions.  The Xerox/Boehm garbage collector might also need some tweaking,
+even though it claims to support a wide variety of platforms.
+
+NOTE TO USERS OF ALLEGRO-CL 4.3
+
+You might have to install patch file `patch0284-01.fasl' available
+on-line from Franz Inc. at http://www.franz.com/ to fix a bug that
+causes an occasional #<printer error> when PowerLoom prints out
+propositions.
+
+
+INSTALLATION
+
+UNPACKING THE SOURCES UNDER UNIX 
+
+Copy the tar-file to the parent directory of where you want to install
+PowerLoom.  Then uncompress and untar it with the following command:
+
+        % gunzip -qc powerloom-X.Y.Z.tar.gz | tar xvf -
+
+`X.Y.Z' are place holders for the actual version numbers.  This will create
+the PowerLoom tree in the directory `powerloom-X.Y.Z/'.  All pathnames
+mentioned in this document are relative to that directory which we will
+usually refer to as the "PowerLoom directory".  If you do not have the
+`gunzip' utility, you can get it from the FSF at
+ftp://prep.ai.mit.edu/pub/gnu/.
+
+UNPACKING THE SOURCES ON NON-UNIX PLATFORMS
+
+Currently, PowerLoom is only distributed in Unix tar format.  However,
+there are utilities available on various non-Unix platforms that can
+handle tar files.  If there is enough demand, we might consider
+packaging PowerLoom in other formats, e.g., as a Macintosh StuffIt
+archive.
+
+BUILDING THE LISP AND C++ VERSIONS UNDER UNIX
+
+Look at the `Makefile' in the PowerLoom directory and edit the values of the
+`LISP', `CXX', `CC', and `CFLAGS' variables to reflect your environment and
+your preferences.  Then `cd' to the PowerLoom directory and simply type
+
+        make
+
+to build PowerLoom.  You can also leave the `Makefile' unmodified and supply
+the necessary values from the command line.  E.g., if your C++ compiler is
+`CC', your standard C compiler is `cc', and the name of your Lisp executable
+is `acl', then you can build PowerLoom by typing
+
+        make CXX=CC CC=cc LISP=acl
+
+We recommend that you always use the -g flag for compiling the C++ version of
+PowerLoom, so that you can use the debugger in case of an error.
+
+BUILDING ONLY THE LISP OR THE C++ VERSION UNDER UNIX
+
+If you are only interested in the Lisp version of PowerLoom, you can do that
+by typing
+
+        make lisp
+
+assuming that you made the necessary modifications to the `Makefile' mentioned
+above.  If you are only interested in the C++ version of PowerLoom, you can
+build it with
+
+        make c++
+
+Again, in both cases you can provide the necessary variable
+customization from the command line, e.g., type
+
+        make LISP=acl lisp
+
+to build the Lisp version only using the Lisp executable `acl'.
+
+BUILDING THE LISP VERSION WITHOUT USING THE MAKEFILE
+
+If you are on a non-Unix platform, or if you don't want to use the Unix
+`make' command, you can install the Lisp version of PowerLoom as
+follows: Edit the value of the variable `*powerloom-root-directory*' in
+the file `translations.lisp' to reflect the location of your PowerLoom
+installation.  Startup Lisp and load the file `load-powerloom.lisp'.
+The first time around this will compile all Lisp files before they are
+loaded.  During subsequent sessions the compiled files will be loaded
+right away.
+
+
+RUNNING POWERLOOM
+
+RUNNING THE LISP VERSION OF POWERLOOM
+
+Startup Lisp and load the file `load-powerloom.lisp'.  When the loading
+has completed type
+
+        (powerloom)
+
+to start the PowerLoom listener.  Then you can execute all PowerLoom commands
+documented in the manual.  In the listener type `(help)' for a list of
+available commands, or `(demo)' for a list of on-line demos.
+
+Alternatively to using the PowerLoom listener, you can switch to the STELLA
+package, e.g., type
+
+        (in-package "STELLA")
+
+and then execute the various PowerLoom commands directly from the Lisp top
+level. 
+
+IMPORTANT: The STELLA package does not inherit anything from the
+COMMON-LISP (or CL) package (see the file `stella/cl-lib/cl-setup.lisp'
+for the few exceptions), hence, you have to explicitly qualify every
+Lisp symbol you want to use with `CL:'.  E.g., to get the result of the
+previous evaluation you have to use `CL:*'.  In some situations, this
+also causes problems for the Allegro-CL Emacs/Lisp interface.  For
+example, starting up Allegro Composer does not work while your Lisp
+listener is in the STELLA package.  You have to switch back to the
+CL-USER package to start it, or start it before you switch to the STELLA
+package.
+
+To reduce startup time, you might want to create a Lisp image that has all of
+PowerLoom preloaded.
+
+RUNNING THE C++ VERSION OF POWERLOOM
+
+The installation process creates a statically linked `powerloom'
+executable in the `bin/' directory.  To run it either `cd' to that
+directory or add it to your `path' and then type
+
+        powerloom
+
+The C++ version always brings up the PowerLoom listener where you can
+run the various documented PowerLoom commands.
+
+
+EMACS SETUP FOR THE LISP VERSION OF POWERLOOM
+
+If you use the Lisp version of PowerLoom for the development of
+knowledge bases, then you will probably use an Emacs-based Lisp
+development environment such as the Allegro-CL fi-interface plus
+Composer, or ILISP.  In that case you should make sure that the files
+that contain your PowerLoom knowledge bases are in the proper Lisp mode,
+since that will allow you to incrementally evaluate definitions,
+assertions, etc., directly from a file buffer instead of having to
+type them into your Lisp listener.
+
+The extension used for the various demo files in the `logic/demos/'
+directory is `.ste' (since they use STELLA syntax).  PowerLoom currently
+does not make any default assumptions about file name extensions,
+however, if you want to use and extend those demo files and you do use
+X/Emacs, add the following to your .emacs file to make sure they are put
+into the proper Lisp mode when you bring them into an Emacs buffer
+(assuming you use ACL with the fi-interface):
+
+        (setq auto-mode-alist
+              (cons '("\\.ste$" . fi:common-lisp-mode) auto-mode-alist))
+
+IMPORTANT: PowerLoom commands are always executed relative to a module
+(somewhat similar to Lisp operations being associated with a package).
+Thus, if you want the result of your commands to wind up in the right
+module, you have to make sure that your Lisp listener is "in that
+module" when you execute a command.  E.g., use `(in-module "FOO")' in
+your Lisp listener to switch to module FOO, before you evaluate any
+commands from a buffer that should go into that module.  If you use the
+Allegro fi-interface, you can load the file `stella/emacs/fi-stella.el'
+in your .emacs file which will provide support for automatic module
+switching based on a file's `in-module' declaration (similar to what is
+done for Lisp package switching based on `in-package' declarations).
+
+
+BUG REPORTS, QUESTIONS, AND COMMENTS
+
+If you do encounter a bug or have a question or comment, please let us
+know.  The best way to do so is to send e-mail to
+`powerloom-forum@isi.edu'.  If you want to be added to that mailing list
+please send e-mail to `powerloom-forum-request@isi.edu'.
+
+If you encounter a bug, please provide us with as much information as
+possible to reproduce it.  In particular, let us know which version of
+PowerLoom you are using, e.g., look at the startup banner of the
+PowerLoom listener, or look at the values of the variables
+`*powerloom-version-string*' and `*stella-version-string*'.

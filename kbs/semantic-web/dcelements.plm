@@ -1,0 +1,160 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;; dcelements.owl
+
+#|
+;;; This is a translation of an OWL2 version of the Dublin Core Elements ontology (see http://bloody-byte.net/rdf/dc_owl2dl/
+;;; for more information on translation and representation choices).
+
+;;; Dependencies: webcore.plm, rdfx.plm, owl.plm
+
+;;; Translation process:
+kbs/semantic-web> java -jar /opt/lib/rdf2rdf-1.0.1-2.3.1.jar dcelements.owl.ttl dcelements.owl
+converting dcelements.owl.ttl to dcelements.owl (Turtle to RDF/XML)
+
+STELLA(2): (load-configuration-file "~/Projects/powerloom/sources/kagg/config/TAC-KBP-2015-coldstart-lisp-test.dat")
+STELLA(3): (load "PL:sources;kagg;scripts;TAC-KBP;TAC-KBP-initialize.plm")
+STELLA(4): (DEFMODULE "/XMLNS/DC"
+  :documentation "Namespace for symbols of the Dublin Core Elements ontology."
+  :CASE-SENSITIVE? TRUE)
+STELLA(5): (DEFMODULE "/XMLNS/SKOS"
+  :documentation "Namespace for symbols of the Simple Knowledge Organization System (SKOS) data model."
+  :CASE-SENSITIVE? TRUE)
+STELLA(6): (set-property "dcMap"
+  (semweb/define-namespace-map
+    :base-map (semweb/define-namespace-map)
+    (quote (:namespace "dc" :uri "http://purl.org/dc/elements/1.1/" :module "/XMLNS/DC" :style :bare-name))
+    (quote (:namespace "skos" :uri "http://www.w3.org/2004/02/skos/core#" :module "/XMLNS/SKOS" :style :bare-name))
+    (quote (:uri "" :module "WEB-CORE" :style :full-uri :default? TRUE))))
+STELLA(7): (eval (semweb/owl-to-powerloom
+ "PL:kbs;semantic-web;dcelements.owl"
+ "PL:kbs;semantic-web;dcelements.plm"
+ (get-property "dcMap")
+ null
+ (get WEB-CORE)))
+
+;;; minor post-editing for module definitions and external references
+|#
+
+
+(CL:IN-PACKAGE "STELLA")
+
+(IN-MODULE "WEB-CORE")
+
+
+(DEFRELATION /XMLNS/SKOS/definition (?X ?Y)
+  ;; Forward definition, so we don't have to import SKOS first which itself references DC Elements.
+  :SUBSET-OF /XMLNS/SKOS/note
+  :BINARY-RELATION TRUE
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/SKOS/definition "definition")
+  :AXIOMS (/XMLNS/RDFS/isDefinedBy /XMLNS/SKOS/definition |http://www.w3.org/2004/02/skos/core|)
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/SKOS/definition "A statement or formal explanation of the meaning of a concept.")
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/SKOS/definition))
+
+
+(ASSERT
+ (AND (/XMLNS/OWL/Ontology |http://purl.org/NET/dc_owl2dl/elements|)
+  (/XMLNS/RDFS/label |http://purl.org/NET/dc_owl2dl/elements| "Dublin Core Metadata Element Set, Version 1.1")
+  (DOCUMENTATION |http://purl.org/NET/dc_owl2dl/elements|
+   "OWL 2 DL ontology for Dublin Core metadata elements from the http://purl.org/dc/elements/1.1/ namespace")
+  (/XMLNS/DC/creator |http://purl.org/NET/dc_owl2dl/elements| |http://simon-reinhardt.de/#me|)
+  (/XMLNS/DC/date |http://purl.org/NET/dc_owl2dl/elements| "2009-09-05")
+  (/XMLNS/DC/rights |http://purl.org/NET/dc_owl2dl/elements| |http://creativecommons.org/licenses/by-sa/3.0/|)
+  (/XMLNS/OWL/imports |http://purl.org/NET/dc_owl2dl/elements| |http://www.w3.org/TR/skos-reference/skos-owl1-dl.rdf|)))
+
+(DEFRELATION /XMLNS/DC/contributor (?X ?Y)
+  :DOCUMENTATION "Examples of a Contributor include a person, an organization, or a service. Typically, the name of a Contributor should be used to indicate the entity."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/contributor)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/contributor "Contributor")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/contributor "An entity responsible for making contributions to the resource."))
+
+(DEFRELATION /XMLNS/DC/coverage (?X ?Y)
+  :DOCUMENTATION "Spatial topic and spatial applicability may be a named place or a location specified by its geographic coordinates. Temporal topic may be a named period, date, or date range. A jurisdiction may be a named administrative entity or a geographic place to which the resource applies. Recommended best practice is to use a controlled vocabulary such as the Thesaurus of Geographic Names. Where appropriate, named places or time periods can be used in preference to numeric identifiers such as sets of coordinates or date ranges."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/coverage)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/coverage "Coverage")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/coverage
+           "The spatial or temporal topic of the resource, the spatial applicability of the resource, or the jurisdiction under which the resource is relevant.")
+  :AXIOMS (/XMLNS/RDFS/seeAlso /XMLNS/DC/coverage |http://www.getty.edu/research/tools/vocabulary/tgn/index.html|))
+
+(DEFRELATION /XMLNS/DC/creator (?X ?Y)
+  :DOCUMENTATION "Examples of a Creator include a person, an organization, or a service. Typically, the name of a Creator should be used to indicate the entity."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/creator)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/creator "Creator")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/creator "An entity primarily responsible for making the resource."))
+
+(DEFRELATION /XMLNS/DC/date (?X ?Y)
+  :DOCUMENTATION "Date may be used to express temporal information at any level of granularity. Recommended best practice is to use an encoding scheme, such as the W3CDTF profile of ISO 8601."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/date)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/date "Date")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/date "A point or period of time associated with an event in the lifecycle of the resource.")
+  :AXIOMS (/XMLNS/RDFS/seeAlso /XMLNS/DC/date |http://www.w3.org/TR/NOTE-datetime|))
+
+(DEFRELATION /XMLNS/DC/description (?X ?Y)
+  :DOCUMENTATION "Description may include but is not limited to: an abstract, a table of contents, a graphical representation, or a free-text account of the resource."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/description)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/description "Description")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/description "An account of the resource."))
+
+(DEFRELATION /XMLNS/DC/format (?X ?Y)
+  :DOCUMENTATION "Examples of dimensions include size and duration. Recommended best practice is to use a controlled vocabulary such as the list of Internet Media Types."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/format)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/format "Format")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/format "The file format, physical medium, or dimensions of the resource.")
+  :AXIOMS (/XMLNS/RDFS/seeAlso /XMLNS/DC/format |http://www.iana.org/assignments/media-types/|))
+
+(DEFRELATION /XMLNS/DC/identifier (?X ?Y)
+  :DOCUMENTATION "Recommended best practice is to identify the resource by means of a string conforming to a formal identification system."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/identifier)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/identifier "Identifier")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/identifier "An unambiguous reference to the resource within a given context."))
+
+(DEFRELATION /XMLNS/DC/language (?X ?Y)
+  :DOCUMENTATION "Recommended best practice is to use a controlled vocabulary such as RFC 4646."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/language)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/language "Language")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/language "A language of the resource.")
+  :AXIOMS (/XMLNS/RDFS/seeAlso /XMLNS/DC/language |http://www.ietf.org/rfc/rfc4646.txt|))
+
+(DEFRELATION /XMLNS/DC/publisher (?X ?Y)
+  :DOCUMENTATION "Examples of a Publisher include a person, an organization, or a service. Typically, the name of a Publisher should be used to indicate the entity."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/publisher)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/publisher "Publisher")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/publisher "An entity responsible for making the resource available."))
+
+(DEFRELATION /XMLNS/DC/relation (?X ?Y)
+  :DOCUMENTATION "Recommended best practice is to identify the related resource by means of a string conforming to a formal identification system."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/relation)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/relation "Relation")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/relation "A related resource."))
+
+(DEFRELATION /XMLNS/DC/rights (?X ?Y)
+  :DOCUMENTATION "Typically, rights information includes a statement about various property rights associated with the resource, including intellectual property rights."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/rights)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/rights "Rights")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/rights "Information about rights held in and over the resource."))
+
+(DEFRELATION /XMLNS/DC/source (?X ?Y)
+  :DOCUMENTATION "The described resource may be derived from the related resource in whole or in part. Recommended best practice is to identify the related resource by means of a string conforming to a formal identification system."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/source)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/source "Source")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/source "A related resource from which the described resource is derived."))
+
+(DEFRELATION /XMLNS/DC/subject (?X ?Y)
+  :DOCUMENTATION "Typically, the subject will be represented using keywords, key phrases, or classification codes. Recommended best practice is to use a controlled vocabulary. To describe the spatial or temporal topic of the resource, use the Coverage element."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/subject)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/subject "Subject")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/subject "The topic of the resource."))
+
+(DEFRELATION /XMLNS/DC/title (?X ?Y)
+  :DOCUMENTATION "Typically, a Title will be a name by which the resource is formally known."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/title)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/title "Title")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/title "A name given to the resource."))
+
+(DEFRELATION /XMLNS/DC/type (?X ?Y)
+  :DOCUMENTATION "Recommended best practice is to use a controlled vocabulary such as the DCMI Type Vocabulary. To describe the file format, physical medium, or dimensions of the resource, use the Format element."
+  :AXIOMS (/XMLNS/OWL/AnnotationProperty /XMLNS/DC/type)
+  :AXIOMS (/XMLNS/RDFS/label /XMLNS/DC/type "Type")
+  :AXIOMS (/XMLNS/SKOS/definition /XMLNS/DC/type "The nature or genre of the resource.")
+  :AXIOMS (/XMLNS/RDFS/seeAlso /XMLNS/DC/type |http://dublincore.org/documents/dcmi-type-vocabulary/|))
+

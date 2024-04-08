@@ -1,0 +1,304 @@
+;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                          ;
+;  COPYRIGHT (C) UNIVERSITY OF SOUTHERN CALIFORNIA, 2002                   ; 
+;  University of Southern California, Information Sciences Institute       ;
+;  4676 Admiralty Way                                                      ;
+;  Marina Del Rey, California 90292                                        ;
+;  All rights reserved.                                                    ;
+;                                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(in-package "STELLA")
+
+(in-module "SEISMOLOGY/FAULTS")
+
+(in-dialect :KIF)
+
+(assert 
+  (documentation FAULTS 
+		 "Support ontology for facts about specific faults.
+
+KB version: $Id$"))
+
+;;;;
+;;;;  ASSERTIONS:
+;;;; 
+
+;;; General assertions about background knowledge
+
+
+
+;; Source:  APPENDIX A - CALIFORNIA FAULT PARAMETERS.
+;; We got this from Ned Field, but I don't know what it is the
+;; Appendix to!
+
+(assert (fault-system san-andreas-fault-system))
+
+(assert (and (fault san-andreas-coachella)
+	     (member-of san-andreas-coachella san-andreas-fault-system)
+	     (the-fault-length san-andreas-coachella (units 95 "km"))
+	     (measurement-uncertainty san-andreas-coachella the-fault-length (units 10 "km"))
+	     (the-fault-slip-rate san-andreas-coachella (units 25 "mm/year"))
+	     (measurement-uncertainty san-andreas-coachella the-fault-slip-rate (units 5 "mm/year"))
+	     (the-fault-maximum-magnitude san-andreas-coachella 7.1)
+	     (the-fault-characteristic-rate san-andreas-coachella (units 0 "/year"))  ;; Correct?
+	     (the-fault-down-dip-width san-andreas-coachella (units 12 "km"))
+	     (measurement-uncertainty san-andreas-coachella the-fault-down-dip-width (units 2 "km"))
+	     (the-fault-rake san-andreas-coachella (units 180 "deg"))
+	     (the-fault-dip san-andreas-coachella (units 90 "deg"))
+	     (documentation san-andreas-coachella "Slip rate based on Sieh and Williams (1990); Sieh (1986); Keller et al. (1982); Bronkowski (1981).  Model assumes slip only in S. San Andreas events")
+	     ))
+
+(assert (and (fault san-andreas-san-bernardino)
+	     (member-of san-andreas-san-bernardino san-andreas-fault-system)
+	     (the-fault-length san-andreas-san-bernardino (units 107 "km"))
+	     (measurement-uncertainty san-andreas-san-bernardino the-fault-length (units 11 "km"))
+	     (the-fault-slip-rate san-andreas-san-bernardino (units 24 "mm/year"))
+	     (measurement-uncertainty san-andreas-san-bernardino the-fault-slip-rate (units 6 "mm/year"))
+	     (the-fault-maximum-magnitude san-andreas-san-bernardino 7.3)
+	     (the-fault-characteristic-rate san-andreas-san-bernardino (units 0.00231 "/year"))
+	     (the-fault-recurrence-interval san-andreas-san-bernardino (units 433 "year"))
+	     (the-fault-down-dip-width san-andreas-san-bernardino (units 18 "km"))
+	     (measurement-uncertainty san-andreas-san-bernardino the-fault-down-dip-width (units 2 "km"))
+	     (the-fault-rake san-andreas-san-bernardino (units 180 "deg"))
+	     (the-fault-dip san-andreas-san-bernardino (units 90 "deg"))
+	     (documentation san-andreas-san-bernardino "Slip rate reported by Weldon and Sieh (1985)")
+	     ))
+
+(assert (and (fault san-andreas-southern)
+	     (member-of san-andreas-southern san-andreas-fault-system)
+	     (sub-region-of san-andreas-coachella san-andreas-southern)
+	     (sub-region-of san-andreas-san-bernadino san-andreas-southern)
+	     (the-fault-length san-andreas-southern (units 203 "km"))
+	     (measurement-uncertainty san-andreas-southern the-fault-length (units 20 "km"))
+	     (the-fault-slip-rate san-andreas-southern (units 24 "mm/year"))
+	     (measurement-uncertainty san-andreas-southern the-fault-slip-rate (units 6 "mm/year"))
+	     (the-fault-maximum-magnitude san-andreas-southern 7.4)
+	     (the-fault-characteristic-rate san-andreas-southern (units 0.00454 "/year"))
+	     (the-fault-recurrence-interval san-andreas-southern (units 220 "year"))
+	     (the-fault-down-dip-width san-andreas-southern (units 12 "km"))
+	     (measurement-uncertainty san-andreas-southern the-fault-down-dip-width (units 2 "km"))
+	     (the-fault-rake san-andreas-southern (units 180 "deg"))
+	     (the-fault-dip san-andreas-southern (units 90 "deg"))
+	     (documentation san-andreas-southern "Rupture of San Bernardino and Coachella segments.  Slip rate based on Coachella segment.")
+	     ))
+
+(assert (and (fault san-andreas-mojave)
+	     (member-of san-andreas-mojave san-andreas-fault-system)
+	     (the-fault-length san-andreas-mojave (units 99 "km"))
+	     (measurement-uncertainty san-andreas-mojave the-fault-length (units 10 "km"))
+	     (the-fault-slip-rate san-andreas-mojave (units 30 "mm/year"))
+	     (measurement-uncertainty san-andreas-mojave the-fault-slip-rate (units 7 "mm/year"))
+	     (the-fault-maximum-magnitude san-andreas-mojave 7.1)
+	     (the-fault-characteristic-rate san-andreas-mojave (units 0.00182 "/year"))
+	     (the-fault-recurrence-interval san-andreas-mojave (units 550 "year"))
+	     (the-fault-down-dip-width san-andreas-mojave (units 12 "km"))
+	     (measurement-uncertainty san-andreas-mojave the-fault-down-dip-width (units 2 "km"))
+	     (the-fault-rake san-andreas-mojave (units 180 "deg"))
+	     (the-fault-dip san-andreas-mojave (units 90 "deg"))
+	     (documentation san-andreas-mojave "Slip rate based on Sieh (1984), Salyards et al. (1992), and WGCEP (1995)")
+	     ))
+
+(assert (and (fault san-andreas-carrizo)
+	     (member-of san-andreas-carrizo san-andreas-fault-system)
+	     (the-fault-length san-andreas-carrizo (units 145 "km"))
+	     (measurement-uncertainty san-andreas-carrizo the-fault-length (units 15 "km"))
+	     (the-fault-slip-rate san-andreas-carrizo (units 34 "mm/year"))
+	     (measurement-uncertainty san-andreas-carrizo the-fault-slip-rate (units 3 "mm/year"))
+	     (the-fault-maximum-magnitude san-andreas-carrizo 7.2)
+	     (the-fault-characteristic-rate san-andreas-carrizo (units 0 "/year"))
+	     (the-fault-down-dip-width san-andreas-carrizo (units 12 "km"))
+	     (measurement-uncertainty san-andreas-carrizo the-fault-down-dip-width (units 2 "km"))
+	     (the-fault-rake san-andreas-carrizo (units 180 "deg"))
+	     (the-fault-dip san-andreas-carrizo (units 90 "deg"))
+	     (documentation san-andreas-carrizo "Slip rate based on Sieh and Jahns (1984).  Model assumes slip only in 1857-type events.")
+	     ))
+
+(assert (and (fault san-andreas-cholame)
+	     (member-of san-andreas-cholame san-andreas-fault-system)
+	     (the-fault-length san-andreas-cholame (units 62 "km"))
+	     (measurement-uncertainty san-andreas-cholame the-fault-length (units 6 "km"))
+	     (the-fault-slip-rate san-andreas-cholame (units 34 "mm/year"))
+	     (measurement-uncertainty san-andreas-cholame the-fault-slip-rate (units 5 "mm/year"))
+	     (the-fault-maximum-magnitude san-andreas-cholame 6.9)
+	     (the-fault-characteristic-rate san-andreas-cholame (units 0.00229 "/year"))
+	     (the-fault-recurrence-interval san-andreas-carrizo (units 437 "year"))
+	     (the-fault-down-dip-width san-andreas-cholame (units 12 "km"))
+	     (measurement-uncertainty san-andreas-cholame the-fault-down-dip-width (units 2 "km"))
+	     (the-fault-rake san-andreas-cholame (units 180 "deg"))
+	     (the-fault-dip san-andreas-cholame (units 90 "deg"))
+	     (documentation san-andreas-cholame "Slip based on analogy with Carrizo segment")
+	     ))
+
+(assert (and (fault san-andreas-parkfield-segment)
+	     (member-of san-andreas-parkfield-segment san-andreas-fault-system)
+	     (the-fault-length san-andreas-parkfield-segment (units 37 "km"))
+	     (measurement-uncertainty san-andreas-parkfield-segment the-fault-length (units 4 "km"))
+	     (the-fault-slip-rate san-andreas-parkfield-segment (units 34 "mm/year"))
+	     (measurement-uncertainty san-andreas-parkfield-segment the-fault-slip-rate (units 5 "mm/year"))
+	     (the-fault-maximum-magnitude san-andreas-parkfield-segment 6.7)
+	     (the-fault-characteristic-rate san-andreas-parkfield-segment (units 0.04060 "/year"))
+	     (the-fault-recurrence-interval san-andreas-parkfield-segment (units 25 "year"))
+	     (the-fault-down-dip-width san-andreas-parkfield-segment (units 12 "km"))
+	     (measurement-uncertainty san-andreas-parkfield-segment the-fault-down-dip-width (units 2 "km"))
+	     (the-fault-rake san-andreas-parkfield-segment (units 180 "deg"))
+	     (the-fault-dip san-andreas-parkfield-segment (units 90 "deg"))
+	     (documentation san-andreas-parkfield-segment "Slip rate reported by WGCEP (1995).")
+	     ))
+
+(assert (and (fault san-andreas-1857-rupture)
+	     (member-of san-andreas-1857-rupture san-andreas-fault-system)
+	     (sub-region-of san-andreas-1857-rupture san-andreas-parkfield-segment)
+	     (sub-region-of san-andreas-1857-rupture san-andreas-cholame)
+	     (sub-region-of san-andreas-1857-rupture san-andreas-carrizo)
+	     (sub-region-of san-andreas-1857-rupture san-andreas-mojave)
+	     (the-fault-length san-andreas-1857-rupture (units 345 "km"))
+	     (measurement-uncertainty san-andreas-1857-rupture the-fault-length (units 35 "km"))
+	     (the-fault-slip-rate san-andreas-1857-rupture (units 34 "mm/year"))
+	     (measurement-uncertainty san-andreas-1857-rupture the-fault-slip-rate (units 5 "mm/year"))
+	     (the-fault-maximum-magnitude san-andreas-1857-rupture 7.8)
+	     (the-fault-characteristic-rate san-andreas-1857-rupture (units 0.00485 "/year"))
+	     (the-fault-recurrence-interval san-andreas-1857-rupture (units 206 "year"))
+	     (the-fault-down-dip-width san-andreas-1857-rupture (units 12 "km"))
+	     (measurement-uncertainty san-andreas-1857-rupture the-fault-down-dip-width (units 2 "km"))
+	     (the-fault-rake san-andreas-1857-rupture (units 180 "deg"))
+	     (the-fault-dip san-andreas-1857-rupture (units 90 "deg"))
+	     (documentation san-andreas-1857-rupture "Rupture of Parkfield, Cholame, Carrizo, and Mojave segments.  Max. magnitude based on 1857 event (Ellsworth, 1990).  Slip based on Carrizo segment.")
+	     ))
+
+(assert (and (fault san-andreas-creeping-segment)
+	     (member-of san-andreas-creeping-segment san-andreas-fault-system)
+	     (the-fault-length san-andreas-creeping-segment (units 125 "km"))
+	     (measurement-uncertainty san-andreas-creeping-segment the-fault-length (units 13 "km"))
+	     (the-fault-slip-rate san-andreas-creeping-segment (units 34 "mm/year"))
+	     (measurement-uncertainty san-andreas-creeping-segment the-fault-slip-rate (units 5 "mm/year"))
+	     ; (the-fault-maximum-magnitude san-andreas-creeping-segment *)  ; NA
+	     (the-fault-characteristic-rate san-andreas-creeping-segment (units 0.0 "/year"))
+	     ; (the-fault-recurrence-interval san-andreas-creeping-segment *) ; NA
+	     (the-fault-down-dip-width san-andreas-creeping-segment (units 12 "km"))
+	     (measurement-uncertainty san-andreas-creeping-segment the-fault-down-dip-width (units 2 "km"))
+	     (the-fault-rake san-andreas-creeping-segment (units 180 "deg"))
+	     (the-fault-dip san-andreas-creeping-segment (units 90 "deg"))
+	     (documentation san-andreas-creeping-segment "Background seismicity.")
+	     ))
+
+(assert (and (fault san-andreas-pajaro)
+	     (member-of san-andreas-pajaro san-andreas-fault-system)
+	     (the-fault-length san-andreas-pajaro (units 22 "km"))
+	     (measurement-uncertainty san-andreas-pajaro the-fault-length (units 2 "km"))
+	     (the-fault-slip-rate san-andreas-pajaro (units 14 "mm/year"))
+	     (measurement-uncertainty san-andreas-pajaro the-fault-slip-rate (units 3 "mm/year"))
+	     (the-fault-maximum-magnitude san-andreas-pajaro 6.8)
+	     (the-fault-characteristic-rate san-andreas-pajaro (units 0.0 "/year"))
+	     ; (the-fault-recurrence-interval san-andreas-pajaro *) ; NA
+	     (the-fault-down-dip-width san-andreas-pajaro (units 18 "km"))
+	     (measurement-uncertainty san-andreas-pajaro the-fault-down-dip-width (units 2 "km"))
+	     (the-fault-rake san-andreas-pajaro (units 180 "deg"))
+	     (the-fault-dip san-andreas-pajaro (units 90 "deg"))
+	     (documentation san-andreas-pajaro "Pajaro segment assumed to rupture only in 1906-type events.  Max. magnitude based on 1.6m displacement.")
+	     ))
+
+(assert (and (fault san-andreas-santa-cruz-mtn)
+	     (member-of san-andreas-santa-cruz-mtn san-andreas-fault-system)
+	     (the-fault-length san-andreas-santa-cruz-mtn (units 37 "km"))
+	     (measurement-uncertainty san-andreas-santa-cruz-mtn the-fault-length (units 4 "km"))
+	     (the-fault-slip-rate san-andreas-santa-cruz-mtn (units 14 "mm/year"))
+	     (measurement-uncertainty san-andreas-santa-cruz-mtn the-fault-slip-rate (units 3 "mm/year"))
+	     (the-fault-maximum-magnitude san-andreas-santa-cruz-mtn 7.0)
+	     (the-fault-characteristic-rate san-andreas-santa-cruz-mtn (units 0.00250 "/year"))
+	     (the-fault-recurrence-interval san-andreas-santa-cruz-mtn (units 400 "year"))
+	     (the-fault-down-dip-width san-andreas-santa-cruz-mtn (units 18 "km"))
+	     (measurement-uncertainty san-andreas-santa-cruz-mtn the-fault-down-dip-width (units 2 "km"))
+	     (the-fault-rake san-andreas-santa-cruz-mtn (units 180 "deg"))
+	     (the-fault-dip san-andreas-santa-cruz-mtn (units 90 "deg"))
+	     (documentation san-andreas-santa-cruz-mtn "Slip rate based on Lienkaemper, et al. (1991) and assumptoin that 3mm/yr rate transferred to Sargent fault.  Max. magnitude based on 1.6m displacement.")
+	     ))
+
+(assert (and (fault san-andreas-peninsula)
+	     (member-of san-andreas-peninsula san-andreas-fault-system)
+	     (the-fault-length san-andreas-peninsula (units 88 "km"))
+	     (measurement-uncertainty san-andreas-peninsula the-fault-length (units 9 "km"))
+	     (the-fault-slip-rate san-andreas-peninsula (units 17 "mm/year"))
+	     (measurement-uncertainty san-andreas-peninsula the-fault-slip-rate (units 3 "mm/year"))
+	     (the-fault-maximum-magnitude san-andreas-peninsula 7.1)
+	     (the-fault-characteristic-rate san-andreas-peninsula (units 0.00250 "/year"))
+	     (the-fault-recurrence-interval san-andreas-peninsula (units 400 "year"))
+	     (the-fault-down-dip-width san-andreas-peninsula (units 14 "km"))
+	     (measurement-uncertainty san-andreas-peninsula the-fault-down-dip-width (units 2 "km"))
+	     (the-fault-rake san-andreas-peninsula (units 180 "deg"))
+	     (the-fault-dip san-andreas-peninsula (units 90 "deg"))
+	     (documentation san-andreas-peninsula "Slip rate is based on Clahan, et al. (1995) and assumptions by WGNCEP (1996)).  Max. magnitude based on 1.6m displacement.")
+	     ))
+
+(assert (and (fault san-andreas-north-coast)
+	     (member-of san-andreas-north-coast san-andreas-fault-system)
+	     (the-fault-length san-andreas-north-coast (units 322 "km"))
+	     (measurement-uncertainty san-andreas-north-coast the-fault-length (units 32 "km"))
+	     (the-fault-slip-rate san-andreas-north-coast (units 24 "mm/year"))
+	     (measurement-uncertainty san-andreas-north-coast the-fault-slip-rate (units 3 "mm/year"))
+	     (the-fault-maximum-magnitude san-andreas-north-coast 7.6)
+	     (the-fault-characteristic-rate san-andreas-north-coast (units 0.0 "/year"))
+	     ; (the-fault-recurrence-interval san-andreas-north-coast *) ; NA
+	     (the-fault-down-dip-width san-andreas-north-coast (units 12 "km"))
+	     (measurement-uncertainty san-andreas-north-coast the-fault-down-dip-width (units 2 "km"))
+	     (the-fault-rake san-andreas-north-coast (units 180 "deg"))
+	     (the-fault-dip san-andreas-north-coast (units 90 "deg"))
+	     (documentation san-andreas-north-coast "Assumption that North Coast segment ruptures only in 1906-type events.  Slip rate based on Niemi and Hall (1992) and Preintice, et al. (1991)")
+	     ))
+
+(assert (and (fault san-andreas-1906)
+	     (member-of san-andreas-1906 san-andreas-fault-system)
+	     (sub-region-of san-andreas-pajaro san-andreas-1906)
+	     (sub-region-of san-andreas-santa-cruz-mtn san-andreas-1906)
+	     (sub-region-of san-andreas-peninsula san-andreas-1906)
+	     (sub-region-of san-andreas-north-coast san-andreas-1906)
+	     (the-fault-length san-andreas-1906 (units 470 "km"))
+	     (measurement-uncertainty san-andreas-1906 the-fault-length (units 47 "km"))
+	     (the-fault-slip-rate san-andreas-1906 (units 24 "mm/year"))
+	     (measurement-uncertainty san-andreas-1906 the-fault-slip-rate (units 3 "mm/year"))
+	     (the-fault-maximum-magnitude san-andreas-1906 7.9)
+	     (the-fault-characteristic-rate san-andreas-1906 (units 0.00476 "/year"))
+	     (the-fault-recurrence-interval san-andreas-1906 (units 210 "year"))
+	     (the-fault-down-dip-width san-andreas-1906 (units 12 "km"))
+	     (measurement-uncertainty san-andreas-1906 the-fault-down-dip-width (units 2 "km"))
+	     (the-fault-rake san-andreas-1906 (units 180 "deg"))
+	     (the-fault-dip san-andreas-1906 (units 90 "deg"))
+	     (documentation san-andreas-1906 "Slip rate based on Niemi and Hall (1992) and Prentice, et al (1991).  Assumption that 1906 events rupture North Coast, Peninsula, and Satna Cruz Mtns. segments to San Juan Bautista.  Max. magnitude based on 1906 average 5m displacement (WGCEP, 1990; Lienkaemper, 1996).")
+	     ))
+
+
+	     
+
+
+;; Source:  IGSMAIL-0466  Northridge Earthquake
+;;          Http://Igscb.jpl.nasa.gov/Mail/Igsmail/1994/Msg00041.html
+;;
+
+(assert (and (fault northridge-fault)
+	     (the-fault-strike northridge-fault (units 109.13 "deg"))
+	     (the-fault-dip northridge-fault (units 39.22 "deg"))
+	     (the-fault-rake northridge-fault (units 89.1674 "deg"))))
+
+(assert (and (earthquake-source northridge-earthquake)
+	     (source-hypocenter northridge-earthquake northridge-hypocenter)
+	     (source-mean-slip northridge-earthquake (units 4.5213 "m"))))
+
+;; Source:  NGS EPIC Database
+
+(assert (and (latitude-of northridge-hypocenter 34.213)
+	     (longitude-of northridge-hypocenter -118.537)
+	     (depth-of northridge-hypocenter (units 18 "km"))))
+
+;;
+;; QUESTIONS:
+;;
+;;  Slip should probably be a property of a particular earthquake
+;;  What about rake?  Since it is related to slip?  Or is that
+;;  sufficiently constant?
+;;
+;;  Strike and Dip are related to to faults.
+;;
+
+

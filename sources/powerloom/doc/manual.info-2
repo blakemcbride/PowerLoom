@@ -1,0 +1,1412 @@
+This is manual.info, produced by makeinfo version 6.7 from manual.texi.
+
+Copyright (C) 2010 University of Southern California, Information
+Sciences Institute, 4676 Admiralty Way, Marina Del Rey, CA 90292, USA
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   PowerLoom is a registered trademark of the University of Southern
+California.
+
+   This file documents the knowledge representation and reasoning
+system.
+
+
+File: manual.info,  Node: Glossary,  Next: PowerLoom Grammar,  Prev: Miscellaneous,  Up: Top
+
+12 Glossary
+***********
+
+This glossary contains brief definitions for terms used in the PowerLoom
+User's Manual and/or used by the knowledge representation community.  It
+is impractical to give a logically precise definition for many of these
+terms, because their interpretation varies quite a bit.  In this case,
+the glossary attempts to indicate a range of interpretations consistent
+with their use in PowerLoom.
+
+*Assertion:* An assertion states that a particular proposition is 'True'
+or 'False'.
+
+*Backward and Forward Inference:* *???*
+
+*BACKWARD RULE:* *???*
+
+*Binary Relation:* A relation having two arguments (arity equals two),
+often as a mapping from one concept domain to another.  This is by far
+the most common form of relation.
+
+*Classifier:* A classifier is a type of an inference engine that
+implements efficient strategies for computing subsumption relations
+between pairs of concepts, or for computing instance-of relations
+between a concept an a set of instances.  PowerLoom implements a
+classifier that can be explicitly invoked by an application program.
+
+*Clipping:* If a function or single-valued binary relation maps an
+instance to two or more other instances, a logical contradiction (a
+clash) exists.  If clipping is enabled, PowerLoom will automatically
+retract all assertions but the last that lead to a clash.  Clipping can
+be toggled on or off; it is enabled by default.
+
+*Closed-World Semantics:* Under closed-world semantics it is assumed
+that "if proposition 'P' cannot be proved 'True', then assume that 'P'
+is 'False'."  PowerLoom gives programmers the option to explicitly
+declare that concept or a relation operates under the assumption of
+closed-world semantics (See also Open-World Semantics).
+
+*Concept:* A concept defines a category or class of individuals.
+PowerLoom categorizes a concept as a special kind of relation.  The
+distinction between a concept and a unary relation is subtle (some
+logicians do not believe that there is any distinction(1)).  In
+linguistics, the distinction is that between a noun and an adjective.
+In logic, the test we favor is whether or not the relation has a domain
+-- a unary relation has a domain, while a concept does not.  For
+example, the relation 'married' has domain 'person', while the concept
+'married-person' does not have a domain (or is its own domain).
+
+*Constraint:* "Constraint" at its most general is a synonym for "rule".
+Often a constraint is conceptualized as a rule that restricts the types
+of the arguments that can appear within a tuple.
+
+*Context:* *???*
+
+*Default Rule:* A default rule expresses an conditional implication that
+applies only when its consequent is consistent with current state of the
+knowledge base.  In other words, the rule applies only when it will not
+lead to a contradition.
+
+*Definition:* A definition binds a name to a logical expression.
+PowerLoom syntax defines several operators with names of the form
+'defxxx' (e.g., 'defconcept' and 'defrule') that declare definitions for
+various types of entities.
+
+*Description:* A "description" is an expression that defines a
+particular logical relation (e.g., the class of all three-legged black
+cats).  In PowerLoom, the terms "concept" and "relation" generally refer
+to 'named' relations, while a description may or may not have a name.
+The KIF operators 'kappa' and 'setofall' are used to define unnamed
+descriptions.
+
+*Description Logic:* The term "description logic" refers to a logic that
+focuses on descriptions as its principal means for expressing logical
+expressions.  A description logic system emphasises the use of
+classification and subsumption reasoning as its primary mode of
+inference.  Loom and Classic were two early examples of knowledge
+representation systems that implement description logics.
+
+*Domain Model:* A collection of definitions, rules, and facts that
+characterizes the possible states of some real or imagined world.  The
+domain model specifies a terminology (of concepts and relations) that is
+useful for describing objects in that world.  Often "domain model"
+refers to that portion of a world's representation that does not change
+over time.
+
+*Extension:* Given a relation 'R' with arity 'N', the extension of 'R'
+is the set of ground propositions of the form '(R x1 ... xN)' whose
+truth value is true.  If R is a concept, then its extension of often
+considered to be, not a set of unary tuples, but the set of argument
+fillers of those tuples, i.e., the set of instances that belong to the
+concept.
+
+*Fact:* A fact is a proposition that has been asserted to be either
+'True' or 'False'.  The term "fact" usually refers to a "ground
+proposition", i.e., a proposition that can be represented as a predicate
+applied to a sequence of instances or literals.
+
+*Filler:* The second argument to a binary tuple is often refered to as
+its "filler".  When a multiple-valued binary relation maps an instance
+to a set of values, these values are also called "fillers".
+
+*Forward Rule:* *???*
+
+*Function:* Formally, a function is a relation such that the value of
+the last (nth) argument of a relational tuple is a function of the
+values of the first n-1 arguments.  This definition coincides with the
+notion of a "single-valued relation".  PowerLoom (and KIF) support
+specialized syntax that allows functions that have been defined using
+the operator 'deffunction' to appear in term expressions (e.g., '(= (f
+?x) 42))').
+
+*Instance:* An instance denotes an entity within a domain model, a
+member of the concept _Thing_.  Depending on ones interpretation, this
+could include almost everything.  Often the term "instance" is used more
+narrowly, to exclude literals and other objects whose properties do not
+change over time.  PowerLoom assumes that concepts and relations are
+instances.
+
+*KIF:* Short for "Knowledge Interchange Format", KIF is a language that
+defines a Lisp-like syntax for the predicate calculus.  There is an
+ANSII-standard that defines the KIF syntax and semantics.  PowerLoom
+adopts KIF as its representation language, and adds a few extensions.
+
+*Knowledge Base:* A knowledge base attempts to capture in abstract
+(machine interpretable) form a useful representation of a physical or
+virtual world.  The entities in that world are modeled in the knowledge
+base by objects we call _ terms_.  Examples of terms are "Georgia"
+(denoting the U.S., state), "BenjaminFranklin" (denoting the historical
+person by that name), the number three, the string "abc", and the
+concept "Person".
+
+*Literal:* A logically static constant.  Examples are numbers, strings,
+quantities, and truth values.
+
+*Module:* *???*
+
+*Open-World Semantics:* PowerLoom assumes an open-world semantics,
+unless a user explicitly specifies that it use closed-world semantics.
+Under this assumption, if PowerLoom cannot prove or disprove a
+proposition, then it assigns that proposition the value 'Unknown' (See
+also Closed-World Semantics).
+
+*Predicate:*.  The term _predicate_ is a syntactic notion that refers to
+the zeroth arguments of a proposition.  Predicates denote relations and
+properties, i.e., sets.
+
+*Proposition:*.  A logical sentence whose truth value can be evaluated
+with respect to some context.  Each PowerLoom assertion assigns the
+value 'True' or 'False' to some proposition.
+
+*Primitive Relation:* 'P' is a primitive concept or relation if and only
+if a proof that '(P x1 ... xn)' is true exists only for the case that
+there exists an explicit assertion of a proposition '(Q x1 ... xn)' and
+either 'Q' equals 'P' or 'Q' is a proper subrelation of 'P'.  In
+otherwords, the only rules that imply membership in 'P' are those that
+relate 'P' to one of its (proper) subconcepts or subrelations.
+
+*Query:* A query probes the informational state of a knowledge base.  An
+'ask' query test the truth of its propositional argument.  A 'retrieve'
+asks for sets of constants (bindings) that make its propositional
+argument true when the constants are substituted in place of its
+variables.  The propositional argument to 'ask' and 'retrieve' arbitrary
+expression in the first-order predicate calculus.  Because of
+constraints imposed either by resource limitations or inherent
+undecidability, PowerLoom cannot guarantee the completeness of its
+inferences.
+
+*Relation:* *???*
+
+*Retraction:* A retraction changes the truth value of a proposition from
+either 'True' or 'False' to the value 'Unknown'.  Retraction is a
+procedural (non-declarative) operation.
+
+*Rule:* A "rule" is any universally-quantified proposition, i.e., a
+proposition of the form '(forall (?x1 ... ?xn) <logical sentence with
+free variables ?x1 ... ?xn)'.  PowerLoom supports several different
+syntactic constructs for defining rules.  (See also Forward Rule and
+Backward Rule).
+
+*Subsumption:* A subsumption relation specifies the relative generality
+of two concepts.  A concept 'A' subsumes a concept 'B' if the
+definitions of 'A' and 'B' logically imply that members of 'B' must also
+be members of 'A'.
+
+*Truth-Maintenance:* *???*
+
+*Type:* Often used a synonym for the term _concept_.  The phrase "a type
+of an instance" generally refers to (one of) the concepts that the
+instance belongs to.  The phrase "nth domain type" refers to a concept
+that contains all instances of the nth column of a relation.
+
+*World:* *???*
+
+   ---------- Footnotes ----------
+
+   (1) but they are mistaken :).
+
+
+File: manual.info,  Node: PowerLoom Grammar,  Next: Function Index,  Prev: Glossary,  Up: Top
+
+13 PowerLoom Grammar
+********************
+
+The syntax of PowerLoom is described below using a modified BNF notation
+adapted from the KIF specification.
+
+* Menu:
+
+* Alphabet::
+* Grammar::
+
+
+File: manual.info,  Node: Alphabet,  Next: Grammar,  Prev: PowerLoom Grammar,  Up: PowerLoom Grammar
+
+13.1 Alphabet
+=============
+
+We distinguish between terminals, which are part of the language, and
+nonterminals.  All nonterminals are bracketed as follows
+'<nonterminal>'.  Squared brackets means zero or one instances of the
+enclosed expression; '<nonterminal>*' means zero or more occurrences and
+'<nonterminal>+' means one or more occurrences of '<nonterminal>'.  The
+notation '<nonterminal1> - <nonterminal2>' refers to all of the members
+of '<nonterminal1>' except for those in '<nonterminal2>'.
+
+   A word is a contiguous sequence of characters, which include all
+upper case letters, lower case letters, digits and alpha characters
+(ASCII character set from 93 to 128) excluding some special characters
+like white spaces, single and double quotes and brackets.
+
+   '<word> ::=' A PRIMITIVE SYNTACTIC OBJECT
+
+   Special words are those who refer to a variable.  All variables are
+preceded by a question mark.
+
+   '<indvar> ::=' A WORD BEGINNING WITH THE CHARACTER '?'
+
+   A string '<string>' is a character sequence including words plus all
+special charcters (except double quotes) enclosed in double quotes.  A
+double quote can be included in a string if it is preceeded by the
+escape character ''\''.
+
+
+File: manual.info,  Node: Grammar,  Prev: Alphabet,  Up: PowerLoom Grammar
+
+13.2 Grammar
+============
+
+Legal expressions in PowerLoom are forms, which are either a statement
+or a definition, described in more detail below.
+
+   '<form> ::= <statement> | <definition>'
+
+* Menu:
+
+* Constants and Typed Variables::
+* Terms::
+* Sentences::
+* Definitions::
+
+
+File: manual.info,  Node: Constants and Typed Variables,  Next: Terms,  Prev: Grammar,  Up: Grammar
+
+13.2.1 Constants and Typed Variables
+------------------------------------
+
+The language consists of several groups of operators, defined as
+follows:
+
+   '<termop> ::= listof | setof | the | setofall | kappa'
+
+   ' <sentop> ::= = | /= | not | fail | and | or | forall | exists
+               | <= | => | <=> |<<= | =>> | <~ | ~> | <<~ | ~>> '
+
+   ' <defop> ::= defconcept | deffunction | defrelation | defrule |
+              :documentation | :-> |
+              :<= | :=> | :<<= | :=>> |
+              :<=> | :<=>> :<<=> | :<<=>> | := |
+              :axioms '
+
+   '<operator> ::= <termop> | <sentop> | <defop>'
+
+   All other words are constants (words which are not operators or
+variables):
+
+   '<constant> ::= <word> - <indvar> - <operator>'
+
+   Semantically, there are different categories of constants --
+_Concept_ constants '<conceptconst>', _Function_ constants '<funconst>',
+_Relation_ constants '<relconst>', _Rule_ constants '<ruleconst>' and
+_Logical_ constants '<logconst>'.  The differences between these
+categories are entirely semantic.  However, some operators will only
+accept specific constants.
+
+   In contrast to the specification of KIF3.0, PowerLoom supports a
+typed syntax.  Therefore, variables in quantified terms and sentences
+can appear either typed or untyped, as follows:
+
+   '<vardecl> ::= (<indvar> <constant>) | <indvar>'
+
+
+File: manual.info,  Node: Terms,  Next: Sentences,  Prev: Constants and Typed Variables,  Up: Grammar
+
+13.2.2 Terms
+------------
+
+Terms are used to denote objects in the world being described:
+
+   ' <term> ::= <indvar> | <constant> | <funterm> | <listterm> |
+<setterm> |
+             <quanterm>'
+
+   '<listterm> ::= (listof <term>*)'
+
+   '<setterm> ::= (setof <term>*)'
+
+   '<funterm> ::= (<funconst> <term>+)'
+
+   Note: Zero arguments are allowed for '<funterm>' in KIF3.0: '<term>*'
+
+   ' <quanterm> ::= (the <vardecl> <sentence>) |
+                 (setofall <vardecl> <sentence>) |
+                 (kappa {<vardecl> | (<vardecl>+)} <sentence>) |
+                 (lambda {<vardecl> | (<vardecl>+)} <term>) '
+
+   Note: KIF3.0 allows '<term>' instead of '<vardecl>' for 'setofall'.
+No '<quanterm>' as well as no '<setterm>' in core of KIF as a result of
+descision 95-3 (March 1995).
+
+
+File: manual.info,  Node: Sentences,  Next: Definitions,  Prev: Terms,  Up: Grammar
+
+13.2.3 Sentences
+----------------
+
+Sentences are used to express propositions about the world:
+
+   ' <sentence> ::= <constant> | <equation> | <inequality> |
+                 <relsent> | <logsent> | <quantsent> '
+
+   '<equation> ::= (= <term> <term>)'
+
+   '<inequality> ::= (/= <term> <term>)'
+
+   '<relsent> ::= (<constant> <term>+)'
+
+   Note: Zero arguments allowed in KIF3.0 for '<relsent>' ('<term>*').
+'<funconst>' is currently not allowed in PowerLoom (use '(= <funterm>
+<term>)' instead).
+
+   ' <logsent> ::= (not <sentence>) |
+                (fail <sentence>) |
+                (and <sentence>*) |
+                (or <sentence>*) |
+                (=> <sentence>* <sentence>) | (=>> <sentence>*
+<sentence>) |
+                (<= <sentence> <sentence>*) | (<<= <sentence>
+<sentence>*) |
+                (~> <sentence>* <sentence>) | (~>> <sentence>*
+<sentence>) |
+                (<~ <sentence> <sentence>*) | (<<~ <sentence>
+<sentence>*) '
+
+   ' <quantsent> ::= (forall {<vardecl> | (<vardecl>+)} <sentence>) |
+                  (forall {<vardecl> | (<vardecl>+)} <sentence>
+<sentence>) |
+                  (exists {<vardecl> | (<vardecl>+)} <sentence>) '
+
+
+File: manual.info,  Node: Definitions,  Prev: Sentences,  Up: Grammar
+
+13.2.4 Definitions
+------------------
+
+PowerLoom supports two distinct categories of definitions -- relation
+definitions (including concept and function definitions) and rule
+definitions.  A relation definition introduces a new logical constant,
+and states some facts about that constant (e.g., who its parents are in
+a subsumption taxonomy).  A rule definitions binds a new constant to a
+proposition (so that the constant _denotes_ the proposition) and asserts
+the truth of that proposition.  Usually, the proposition asserted by a
+'defrule' is an implication.  The assertional truth of a proposition
+defined by a rule can be altered by asserting or retracting the constant
+that denotes the proposition.
+
+     <keyword-option> ::= <keyword> <word>
+     <definition> ::= <reldefinition> | <objdefinition> | <ruledefinition>
+
+     <reldefinition> ::=
+      (defconcept <conceptconst> <vardecl>
+         [:documentation <string>]
+         [:<= <sentence>] | [:=> <sentence>] |
+         [:<<= <sentence>] | [:=>> <sentence>] |
+         [:<=> <sentence>] | [:<=>> <sentence>] | [:<<=> <sentence>] |
+         [:<<=>> <sentence>] |
+         [:axioms {<sentence> | (<sentence>+)}] |
+         [<keyword-option>*])
+      |
+      (deffunction <funconst> (<vardecl>+)
+         [:documentation <string>]
+         [:-> <vardecl>]
+         [:<= <sentence>] | [:=> <sentence>] |
+         [:<<= <sentence>] | [:=>> <sentence>] |
+         [:<=> <sentence>] | [:<=>> <sentence>] | [:<<=> <sentence>] |
+         [:<<=>> <sentence>] |
+         [:axioms {<sentence> | (<sentence>+)}]
+         [<keyword-option>*])
+      |
+      (defrelation <relconst> (<vardecl>+)
+         [:documentation <string>]
+         [:<= <sentence>] | [:=> <sentence>] |
+         [:<<= <sentence>] | [:=>> <sentence>] |
+         [:<=> <sentence>] | [:<=>> <sentence>] | [:<<=> <sentence>] |
+         [:<<=>> <sentence>] |
+         [:axioms {<sentence> | (<sentence>+)}]
+         [<keyword-option>*])
+
+     <objdefinition> ::= (defobject <constant>
+                            [:documentation <string>]
+                            [<keyword-option>*])
+
+     <ruledefinition> ::= (defrule <constant> <sentence>
+                            [:documentation <string>]
+                            [<keyword-option>*])
+
+   '<ruledefinition> ::= (defrule <ruleconst> <sentence>)'
+
+
+File: manual.info,  Node: Function Index,  Next: Variable Index,  Prev: PowerLoom Grammar,  Up: Top
+
+Function Index
+**************
+
+ [index ]
+* Menu:
+
+* *:                                     Built-In Relations. (line   11)
+* +:                                     Built-In Relations. (line   14)
+* -:                                     Built-In Relations. (line   17)
+* /:                                     Built-In Relations. (line   20)
+* 2_d_element on 2_D_ARRAY:              Miscellaneous.      (line   11)
+* 2_d_element on 2_D_FLOAT-ARRAY:        Miscellaneous.      (line   15)
+* 2_d_element-setter on 2_D_ARRAY:       Miscellaneous.      (line   19)
+* 2_d_element-setter on 2_D_FLOAT-ARRAY: Miscellaneous.      (line   24)
+* <:                                     Built-In Relations. (line   23)
+* =<:                                    Built-In Relations. (line   26)
+* >:                                     Built-In Relations. (line   29)
+* >=:                                    Built-In Relations. (line   32)
+* ABSTRACT:                              Built-In Relations. (line   35)
+* add-load-path:                         Commands.           (line   58)
+* add-testing-example:                   Miscellaneous.      (line   29)
+* add-training-example:                  Miscellaneous.      (line   33)
+* AGGREGATE:                             Built-In Relations. (line   38)
+* all-asserted-collection-members:       Miscellaneous.      (line   37)
+* all-asserted-member-of-collection-supports: Miscellaneous. (line   44)
+* all-asserted-types:                    Miscellaneous.      (line   58)
+* all-class-instances:                   Miscellaneous.      (line   63)
+* all-cycles:                            Miscellaneous.      (line   66)
+* all-direct-subrelations:               Miscellaneous.      (line   71)
+* all-direct-superrelations:             Miscellaneous.      (line   77)
+* all-direct-types:                      Miscellaneous.      (line   83)
+* all-equivalent-relations:              Miscellaneous.      (line   86)
+* all-facts-of:                          Commands.           (line   14)
+* all-facts-of <1>:                      Commands.           (line   62)
+* all-facts-of-instance:                 Miscellaneous.      (line   91)
+* all-facts-of-n:                        Miscellaneous.      (line   97)
+* all-inconsistent-propositions:         Miscellaneous.      (line  120)
+* all-instances:                         Miscellaneous.      (line  126)
+* all-locally-modified-propositions:     Miscellaneous.      (line  132)
+* all-named-descriptions:                Miscellaneous.      (line  139)
+* all-named-instances:                   Miscellaneous.      (line  145)
+* all-named-terms:                       Miscellaneous.      (line  152)
+* all-propositions:                      Miscellaneous.      (line  159)
+* all-relation-values:                   Miscellaneous.      (line  165)
+* all-sentences-of:                      Miscellaneous.      (line  170)
+* all-slot-value-types:                  Miscellaneous.      (line  174)
+* all-slot-values:                       Miscellaneous.      (line  179)
+* all-subrelations:                      Miscellaneous.      (line  184)
+* all-superrelations:                    Miscellaneous.      (line  188)
+* all-taxonomic-types:                   Miscellaneous.      (line  192)
+* all-terms:                             Miscellaneous.      (line  197)
+* all-types:                             Miscellaneous.      (line  204)
+* all-unnamed-terms:                     Miscellaneous.      (line  207)
+* allocate-network-arrays on CHAMELEON-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  224)
+* allocate-network-arrays on NEURAL-NETWORK: Miscellaneous.  (line  214)
+* allocate-network-arrays on PROPOSITION-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  219)
+* allocate-network-arrays on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  229)
+* allocate-supported-closure-iterator:   Miscellaneous.      (line  234)
+* allocate-transitive-closure-iterator:  Miscellaneous.      (line  240)
+* ANTISYMMETRIC:                         Built-In Relations. (line   41)
+* apply-ask:                             Miscellaneous.      (line  249)
+* apply-kappa?:                          Miscellaneous.      (line  255)
+* apply-retrieve:                        Miscellaneous.      (line  262)
+* arguments-unify-with-arguments?:       Miscellaneous.      (line  271)
+* ARITY:                                 Built-In Relations. (line   45)
+* ask:                                   Commands.           (line   75)
+* ask <1>:                               API Functions.      (line   27)
+* ask-partial:                           Miscellaneous.      (line  278)
+* assert:                                Commands.           (line  104)
+* assert-binary-proposition:             API Functions.      (line   53)
+* assert-from-query:                     Commands.           (line  112)
+* assert-nary-proposition:               API Functions.      (line   59)
+* assert-proposition:                    API Functions.      (line   64)
+* assert-rule:                           Commands.           (line  161)
+* assert-unary-proposition:              API Functions.      (line   69)
+* asserted-collection-members:           Miscellaneous.      (line  285)
+* asserted-false?:                       Miscellaneous.      (line  294)
+* asserted-true?:                        Miscellaneous.      (line  297)
+* ASSERTION-QUERY:                       Built-In Relations. (line   48)
+* BACKTRACKING-QUERY:                    Built-In Relations. (line   52)
+* backward-propagate-cached-network-multi-proof: Miscellaneous.
+                                                             (line  300)
+* backward-propagate-cached-network-proof: Miscellaneous.    (line  305)
+* backward-propagate-error on CHAMELEON-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  331)
+* backward-propagate-error on NEURAL-NETWORK: Miscellaneous. (line  314)
+* backward-propagate-error on PROPOSITION-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  322)
+* backward-propagate-error on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  339)
+* batch-backward-propagate-error on NEURAL-NETWORK: Miscellaneous.
+                                                             (line  347)
+* batch-forward-propagate-inputs on NEURAL-NETWORK: Miscellaneous.
+                                                             (line  351)
+* batch-is-full? on NEURAL-NETWORK:      Miscellaneous.      (line  356)
+* batch-process-cached-network-proof on NETWORK-PROOF-BACKWARD-QUEUE: Miscellaneous.
+                                                             (line  370)
+* batch-process-cached-network-proof on NETWORK-PROOF-FORWARD-QUEUE: Miscellaneous.
+                                                             (line  359)
+* batch-process-cached-network-proof on NETWORK-PROOF-UPDATE-QUEUE: Miscellaneous.
+                                                             (line  377)
+* batch-update-network-weights on NEURAL-NETWORK: Miscellaneous.
+                                                             (line  384)
+* BINARY-RELATION:                       Built-In Relations. (line   57)
+* bottom?:                               Miscellaneous.      (line  387)
+* BOUND-VARIABLES:                       Built-In Relations. (line   60)
+* build-proposition-network on CHAMELEON-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  404)
+* build-proposition-network on NEURAL-NETWORK: Miscellaneous.
+                                                             (line  390)
+* build-proposition-network on PROPOSITION-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  397)
+* build-proposition-network on TENSORFLOW-BATCH-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  419)
+* build-proposition-network on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  411)
+* call-all-facts-of:                     Miscellaneous.      (line  426)
+* call-ask:                              Miscellaneous.      (line  431)
+* call-defconcept:                       Miscellaneous.      (line  437)
+* call-deffunction:                      Miscellaneous.      (line  441)
+* call-defobject:                        Miscellaneous.      (line  445)
+* call-defproposition:                   Miscellaneous.      (line  449)
+* call-defrelation:                      Miscellaneous.      (line  454)
+* call-list-undefined-relations:         Miscellaneous.      (line  458)
+* call-propagate-constraints:            Miscellaneous.      (line  462)
+* call-retrieve:                         Miscellaneous.      (line  465)
+* call-retrieve-partial:                 Miscellaneous.      (line  472)
+* call-run-forward-rules:                Miscellaneous.      (line  479)
+* call-set-inference-level:              Miscellaneous.      (line  484)
+* CARDINALITY:                           Built-In Relations. (line   72)
+* cc:                                    Commands.           (line  167)
+* chameleon-ignored-value-relation?:     Miscellaneous.      (line  491)
+* chameleon-partial-match-mode?:         Miscellaneous.      (line  495)
+* chameleon-primitive-value-relation?:   Miscellaneous.      (line  498)
+* chameleon-truth-value-relation?:       Miscellaneous.      (line  501)
+* chameleon-vector-relation?:            Miscellaneous.      (line  505)
+* change-module:                         API Functions.      (line   75)
+* class?:                                Miscellaneous.      (line  508)
+* classify-instances:                    Commands.           (line  192)
+* classify-relations:                    Commands.           (line  173)
+* clear-batch-arrays on NEURAL-NETWORK:  Miscellaneous.      (line  511)
+* clear-caches:                          Commands.           (line  211)
+* clear-caches <1>:                      API Functions.      (line   80)
+* clear-instances:                       Commands.           (line  214)
+* clear-module:                          Commands.           (line  220)
+* clear-module <1>:                      API Functions.      (line   83)
+* CLOSED:                                Built-In Relations. (line   75)
+* coerce-to-instance:                    Miscellaneous.      (line  515)
+* coerce-to-instance-or-literal:         Miscellaneous.      (line  519)
+* coerce-to-vector:                      Miscellaneous.      (line  524)
+* COLLECT-INTO-ASCENDING-SET:            Built-In Relations. (line   87)
+* COLLECT-INTO-DESCENDING-SET:           Built-In Relations. (line   99)
+* COLLECT-INTO-LIST:                     Built-In Relations. (line  111)
+* COLLECT-INTO-ORDERED-SET:              Built-In Relations. (line  119)
+* COLLECT-INTO-SET:                      Built-In Relations. (line  124)
+* collection?:                           Miscellaneous.      (line  528)
+* COLLECTIONOF:                          Built-In Relations. (line  146)
+* combine-multiple-match-scores:         Miscellaneous.      (line  531)
+* COMMENT:                               Built-In Relations. (line  149)
+* COMMUTATIVE:                           Built-In Relations. (line  153)
+* compact-partial-proof-to-network-proof: Miscellaneous.     (line  536)
+* conceive:                              Commands.           (line  226)
+* conceive <1>:                          API Functions.      (line   87)
+* conceive-inverted-proposition:         Miscellaneous.      (line  543)
+* conceive-term:                         Miscellaneous.      (line  548)
+* CONCEPT:                               Built-In Relations. (line  157)
+* CONCEPT-PROTOTYPE:                     Built-In Relations. (line  167)
+* conjoin-truth-values:                  Miscellaneous.      (line  554)
+* cons-first:                            Miscellaneous.      (line 2203)
+* cons-is-empty:                         Miscellaneous.      (line 2207)
+* cons-length:                           Miscellaneous.      (line 2211)
+* cons-nth:                              Miscellaneous.      (line 2215)
+* cons-nth-rest:                         Miscellaneous.      (line 2220)
+* cons-rest:                             Miscellaneous.      (line 2224)
+* cons-set-first:                        Miscellaneous.      (line 2228)
+* cons-set-nth:                          Miscellaneous.      (line 2232)
+* cons-set-nth-rest:                     Miscellaneous.      (line 2237)
+* cons-set-rest:                         Miscellaneous.      (line 2242)
+* cons-to-pl-iterator:                   API Functions.      (line  100)
+* consify on JUSTIFICATION:              Miscellaneous.      (line  558)
+* consify on PL-ITERATOR:                Miscellaneous.      (line 2671)
+* consify on QUERY-ITERATOR:             Miscellaneous.      (line  566)
+* consify on QUERY-SOLUTION-TABLE:       Miscellaneous.      (line  571)
+* consify-cached-query-solutions:        Miscellaneous.      (line  575)
+* consify-current-solutions on QUERY-ITERATOR: Miscellaneous.
+                                                             (line  587)
+* consify-justification:                 Miscellaneous.      (line  592)
+* constant-proposition?:                 Miscellaneous.      (line  604)
+* constant?:                             Miscellaneous.      (line  607)
+* copy on JUSTIFICATION:                 Miscellaneous.      (line  610)
+* copy-float-values-to-buffer:           Miscellaneous.      (line  615)
+* copyright:                             Commands.           (line  238)
+* COVERING:                              Built-In Relations. (line  187)
+* create:                                Miscellaneous.      (line  620)
+* create-2_d_array:                      Miscellaneous.      (line  625)
+* create-2_d_float-array:                Miscellaneous.      (line  632)
+* create-boolean-wrapper:                Miscellaneous.      (line 2247)
+* create-concept:                        API Functions.      (line  103)
+* create-cons:                           Miscellaneous.      (line 2250)
+* create-cons-list:                      Miscellaneous.      (line 2255)
+* create-direct-string-wrapper:          Miscellaneous.      (line 2259)
+* create-enumerated-list:                API Functions.      (line  115)
+* create-enumerated-set:                 API Functions.      (line  121)
+* create-float-vector:                   Miscellaneous.      (line  638)
+* create-float-wrapper:                  Miscellaneous.      (line 2265)
+* create-function:                       API Functions.      (line  126)
+* create-integer-wrapper:                Miscellaneous.      (line 2268)
+* create-keyword:                        Miscellaneous.      (line 2271)
+* create-long-integer-wrapper:           Miscellaneous.      (line 2276)
+* create-marker-storage:                 Miscellaneous.      (line  641)
+* create-module:                         API Functions.      (line  136)
+* create-object:                         API Functions.      (line  142)
+* create-relation:                       API Functions.      (line  163)
+* create-string:                         Miscellaneous.      (line 2280)
+* create-string-wrapper:                 Miscellaneous.      (line 2289)
+* create-symbol:                         Miscellaneous.      (line 2294)
+* create-vector:                         Miscellaneous.      (line  648)
+* current-batch-size on NEURAL-NETWORK:  Miscellaneous.      (line  651)
+* current-inference-level:               Miscellaneous.      (line  654)
+* CUT:                                   Built-In Relations. (line  191)
+* debug-id-setter on QUERY-ITERATOR:     Miscellaneous.      (line  658)
+* default-false?:                        Miscellaneous.      (line  662)
+* default-true?:                         Miscellaneous.      (line  665)
+* default-truth-value?:                  Miscellaneous.      (line  668)
+* defconcept:                            Commands.           (line  241)
+* deffunction:                           Commands.           (line  263)
+* define-arithmetic-operation-on-wrappers: Miscellaneous.    (line  671)
+* define-arithmetic-test-on-wrappers:    Miscellaneous.      (line  685)
+* define-computed-constraint:            Miscellaneous.      (line  692)
+* definstance:                           Commands.           (line  281)
+* defmodule:                             Commands.           (line  285)
+* defobject:                             Commands.           (line  378)
+* defproposition:                        Commands.           (line  393)
+* defrelation:                           Commands.           (line  423)
+* defrule:                               Commands.           (line  444)
+* delete-neural-network on CHAMELEON-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  719)
+* delete-neural-network on NEURAL-NETWORK: Miscellaneous.    (line  711)
+* delete-neural-network on PROPOSITION-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  715)
+* delete-neural-network on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  723)
+* delete-neural-networks:                Miscellaneous.      (line  727)
+* delete-rules:                          Commands.           (line  448)
+* deleted? on CHAMELEON-NEURAL-NETWORK:  Miscellaneous.      (line  737)
+* deleted? on NEURAL-NETWORK:            Miscellaneous.      (line  731)
+* deleted? on PROPOSITION-NEURAL-NETWORK: Miscellaneous.     (line  734)
+* deleted? on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.      (line  740)
+* demo:                                  Commands.           (line  453)
+* deny:                                  Commands.           (line  464)
+* deobjectify-tree:                      Miscellaneous.      (line  743)
+* describe:                              Commands.           (line  471)
+* describe-object on NAMED-DESCRIPTION:  Miscellaneous.      (line  748)
+* description-name on DESCRIPTION:       Miscellaneous.      (line  756)
+* description-name on NAMED-DESCRIPTION: Miscellaneous.      (line  753)
+* description?:                          Miscellaneous.      (line  759)
+* destroy:                               Commands.           (line  475)
+* destroy-instance:                      Miscellaneous.      (line  762)
+* destroy-object:                        API Functions.      (line  173)
+* destroy-object <1>:                    Miscellaneous.      (line  766)
+* destroy-proposition:                   Miscellaneous.      (line  771)
+* destroy-term:                          Miscellaneous.      (line  777)
+* DIRECT-SUBRELATION:                    Built-In Relations. (line  195)
+* DIRECT-SUPERRELATION:                  Built-In Relations. (line  201)
+* direct-superrelations:                 Miscellaneous.      (line  782)
+* disabled-powerloom-feature?:           Miscellaneous.      (line  786)
+* disjoin-truth-values:                  Miscellaneous.      (line  789)
+* DISJOINT:                              Built-In Relations. (line  206)
+* DISJOINT-COVERING:                     Built-In Relations. (line  209)
+* disjoint-terms?:                       Miscellaneous.      (line  793)
+* do-clear-instances:                    Miscellaneous.      (line  797)
+* do-save-module:                        Miscellaneous.      (line  800)
+* DOCUMENTATION:                         Built-In Relations. (line  216)
+* DOMAIN:                                Built-In Relations. (line  221)
+* drop-load-path:                        Commands.           (line  481)
+* DUPLICATE-FREE:                        Built-In Relations. (line  228)
+* DUPLICATE-FREE-COLLECTION:             Built-In Relations. (line  231)
+* EMPTY:                                 Built-In Relations. (line  234)
+* empty? on FLOAT-VECTOR:                Miscellaneous.      (line  807)
+* empty? on PL-ITERATOR:                 API Functions.      (line  176)
+* empty? on QUERY-SOLUTION-TABLE:        Miscellaneous.      (line  804)
+* enabled-powerloom-feature?:            Miscellaneous.      (line  810)
+* ensure-chameleon-ontology:             Miscellaneous.      (line  813)
+* EQUIVALENT-RELATION:                   Built-In Relations. (line  240)
+* estimated-length on PAGING-INDEX:      Miscellaneous.      (line  817)
+* evaluate:                              Command Interpreter.
+                                                             (line   31)
+* evaluate <1>:                          API Functions.      (line  179)
+* evaluate-proposition:                  Miscellaneous.      (line  821)
+* evaluate-string:                       Command Interpreter.
+                                                             (line   40)
+* evaluation-state:                      Miscellaneous.      (line  825)
+* evaluation-state-setter:               Miscellaneous.      (line  830)
+* EXAMPLE:                               Built-In Relations. (line  245)
+* execute-all on NETWORK-PROOF-QUEUE:    Miscellaneous.      (line  834)
+* explain-proposition:                   Miscellaneous.      (line  837)
+* explain-why:                           Miscellaneous.      (line  842)
+* explain-whynot:                        Miscellaneous.      (line  846)
+* false-truth-value?:                    Miscellaneous.      (line  851)
+* false?:                                Miscellaneous.      (line  854)
+* fetch-duplicate-proposition on OBJECT-STORE: Miscellaneous.
+                                                             (line  858)
+* fetch-instance on OBJECT-STORE:        Miscellaneous.      (line  865)
+* fetch-relation on OBJECT-STORE:        Miscellaneous.      (line  872)
+* FIFTH-ELEMENT:                         Built-In Relations. (line  248)
+* fill-array on 2_D_ARRAY:               Miscellaneous.      (line  878)
+* fill-array on 2_D_FLOAT-ARRAY:         Miscellaneous.      (line  883)
+* FILLERS:                               Built-In Relations. (line  251)
+* finalize-objects:                      Miscellaneous.      (line  888)
+* find-direct-supers-and-subs:           Miscellaneous.      (line  892)
+* find-direct-supers-of-instance:        Miscellaneous.      (line  901)
+* find-instance:                         Miscellaneous.      (line  906)
+* find-rule:                             Miscellaneous.      (line  912)
+* FIRST-ELEMENT:                         Built-In Relations. (line  256)
+* FORK:                                  Built-In Relations. (line  259)
+* forward-propagate-cached-network-from-justification: Miscellaneous.
+                                                             (line  916)
+* forward-propagate-cached-network-proof: Miscellaneous.     (line  921)
+* forward-propagate-inputs on CHAMELEON-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  943)
+* forward-propagate-inputs on NEURAL-NETWORK: Miscellaneous. (line  930)
+* forward-propagate-inputs on PROPOSITION-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  936)
+* forward-propagate-inputs on TENSORFLOW-BATCH-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  957)
+* forward-propagate-inputs on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line  950)
+* FOURTH-ELEMENT:                        Built-In Relations. (line  264)
+* FRAME-PREDICATE:                       Built-In Relations. (line  267)
+* function?:                             Miscellaneous.      (line  964)
+* generate-expression:                   Miscellaneous.      (line  967)
+* generate-specialized-term on LOGIC-THING: Miscellaneous.   (line  971)
+* generate-unique-name:                  API Functions.      (line  188)
+* get-arity:                             API Functions.      (line  195)
+* get-binary-proposition:                API Functions.      (line  198)
+* get-binary-propositions:               API Functions.      (line  208)
+* get-cached-network-proof:              Miscellaneous.      (line  977)
+* get-chameleon-module:                  Miscellaneous.      (line  985)
+* get-child-modules:                     API Functions.      (line  216)
+* get-class:                             Miscellaneous.      (line  988)
+* get-column-count:                      API Functions.      (line  220)
+* get-concept:                           API Functions.      (line  232)
+* get-concept-instance-matching-value:   API Functions.      (line  238)
+* get-concept-instances:                 API Functions.      (line  247)
+* get-concept-instances-matching-value:  API Functions.      (line  253)
+* get-current-module:                    API Functions.      (line  261)
+* get-direct-concept-instances:          API Functions.      (line  264)
+* get-direct-subrelations:               API Functions.      (line  270)
+* get-direct-superrelations:             API Functions.      (line  275)
+* get-direct-types:                      API Functions.      (line  280)
+* get-domain:                            API Functions.      (line  284)
+* get-enumerated-collection-members:     API Functions.      (line  288)
+* get-existing-module:                   Miscellaneous.      (line 2301)
+* get-forward-justifications:            Miscellaneous.      (line  994)
+* get-frame-arity:                       Miscellaneous.      (line 2306)
+* get-frame-binding-pattern:             Miscellaneous.      (line 2311)
+* get-frame-binding-state:               Miscellaneous.      (line 2316)
+* get-frame-iterator:                    Miscellaneous.      (line 2321)
+* get-frame-proposition:                 Miscellaneous.      (line 2325)
+* get-home-module:                       API Functions.      (line  293)
+* get-inconsistent-propositions:         Miscellaneous.      (line 2331)
+* get-inferred-binary-proposition-values: API Functions.     (line  296)
+* get-instance:                          Miscellaneous.      (line  998)
+* get-justification-neural-network:      Miscellaneous.      (line 1004)
+* get-keyword:                           Miscellaneous.      (line 2335)
+* get-load-path:                         Commands.           (line  485)
+* get-logic-type:                        Miscellaneous.      (line 2338)
+* get-logic-type-name:                   Miscellaneous.      (line 2345)
+* get-logic-type-short-name:             Miscellaneous.      (line 2348)
+* get-module:                            API Functions.      (line  303)
+* get-module <1>:                        Miscellaneous.      (line 1010)
+* get-modules:                           API Functions.      (line  307)
+* get-name:                              API Functions.      (line  313)
+* get-name-in-module:                    Miscellaneous.      (line 2351)
+* get-neural-network-proposition on CHAMELEON-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1021)
+* get-neural-network-proposition on NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1013)
+* get-neural-network-proposition on PROPOSITION-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1017)
+* get-neural-network-proposition on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1025)
+* get-nth-domain:                        API Functions.      (line  317)
+* get-nth-float:                         API Functions.      (line  325)
+* get-nth-frame-argument:                Miscellaneous.      (line 2356)
+* get-nth-frame-binding:                 Miscellaneous.      (line 2362)
+* get-nth-integer:                       API Functions.      (line  341)
+* get-nth-logic-object:                  API Functions.      (line  357)
+* get-nth-string:                        API Functions.      (line  374)
+* get-nth-value:                         API Functions.      (line  391)
+* get-object:                            API Functions.      (line  412)
+* get-one-supported-forward-justification: Miscellaneous.    (line 1029)
+* get-operator:                          API Functions.      (line  407)
+* get-parent-modules:                    API Functions.      (line  419)
+* get-predicate:                         API Functions.      (line  423)
+* get-proper-subrelations:               API Functions.      (line  426)
+* get-proper-superrelations:             API Functions.      (line  431)
+* get-property:                          Miscellaneous.      (line 2368)
+* get-property-boolean:                  Miscellaneous.      (line 2372)
+* get-property-float:                    Miscellaneous.      (line 2378)
+* get-property-integer:                  Miscellaneous.      (line 2384)
+* get-property-object:                   Miscellaneous.      (line 2390)
+* get-property-string:                   Miscellaneous.      (line 2395)
+* get-proposition:                       API Functions.      (line  436)
+* get-proposition-neural-network:        Miscellaneous.      (line 1034)
+* get-propositions:                      API Functions.      (line  447)
+* get-propositions-in-module:            API Functions.      (line  456)
+* get-propositions-of:                   API Functions.      (line  461)
+* get-range:                             API Functions.      (line  467)
+* get-relation:                          API Functions.      (line  471)
+* get-relation <1>:                      Miscellaneous.      (line 1039)
+* get-relation-extension:                API Functions.      (line  477)
+* get-rules:                             Commands.           (line  488)
+* get-rules <1>:                         API Functions.      (line  483)
+* get-self-or-prototype:                 Miscellaneous.      (line 1045)
+* get-short-name:                        Miscellaneous.      (line 2400)
+* get-skolem-name:                       Miscellaneous.      (line 2404)
+* get-skolem-short-name:                 Miscellaneous.      (line 2410)
+* get-slot-maximum-cardinality:          Miscellaneous.      (line 1051)
+* get-slot-minimum-cardinality:          Miscellaneous.      (line 1056)
+* get-slot-value:                        Miscellaneous.      (line 1061)
+* get-slot-value-type:                   Miscellaneous.      (line 1066)
+* get-stella-type:                       Miscellaneous.      (line 2416)
+* get-stella-type-name:                  Miscellaneous.      (line 2420)
+* get-stella-type-short-name:            Miscellaneous.      (line 2424)
+* get-supported-forward-justifications:  Miscellaneous.      (line 1071)
+* get-symbol:                            Miscellaneous.      (line 2428)
+* get-tensorflow-callback:               Miscellaneous.      (line 1076)
+* get-types:                             API Functions.      (line  488)
+* get-unary-propositions:                Miscellaneous.      (line 2433)
+* get-undefined-relations:               Miscellaneous.      (line 2440)
+* get-variable-name:                     Miscellaneous.      (line 2445)
+* get-variable-short-name:               Miscellaneous.      (line 2448)
+* get-vector-argument-spec on NEURAL-NETWORK: Miscellaneous. (line 1079)
+* get-vector-argument-spec on TENSORFLOW-BATCH-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1098)
+* get-vector-argument-spec on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1092)
+* get-vector-argument-spec on VECTOR-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1086)
+* get-visible-clash-exceptions:          Miscellaneous.      (line 1104)
+* get-why-justification:                 Miscellaneous.      (line 1110)
+* get-whynot-justifications:             Miscellaneous.      (line 1117)
+* GOES-FALSE-DEMON:                      Built-In Relations. (line  296)
+* GOES-TRUE-DEMON:                       Built-In Relations. (line  302)
+* GOES-UNKNOWN-DEMON:                    Built-In Relations. (line  308)
+* has-forward-justifications?:           Miscellaneous.      (line 1124)
+* has-supported-forward-justifications?: Miscellaneous.      (line 1128)
+* has-vector-arguments? on NEURAL-NETWORK: Miscellaneous.    (line 1133)
+* has-vector-arguments? on VECTOR-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1136)
+* have-active-object-stores?:            Miscellaneous.      (line 1140)
+* help:                                  Commands.           (line  491)
+* help-compute-argument-index:           Miscellaneous.      (line 1145)
+* help-print-outline on DESCRIPTION:     Miscellaneous.      (line 1156)
+* help-print-outline on NAMED-DESCRIPTION: Miscellaneous.    (line 1150)
+* HOLDS:                                 Built-In Relations. (line  314)
+* ignored-value-argument? on NEURAL-NETWORK: Miscellaneous.  (line 1163)
+* IMAGE-URL:                             Built-In Relations. (line  332)
+* in-dialect:                            Miscellaneous.      (line 1169)
+* in-module:                             Commands.           (line  494)
+* inconsistent-truth-value?:             Miscellaneous.      (line 1175)
+* inconsistent?:                         Miscellaneous.      (line 1178)
+* INEQUALITY:                            Built-In Relations. (line  338)
+* initialize:                            API Functions.      (line  492)
+* initialize-kernel-kb:                  Miscellaneous.      (line 2677)
+* initialize-network-weights on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1181)
+* insert-at on QUERY-SOLUTION-TABLE:     Miscellaneous.      (line 1186)
+* INSERT-ELEMENT:                        Built-In Relations. (line  341)
+* INSTANCE-OF:                           Built-In Relations. (line  348)
+* INVERSE:                               Built-In Relations. (line  352)
+* invert-truth-value:                    Miscellaneous.      (line 1193)
+* IRREFLEXIVE:                           Built-In Relations. (line  370)
+* is-a:                                  API Functions.      (line  497)
+* is-default:                            API Functions.      (line  501)
+* is-defined-property:                   Miscellaneous.      (line 2452)
+* is-enumerated-collection:              API Functions.      (line  504)
+* is-enumerated-list:                    API Functions.      (line  508)
+* is-enumerated-set:                     API Functions.      (line  511)
+* is-false:                              API Functions.      (line  514)
+* is-float:                              API Functions.      (line  518)
+* is-frame-binding-pattern:              Miscellaneous.      (line 2455)
+* is-inconsistent:                       API Functions.      (line  521)
+* is-instance:                           Miscellaneous.      (line 2466)
+* is-integer:                            API Functions.      (line  524)
+* is-known:                              Miscellaneous.      (line 2471)
+* is-logic-object:                       API Functions.      (line  527)
+* is-number:                             API Functions.      (line  530)
+* is-skolem:                             Miscellaneous.      (line 2474)
+* is-strict:                             API Functions.      (line  535)
+* is-string:                             API Functions.      (line  538)
+* is-subrelation:                        API Functions.      (line  541)
+* is-true:                               API Functions.      (line  545)
+* is-true-binary-proposition:            API Functions.      (line  549)
+* is-true-nary-proposition:              Miscellaneous.      (line 2478)
+* is-true-proposition:                   API Functions.      (line  555)
+* is-true-unary-proposition:             API Functions.      (line  559)
+* is-unknown:                            API Functions.      (line  565)
+* is-variable:                           Miscellaneous.      (line 2483)
+* ISSUE:                                 Built-In Relations. (line  374)
+* IST:                                   Built-In Relations. (line  378)
+* iterator-to-pl-iterator:               API Functions.      (line  568)
+* just-in-time-inference-cache?:         Miscellaneous.      (line 1196)
+* known-truth-value?:                    Miscellaneous.      (line 1199)
+* LENGTH:                                Built-In Relations. (line  392)
+* LENGTH <1>:                            Built-In Relations. (line  395)
+* length on PL-ITERATOR:                 API Functions.      (line  573)
+* length on QUERY-SOLUTION-TABLE:        Miscellaneous.      (line 1203)
+* LEXEME:                                Built-In Relations. (line  398)
+* link-neural-network on CHAMELEON-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1214)
+* link-neural-network on NEURAL-NETWORK: Miscellaneous.      (line 1206)
+* link-neural-network on PROPOSITION-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1210)
+* link-neural-network on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1218)
+* LIST-CONCATENATE:                      Built-In Relations. (line  411)
+* list-features:                         Miscellaneous.      (line 1222)
+* list-first:                            Miscellaneous.      (line 2486)
+* list-inconsistent-propositions:        Commands.           (line  497)
+* list-modules:                          Commands.           (line  507)
+* list-nth:                              Miscellaneous.      (line 2490)
+* list-rest:                             Miscellaneous.      (line 2495)
+* list-to-pl-iterator:                   API Functions.      (line  576)
+* list-unclassified-instances:           Commands.           (line  512)
+* list-unclassified-relations:           Commands.           (line  523)
+* list-undefined-relations:              Commands.           (line  535)
+* listify on PL-ITERATOR:                Miscellaneous.      (line 2674)
+* listify on QUERY-ITERATOR:             Miscellaneous.      (line 1226)
+* LISTOF:                                Built-In Relations. (line  417)
+* load:                                  Commands.           (line  546)
+* load <1>:                              API Functions.      (line  579)
+* load-cmd-line-files:                   Miscellaneous.      (line 1229)
+* load-command-eval-phase:               Miscellaneous.      (line 1236)
+* load-directory:                        Miscellaneous.      (line 1240)
+* load-file:                             Commands.           (line  584)
+* load-in-module:                        Miscellaneous.      (line 2501)
+* load-native-stream:                    API Functions.      (line  588)
+* load-native-stream-in-module:          Miscellaneous.      (line 2507)
+* load-stream:                           API Functions.      (line  583)
+* load-stream <1>:                       Miscellaneous.      (line 1244)
+* load-stream-in-module:                 Miscellaneous.      (line 1249)
+* load-stream-in-module <1>:             Miscellaneous.      (line 2517)
+* locally-modified-proposition?:         Miscellaneous.      (line 1255)
+* logic-class?:                          Miscellaneous.      (line 1262)
+* logic-form-less?:                      Miscellaneous.      (line 1267)
+* logic-module?:                         Miscellaneous.      (line 1273)
+* lookup on QUERY-SOLUTION-TABLE:        Miscellaneous.      (line 1278)
+* lookup-native-computation:             Miscellaneous.      (line 1283)
+* lookup-native-specialist:              Miscellaneous.      (line 1290)
+* lookup-proposition-neural-network:     Miscellaneous.      (line 1296)
+* make-cached-query:                     Miscellaneous.      (line 1300)
+* MAXIMUM-ELEMENT:                       Built-In Relations. (line  427)
+* MAXIMUM-VALUE:                         Built-In Relations. (line  433)
+* MEAN-VALUE:                            Built-In Relations. (line  436)
+* MEDIAN-VALUE:                          Built-In Relations. (line  439)
+* MEMBER-OF:                             Built-In Relations. (line  442)
+* merge-truth-values:                    Miscellaneous.      (line 1310)
+* meta-inference-cache?:                 Miscellaneous.      (line 1320)
+* meta-proposition?:                     Miscellaneous.      (line 1323)
+* MINIMUM-ELEMENT:                       Built-In Relations. (line  447)
+* MINIMUM-VALUE:                         Built-In Relations. (line  453)
+* MUTUALLY-DISJOINT-COLLECTION:          Built-In Relations. (line  456)
+* NAME-TO-OBJECT:                        Built-In Relations. (line  464)
+* named-description?:                    Miscellaneous.      (line 1328)
+* natural-deduction-mode?:               Miscellaneous.      (line 1332)
+* next? on PL-ITERATOR:                  API Functions.      (line  596)
+* non-empty? on FLOAT-VECTOR:            Miscellaneous.      (line 1338)
+* non-empty? on QUERY-SOLUTION-TABLE:    Miscellaneous.      (line 1335)
+* NORMAL-QUERY:                          Built-In Relations. (line  475)
+* normalize-chameleon-training-options:  Miscellaneous.      (line 1341)
+* notify-of-completion on NETWORK-PROOF-QUEUE: Miscellaneous.
+                                                             (line 1346)
+* nth on QUERY-SOLUTION-TABLE:           Miscellaneous.      (line 1351)
+* nth-batch-key on NEURAL-NETWORK:       Miscellaneous.      (line 1355)
+* nth-batch-output on NEURAL-NETWORK:    Miscellaneous.      (line 1359)
+* NTH-DOMAIN:                            Built-In Relations. (line  479)
+* NTH-ELEMENT:                           Built-In Relations. (line  483)
+* NTH-HEAD:                              Built-In Relations. (line  489)
+* nth-input on CHAMELEON-NEURAL-NETWORK: Miscellaneous.      (line 1373)
+* nth-input on NEURAL-NETWORK:           Miscellaneous.      (line 1364)
+* nth-input on PROPOSITION-NEURAL-NETWORK: Miscellaneous.    (line 1368)
+* nth-input on TENSORFLOW-BATCH-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1383)
+* nth-input on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.     (line 1378)
+* nth-input-error on CHAMELEON-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1397)
+* nth-input-error on NEURAL-NETWORK:     Miscellaneous.      (line 1388)
+* nth-input-error on PROPOSITION-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1392)
+* nth-input-error on TENSORFLOW-BATCH-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1408)
+* nth-input-error on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1403)
+* nth-kth-batch-input-error on NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1413)
+* NTH-REST:                              Built-In Relations. (line  493)
+* number-of-ignored-value-arguments on NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1419)
+* number-of-inputs on CHAMELEON-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1434)
+* number-of-inputs on NEURAL-NETWORK:    Miscellaneous.      (line 1425)
+* number-of-inputs on PROPOSITION-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1429)
+* number-of-inputs on TENSORFLOW-BATCH-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1444)
+* number-of-inputs on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1439)
+* number-of-truth-value-arguments on NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1449)
+* number-of-vector-argument-inputs on VECTOR-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1455)
+* number-of-vector-argument-specs on VECTOR-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1461)
+* number-of-vector-arguments on NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1469)
+* number-of-vector-arguments on VECTOR-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1475)
+* NUMERIC-MAXIMUM:                       Built-In Relations. (line  497)
+* NUMERIC-MINIMUM:                       Built-In Relations. (line  501)
+* NUMERIC-SET:                           Built-In Relations. (line  505)
+* OBJECT-CONTEXT:                        Built-In Relations. (line  183)
+* OBJECT-NAME:                           Built-In Relations. (line  508)
+* object-name:                           Miscellaneous.      (line 1481)
+* object-name-string:                    Miscellaneous.      (line 1484)
+* object-surrogate:                      Miscellaneous.      (line 1487)
+* object-surrogate-setter:               Miscellaneous.      (line 1492)
+* object-to-float:                       API Functions.      (line  600)
+* object-to-integer:                     API Functions.      (line  604)
+* object-to-parsable-string:             API Functions.      (line  609)
+* object-to-string:                      API Functions.      (line  614)
+* ORDERED:                               Built-In Relations. (line  512)
+* parse-logic-command-options:           Miscellaneous.      (line 1496)
+* PHRASE:                                Built-In Relations. (line  516)
+* pl-iterator-is-empty:                  Miscellaneous.      (line 2523)
+* pl-iterator-value:                     Miscellaneous.      (line 2527)
+* pop on QUERY-SOLUTION-TABLE:           Miscellaneous.      (line 1503)
+* pop-load-path:                         Commands.           (line  591)
+* post-for-evaluation:                   Miscellaneous.      (line 1507)
+* powerloom:                             Miscellaneous.      (line 1510)
+* powerloom <1>:                         Miscellaneous.      (line 2530)
+* powerloom-gui-exit-hook:               Miscellaneous.      (line 1515)
+* powerloom-information:                 Miscellaneous.      (line 1518)
+* presume:                               Commands.           (line  595)
+* pretty-print-logical-form:             Miscellaneous.      (line 1522)
+* print-array on 2_D_ARRAY:              Miscellaneous.      (line 1527)
+* print-array on 2_D_FLOAT-ARRAY:        Miscellaneous.      (line 1531)
+* print-extension-sizes:                 Miscellaneous.      (line 1535)
+* print-facts:                           Miscellaneous.      (line 1542)
+* print-features:                        Commands.           (line  601)
+* print-goal-stack:                      Miscellaneous.      (line 1546)
+* print-logical-form:                    Miscellaneous.      (line 1551)
+* print-logical-form-in-dialect:         Miscellaneous.      (line 1557)
+* print-properties:                      Miscellaneous.      (line 2533)
+* print-rules:                           Commands.           (line  605)
+* print-rules <1>:                       API Functions.      (line  617)
+* print-unformatted-logical-form:        Miscellaneous.      (line 1563)
+* print-whynot-justification:            Miscellaneous.      (line 1569)
+* process-definitions:                   Commands.           (line  608)
+* PROJECT-COLUMN:                        Built-In Relations. (line  525)
+* propagate-constraints:                 Commands.           (line  620)
+* PROPER-SUBRELATION:                    Built-In Relations. (line  531)
+* PROPER-SUPERRELATION:                  Built-In Relations. (line  536)
+* PROPOSITION-ARGUMENT:                  Built-In Relations. (line  558)
+* PROPOSITION-ARGUMENTS:                 Built-In Relations. (line  563)
+* PROPOSITION-ARITY:                     Built-In Relations. (line  566)
+* proposition-has-strength?:             Miscellaneous.      (line 1575)
+* PROPOSITION-RELATION:                  Built-In Relations. (line  569)
+* push-input-values on NEURAL-NETWORK:   Miscellaneous.      (line 1579)
+* push-load-path:                        Commands.           (line  623)
+* push-target-value on NEURAL-NETWORK:   Miscellaneous.      (line 1586)
+* push-vector-input-values on NEURAL-NETWORK: Miscellaneous. (line 1593)
+* QUERY:                                 Built-In Relations. (line  572)
+* queue-input-values on NETWORK-PROOF-QUEUE: Miscellaneous.  (line 1603)
+* random-float:                          Miscellaneous.      (line 1609)
+* randomize-network-weights on CHAMELEON-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1620)
+* randomize-network-weights on NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1613)
+* randomize-network-weights on PROPOSITION-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1616)
+* randomize-network-weights on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1624)
+* randomize-neural-networks:             Miscellaneous.      (line 1628)
+* RANGE:                                 Built-In Relations. (line  589)
+* RANGE-CARDINALITY:                     Built-In Relations. (line  596)
+* RANGE-CARDINALITY-LOWER-BOUND:         Built-In Relations. (line  606)
+* RANGE-CARDINALITY-UPPER-BOUND:         Built-In Relations. (line  626)
+* RANGE-MAX-CARDINALITY:                 Built-In Relations. (line  632)
+* RANGE-MIN-CARDINALITY:                 Built-In Relations. (line  638)
+* RANGE-TYPE:                            Built-In Relations. (line  644)
+* recall-marked-objects on MARKER-TABLE: Miscellaneous.      (line 1631)
+* record-justifications?:                Miscellaneous.      (line 1635)
+* REFLEXIVE:                             Built-In Relations. (line  652)
+* REFUTATION-QUERY:                      Built-In Relations. (line  656)
+* register-computation-function:         Miscellaneous.      (line 1639)
+* register-computation-function <1>:     Miscellaneous.      (line 2537)
+* register-computation-function-name:    Miscellaneous.      (line 1650)
+* register-logic-dialect-print-function: Miscellaneous.      (line 1657)
+* register-neural-network:               Miscellaneous.      (line 1663)
+* register-object:                       Miscellaneous.      (line 2554)
+* register-object-store:                 Miscellaneous.      (line 1667)
+* register-specialist-function:          Miscellaneous.      (line 1670)
+* register-specialist-function <1>:      Miscellaneous.      (line 2563)
+* register-specialist-function-name:     Miscellaneous.      (line 1680)
+* register-tensorflow-callback:          Miscellaneous.      (line 1687)
+* RELATION-COMPUTATION:                  Built-In Relations. (line  665)
+* RELATION-CONSTRAINT:                   Built-In Relations. (line  673)
+* RELATION-EVALUATOR:                    Built-In Relations. (line  684)
+* relation-name:                         Miscellaneous.      (line 1695)
+* RELATION-SPECIALIST:                   Built-In Relations. (line  696)
+* relation?:                             Miscellaneous.      (line 1698)
+* remove-at on QUERY-SOLUTION-TABLE:     Miscellaneous.      (line 1701)
+* remove-deleted-members on PAGING-INDEX: Miscellaneous.     (line 1707)
+* repropagate-constraints:               Commands.           (line  627)
+* reset-clash-exceptions:                Miscellaneous.      (line 1710)
+* reset-features:                        Commands.           (line  630)
+* reset-powerloom:                       Commands.           (line  633)
+* reset-powerloom <1>:                   API Functions.      (line  620)
+* reset-query-caches:                    Miscellaneous.      (line 1713)
+* retract:                               Commands.           (line  638)
+* retract <1>:                           API Functions.      (line  625)
+* retract-binary-proposition:            API Functions.      (line  633)
+* retract-facts-of:                      Commands.           (line  646)
+* retract-facts-of-instance:             Miscellaneous.      (line 1717)
+* retract-from-query:                    Commands.           (line  650)
+* retract-nary-proposition:              API Functions.      (line  639)
+* retract-proposition:                   API Functions.      (line  644)
+* retract-rule:                          Commands.           (line  657)
+* retract-unary-proposition:             API Functions.      (line  649)
+* retrieve:                              Commands.           (line  666)
+* retrieve <1>:                          API Functions.      (line  655)
+* retrieve-partial:                      Miscellaneous.      (line 1720)
+* retrieve-training-examples:            Miscellaneous.      (line 1737)
+* run-forward-rules:                     API Functions.      (line  688)
+* run-forward-rules <1>:                 Miscellaneous.      (line 1742)
+* run-powerloom-tests:                   Miscellaneous.      (line 1766)
+* s-ask:                                 API Functions.      (line  694)
+* s-assert-proposition:                  API Functions.      (line  715)
+* s-change-module:                       API Functions.      (line  726)
+* s-clear-module:                        API Functions.      (line  733)
+* s-conceive:                            API Functions.      (line  739)
+* s-create-concept:                      API Functions.      (line  756)
+* s-create-function:                     API Functions.      (line  772)
+* s-create-module:                       API Functions.      (line  805)
+* s-create-object:                       API Functions.      (line  786)
+* s-create-relation:                     API Functions.      (line  811)
+* s-destroy-object:                      API Functions.      (line  825)
+* s-evaluate:                            API Functions.      (line  835)
+* s-get-arity:                           API Functions.      (line  845)
+* s-get-child-modules:                   API Functions.      (line  853)
+* s-get-concept:                         API Functions.      (line  859)
+* s-get-concept-instances:               API Functions.      (line  868)
+* s-get-direct-concept-instances:        API Functions.      (line  878)
+* s-get-domain:                          API Functions.      (line  888)
+* s-get-inferred-binary-proposition-values: API Functions.   (line  897)
+* s-get-nth-domain:                      API Functions.      (line  909)
+* s-get-object:                          API Functions.      (line  918)
+* s-get-parent-modules:                  API Functions.      (line  927)
+* s-get-parent-modules <1>:              API Functions.      (line  933)
+* s-get-proposition:                     API Functions.      (line  939)
+* s-get-propositions:                    API Functions.      (line  956)
+* s-get-propositions-of:                 API Functions.      (line  971)
+* s-get-range:                           API Functions.      (line  980)
+* s-get-relation:                        API Functions.      (line  989)
+* s-get-relation-extension:              API Functions.      (line  998)
+* s-get-rules:                           API Functions.      (line 1004)
+* s-is-true-nary-proposition:            Miscellaneous.      (line 2577)
+* s-is-true-proposition:                 API Functions.      (line 1012)
+* s-print-rules:                         API Functions.      (line 1015)
+* s-register-computation-function:       Miscellaneous.      (line 2587)
+* s-register-specialist-function:        Miscellaneous.      (line 2603)
+* s-retract-proposition:                 API Functions.      (line 1022)
+* s-retrieve:                            API Functions.      (line 1034)
+* s-save-module:                         API Functions.      (line 1073)
+* satisfies?:                            Miscellaneous.      (line 1772)
+* save-all-neural-networks:              Miscellaneous.      (line 1781)
+* save-module:                           Commands.           (line  775)
+* save-module <1>:                       API Functions.      (line 1089)
+* SCALAR:                                Built-In Relations. (line  707)
+* SCALAR-INTERVAL:                       Built-In Relations. (line  710)
+* SECOND-ELEMENT:                        Built-In Relations. (line  713)
+* select-proof-result:                   Miscellaneous.      (line 1786)
+* select-test-result:                    Miscellaneous.      (line 1791)
+* select-training-examples:              Miscellaneous.      (line 1801)
+* set-error-print-cycle:                 Miscellaneous.      (line 1807)
+* set-feature:                           Commands.           (line  787)
+* set-frame-binding-state:               Miscellaneous.      (line 2618)
+* set-frame-iterator:                    Miscellaneous.      (line 2625)
+* set-inference-level:                   Miscellaneous.      (line 1813)
+* set-input-values on CHAMELEON-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1829)
+* set-input-values on NEURAL-NETWORK:    Miscellaneous.      (line 1818)
+* set-input-values on PROPOSITION-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1823)
+* set-input-values on TENSORFLOW-BATCH-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1841)
+* set-input-values on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1835)
+* set-load-path:                         Commands.           (line  822)
+* set-marker on MARKER-TABLE:            Miscellaneous.      (line 1847)
+* set-nth-frame-binding:                 Miscellaneous.      (line 2630)
+* set-num-neighbors:                     Miscellaneous.      (line 1850)
+* set-num-training-per-case:             Miscellaneous.      (line 1853)
+* set-powerloom-feature:                 Miscellaneous.      (line 1857)
+* set-property:                          Miscellaneous.      (line 2638)
+* set-property-boolean:                  Miscellaneous.      (line 2641)
+* set-property-float:                    Miscellaneous.      (line 2644)
+* set-property-integer:                  Miscellaneous.      (line 2647)
+* set-property-object:                   Miscellaneous.      (line 2650)
+* set-property-string:                   Miscellaneous.      (line 2653)
+* set-save-network-cycle:                Miscellaneous.      (line 1860)
+* set-vector-input-values on CHAMELEON-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1873)
+* set-vector-input-values on NEURAL-NETWORK: Miscellaneous.  (line 1865)
+* set-vector-input-values on TENSORFLOW-BATCH-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1897)
+* set-vector-input-values on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1889)
+* set-vector-input-values on VECTOR-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 1881)
+* SETOF:                                 Built-In Relations. (line  721)
+* shallow-copy on JUSTIFICATION:         Miscellaneous.      (line 1905)
+* SHALLOW-QUERY:                         Built-In Relations. (line  726)
+* SINGLE-VALUED:                         Built-In Relations. (line  730)
+* sort on QUERY-SOLUTION-TABLE:          Miscellaneous.      (line 1908)
+* specializes?:                          Miscellaneous.      (line 1914)
+* SQUARE-ROOT:                           Built-In Relations. (line  735)
+* STANDARD-DEVIATION:                    Built-In Relations. (line  739)
+* start-ontosaurus:                      Miscellaneous.      (line 1920)
+* start-powerloom-gui:                   Miscellaneous.      (line 1925)
+* start-powerloom-server:                Miscellaneous.      (line 1937)
+* stop-ontosaurus:                       Miscellaneous.      (line 1942)
+* stop-powerloom-gui:                    Miscellaneous.      (line 1946)
+* stop-powerloom-server:                 Miscellaneous.      (line 1951)
+* strengthen-truth-value:                Miscellaneous.      (line 1955)
+* strict-truth-value?:                   Miscellaneous.      (line 1962)
+* STRING-CONCATENATE:                    Built-In Relations. (line  742)
+* STRING-MATCH:                          Built-In Relations. (line  747)
+* STRING-MATCH-IGNORE-CASE:              Built-In Relations. (line  759)
+* string-to-object:                      API Functions.      (line 1101)
+* string-to-stella-expression:           Miscellaneous.      (line 2656)
+* stronger-truth-value?:                 Miscellaneous.      (line 1965)
+* SUBRELATION:                           Built-In Relations. (line  765)
+* SUBSET-OF:                             Built-In Relations. (line  770)
+* SUBSTRING:                             Built-In Relations. (line  779)
+* SUBSUMPTION-QUERY:                     Built-In Relations. (line  799)
+* SUM:                                   Built-In Relations. (line  804)
+* SUPERRELATION:                         Built-In Relations. (line  807)
+* SYMMETRIC:                             Built-In Relations. (line  812)
+* SYNONYM:                               Built-In Relations. (line  815)
+* tensorflow-backend-available?:         Miscellaneous.      (line 1972)
+* termify:                               Miscellaneous.      (line 1975)
+* test-closed-slot?:                     Miscellaneous.      (line 1979)
+* test-environment-level?:               Miscellaneous.      (line 2661)
+* test-function-slot?:                   Miscellaneous.      (line 1983)
+* test-marker? on MARKER-TABLE:          Miscellaneous.      (line 1986)
+* test-relation-on-arguments?:           Miscellaneous.      (line 1990)
+* test-slot-value?:                      Miscellaneous.      (line 1995)
+* test-special-marker-table?:            Miscellaneous.      (line 2001)
+* test-subrelation?:                     Miscellaneous.      (line 2006)
+* test-type-on-instance?:                Miscellaneous.      (line 2010)
+* THIRD-ELEMENT:                         Built-In Relations. (line  826)
+* time-command:                          Commands.           (line  826)
+* TOTAL:                                 Built-In Relations. (line  829)
+* train-chameleon-neural-networks:       Miscellaneous.      (line 2014)
+* TRANSITIVE:                            Built-In Relations. (line  845)
+* translate-loom-file:                   Miscellaneous.      (line 2023)
+* true-truth-value?:                     Miscellaneous.      (line 2031)
+* true?:                                 Miscellaneous.      (line 2034)
+* truth-value-argument-index on NEURAL-NETWORK: Miscellaneous.
+                                                             (line 2038)
+* truth-value-argument? on NEURAL-NETWORK: Miscellaneous.    (line 2046)
+* TYPE-OF:                               Built-In Relations. (line  852)
+* unassert:                              Miscellaneous.      (line 2052)
+* unassert-proposition:                  Miscellaneous.      (line 2063)
+* unknown-truth-value?:                  Miscellaneous.      (line 2067)
+* unknown?:                              Miscellaneous.      (line 2070)
+* unlink-neural-network on CHAMELEON-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 2079)
+* unlink-neural-network on NEURAL-NETWORK: Miscellaneous.    (line 2073)
+* unlink-neural-network on PROPOSITION-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 2076)
+* unlink-neural-network on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 2082)
+* unnamed-description?:                  Miscellaneous.      (line 2085)
+* unregister-neural-network:             Miscellaneous.      (line 2088)
+* unregister-object:                     Miscellaneous.      (line 2665)
+* unregister-object-store:               Miscellaneous.      (line 2091)
+* unset-feature:                         Commands.           (line  830)
+* unset-powerloom-feature:               Miscellaneous.      (line 2094)
+* upclassify-all-descriptions:           Miscellaneous.      (line 2097)
+* upclassify-all-instances:              Miscellaneous.      (line 2100)
+* upclassify-instances:                  Miscellaneous.      (line 2103)
+* upclassify-named-descriptions:         Miscellaneous.      (line 2108)
+* update-network-weights on CHAMELEON-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 2132)
+* update-network-weights on NEURAL-NETWORK: Miscellaneous.   (line 2114)
+* update-network-weights on PROPOSITION-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 2123)
+* update-network-weights on TENSORFLOW-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 2141)
+* update-proposition-in-store on OBJECT-STORE: Miscellaneous.
+                                                             (line 2150)
+* update-tuple:                          Miscellaneous.      (line 2155)
+* VALUE:                                 Built-In Relations. (line  855)
+* VARIABLE-ARITY:                        Built-In Relations. (line  861)
+* VARIANCE:                              Built-In Relations. (line  865)
+* vector-argument-index on NEURAL-NETWORK: Miscellaneous.    (line 2160)
+* vector-argument-index on VECTOR-NEURAL-NETWORK: Miscellaneous.
+                                                             (line 2166)
+* vector-argument? on NEURAL-NETWORK:    Miscellaneous.      (line 2172)
+* vector-argument? on VECTOR-NEURAL-NETWORK: Miscellaneous.  (line 2176)
+* weaken-truth-value:                    Miscellaneous.      (line 2180)
+* why:                                   Commands.           (line  837)
+* with-logic-environment:                Miscellaneous.      (line 2186)
+* within-classification-session:         Miscellaneous.      (line 2193)
+* within-meta-cache:                     Miscellaneous.      (line 2199)
+
+
+File: manual.info,  Node: Variable Index,  Next: Concept Index,  Prev: Function Index,  Up: Top
+
+Variable Index
+**************
+
+ [index ]
+* Menu:
+
+* abstract?:                             Built-In Relations.  (line 662)
+* all-super-contexts:                    Built-In Relations.  (line 178)
+* any-value:                             Built-In Relations.  (line 143)
+* any-value <1>:                         Built-In Relations.  (line 406)
+* any-value <2>:                         Built-In Relations.  (line 718)
+* arguments:                             Built-In Relations.  (line 550)
+* base-module:                           Built-In Relations.  (line 176)
+* child-contexts:                        Built-In Relations.  (line 174)
+* context-number:                        Built-In Relations.  (line 180)
+* dependent-propositions:                Built-In Relations.  (line 554)
+* function-code:                         Built-In Relations.  (line 291)
+* home-context:                          Built-In Relations.  (line 544)
+* kind:                                  Built-In Relations.  (line 546)
+* method-code:                           Built-In Relations.  (line 289)
+* method-function?:                      Built-In Relations.  (line 293)
+* method-parameter-names:                Built-In Relations.  (line 280)
+* method-parameter-type-specifiers:      Built-In Relations.  (line 282)
+* method-return-type-specifiers:         Built-In Relations.  (line 285)
+* method-setter?:                        Built-In Relations.  (line 278)
+* method-stringified-source:             Built-In Relations.  (line 287)
+* operator:                              Built-In Relations.  (line 552)
+* surrogate-value-inverse:               Built-In Relations.  (line 823)
+* the-cons-list:                         Built-In Relations.  (line 408)
+* truth-value:                           Built-In Relations.  (line 548)
+
+
+File: manual.info,  Node: Concept Index,  Prev: Variable Index,  Up: Top
+
+Concept Index
+*************
+

@@ -1,0 +1,141 @@
+; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;; BEGIN LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                            ;
+; Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          ;
+;                                                                            ;
+; The contents of this file are subject to the Mozilla Public License        ;
+; Version 1.1 (the "License"); you may not use this file except in           ;
+; compliance with the License. You may obtain a copy of the License at       ;
+; http://www.mozilla.org/MPL/                                                ;
+;                                                                            ;
+; Software distributed under the License is distributed on an "AS IS" basis, ;
+; WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   ;
+; for the specific language governing rights and limitations under the       ;
+; License.                                                                   ;
+;                                                                            ;
+; The Original Code is the PowerLoom KR&R System.                            ;
+;                                                                            ;
+; The Initial Developer of the Original Code is                              ;
+; UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          ;
+; 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               ;
+;                                                                            ;
+; Portions created by the Initial Developer are Copyright (C) 1997-2020      ;
+; the Initial Developer. All Rights Reserved.                                ;
+;                                                                            ;
+; Contributor(s):                                                            ;
+;                                                                            ;
+; Alternatively, the contents of this file may be used under the terms of    ;
+; either the GNU General Public License Version 2 or later (the "GPL"), or   ;
+; the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   ;
+; in which case the provisions of the GPL or the LGPL are applicable instead ;
+; of those above. If you wish to allow use of your version of this file only ;
+; under the terms of either the GPL or the LGPL, and not to allow others to  ;
+; use your version of this file under the terms of the MPL, indicate your    ;
+; decision by deleting the provisions above and replace them with the notice ;
+; and other provisions required by the GPL or the LGPL. If you do not delete ;
+; the provisions above, a recipient may use your version of this file under  ;
+; the terms of any one of the MPL, the GPL or the LGPL.                      ;
+;                                                                            ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; END LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; Support relations for Chameleon reasoner extensions
+
+(in-package "STELLA")
+
+(defmodule "/CHAMELEON"
+  :documentation "Namespace for Chameleon relations" ;; also defined in logic-system.ste
+  :includes ()
+  :uses ()
+  :nickname "CHAM"
+  :protect-surrogates? TRUE)
+
+(in-module "PL-KERNEL")
+
+
+;;; Extensions to Chameleon 1.0
+
+;;; In the original Chameleon 1.0 implementation, each clause in a neural-network-associated rule only
+;;; contributes its partial truth value as an input to the network.  For version 2.0, we are extending
+;;; this mechanism to also allow vector-valued arguments for richer input/output connections.
+;;; In particular, we want to support embeddings associated with instances to make truth-value computations
+;;; not only dependent on truth values of input (or antecedent) clauses, but also on the embeddings
+;;; associated with the instances that ground a particular rule.  This way, embedding-based instance
+;;; similarity can be taken into account by a rule's NN in addition to partial truth values.  This allows
+;;; us to "soften" types and predicates by using embeddings.
+
+;;; The new approach here is that within a rule antecedent we can have user-defined embedding (or vector)
+;;; generating functions or relations marked as `cham/vector-relation's that given a set of input
+;;; bindings generate one or more vectors that will serve as additional inputs to the network.  The
+;;; properties `cham/vector-arity' and `cham/vector-dimensions' specify additional information about
+;;; the number and size of the generated vectors.  How these vectors are generated and used depends on
+;;; the specific neural network implementation used by Chameleon.  In the current Python-based Tensorflow
+;;; implementation, we generate such vectors on the Python side via computations or specialists that
+;;; produce Numpy arrays which are represented on the PowerLoom side via long integer pointers.  For
+;;; example, see the embedding computation defined in chameleon_pli.py.
+
+;;; Various other meta-types defined in here allow for additional Chameleon inference control, e.g.,
+;;; to ignore the truth value of a particular relation, ignore auxiliary chaining, etc.
+
+
+(defconcept cham/truth-value-relation ((?r relation))
+  :documentation "Meta-type to mark relations ?r whose partial truth value will be used
+as one of the regular inputs for a Chameleon neural network.  This is the default
+unless ?r is explicitly asserted to be a `cham/ignored-relation'.")
+
+(defconcept cham/primitive-value-relation ((?r relation))
+  :documentation "Meta-type to mark relations ?r whose partial truth value will be used
+primitively as is without considering its antecedents if any.  This is useful for computed
+relations whose computation should not be subject to any learning."
+  :subset-of cham/truth-value-relation)
+  
+(defconcept cham/ignored-value-relation ((?r relation))
+  :documentation "Meta-relation to mark relations whose truth value should be ignored when
+computing the inputs for a Chameleon neural network.")
+
+(defconcept cham/vector-relation ((?r relation))
+  :documentation "Meta-type to mark relations ?r that yield one or more vector
+inputs to a Chameleon neural network (such as embeddings).  By default, the partial
+truth value of a vector relation will be ignored unless it is explicitly marked as a
+truth value relation."
+  :closed TRUE)
+
+(deffunction cham/vector-arity ((?r cham/vector-relation) (?n integer))
+  :documentation "The number of vectors created by a vector relation ?r.  It is assumed that
+each invocation of ?r creates exactly ?n vectors of the same dimension.  The number of
+arguments of ?r can be more or less than ?n, as long as the number of generated vectors is ?n.")
+
+(deffunction cham/vector-dimensions ((?r cham/vector-relation) (?n integer))
+  :documentation "The length of any vector created by a vector relation ?r.  If ?r creates
+more than one vector, it is assumed that they all have the same dimensions.")
+
+(deffunction cham/default-score ((?r relation) (?score number))
+  :documentation "The default ?score to use for instances of the relation ?r with unknown truth value.
+If not specified, the reasoner will use the value of the property powerloom.chameleon.defaultDefaultScore.
+Under a probabilistic interpretation, this value serves roughly the purpose of a prior.")
+
+;; TO DO: possibly move this into pl-kernel-kb.ste with assertion-query and friends
+(defrelation scored-query ((?goal proposition) (?score number))
+  :documentation "Retrieve solutions for ?goal and assign each of them the match-score ?score.  If we are not
+in partial-match mode, this simply subgoals on ?goal.  If in partial-match mode, it temporarily switches to
+strict mode and associates each solution found for ?goal with match score ?score.  ?score can either be fixed
+or be generated on a per-solution basis within ?goal.  This is useful to generate priors and/or to associate
+computed results with relevant scores, either directly or as the antecedent of a rule on a domain predicate."
+  :relation-specialist logic/scored-query-specialist
+  :axioms (cham/primitive-value-relation scored-query))
+
+(defrelation cham/match-score ((?goal proposition) (?score number))
+  :documentation "Retrieve solutions for ?goal and if they have a partial match score associated with them
+bind ?score to that match score.  This is the dual to `scored-query', since instead of propagating a ?score
+from the goal level to the internal match frame, it propagates an internal match score to the goal.  This
+runs in the current strict or partial match mode and does not do any mode switching.  If the subgoal was
+run in strict mode, a truth-value-based score will be computed."
+  :relation-specialist logic/match-score-specialist)
+
+(defrelation cham/training-example ((?goal proposition) (?score number))
+  :documentation "KB version of `add-training-example' that asserts a ?goal proposition and its target ?score.")
+
+(defrelation cham/training-target ((?goal proposition) (?score number))
+  :documentation "Annotation relation that allows us to represent a target ?score for a ?goal proposition
+without making it an active training example at the same time; useful to derive different example subsets.")

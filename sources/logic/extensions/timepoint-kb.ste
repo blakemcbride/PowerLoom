@@ -1,0 +1,356 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;; BEGIN LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                            ;
+; Version: MPL 1.1/GPL 2.0/LGPL 2.1                                          ;
+;                                                                            ;
+; The contents of this file are subject to the Mozilla Public License        ;
+; Version 1.1 (the "License"); you may not use this file except in           ;
+; compliance with the License. You may obtain a copy of the License at       ;
+; http://www.mozilla.org/MPL/                                                ;
+;                                                                            ;
+; Software distributed under the License is distributed on an "AS IS" basis, ;
+; WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License   ;
+; for the specific language governing rights and limitations under the       ;
+; License.                                                                   ;
+;                                                                            ;
+; The Original Code is the PowerLoom KR&R System.                            ;
+;                                                                            ;
+; The Initial Developer of the Original Code is                              ;
+; UNIVERSITY OF SOUTHERN CALIFORNIA, INFORMATION SCIENCES INSTITUTE          ;
+; 4676 Admiralty Way, Marina Del Rey, California 90292, U.S.A.               ;
+;                                                                            ;
+; Portions created by the Initial Developer are Copyright (C) 1997-2015      ;
+; the Initial Developer. All Rights Reserved.                                ;
+;                                                                            ;
+; Contributor(s):                                                            ;
+;                                                                            ;
+; Alternatively, the contents of this file may be used under the terms of    ;
+; either the GNU General Public License Version 2 or later (the "GPL"), or   ;
+; the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),   ;
+; in which case the provisions of the GPL or the LGPL are applicable instead ;
+; of those above. If you wish to allow use of your version of this file only ;
+; under the terms of either the GPL or the LGPL, and not to allow others to  ;
+; use your version of this file under the terms of the MPL, indicate your    ;
+; decision by deleting the provisions above and replace them with the notice ;
+; and other provisions required by the GPL or the LGPL. If you do not delete ;
+; the provisions above, a recipient may use your version of this file under  ;
+; the terms of any one of the MPL, the GPL or the LGPL.                      ;
+;                                                                            ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; END LICENSE BLOCK ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; Version: $Id$
+
+(in-package "STELLA")
+
+(in-module "TIMEPOINT-SUPPORT")
+
+
+(startup-time-progn :final
+
+(within-module (get-stella-module "PL-KERNEL-KB" true)
+
+
+;;;;
+;;;; TIMEPOINT ONTOLOGY
+;;;;
+
+;;; TO DO:
+;;; - add some overarching description here about the timepoint-kb namespace,
+;;;   timepoint and duration objects, etc.
+;;; - a current-time function which is a bit tricky, I guess what we have to
+;;;   do there is to have a name object, that, if unbound is being computed to
+;;;   be the current time, or, if not, evaluates to the previously measured time
+;;;   - or something like that...
+
+(defconcept /timepoint-kb/timepoint)
+
+(defconcept /timepoint-kb/day-of-week ()
+  :closed TRUE
+  :axioms (and (/timepoint-kb/day-of-week /timepoint-kb/sunday)
+	       (/timepoint-kb/day-of-week /timepoint-kb/saturday)
+	       (/timepoint-kb/day-of-week /timepoint-kb/friday)
+	       (/timepoint-kb/day-of-week /timepoint-kb/thursday)
+	       (/timepoint-kb/day-of-week /timepoint-kb/wednesday)
+	       (/timepoint-kb/day-of-week /timepoint-kb/tuesday)
+	       (/timepoint-kb/day-of-week /timepoint-kb/monday)))
+
+(deffunction /timepoint-kb/timepoint-of ((?x STRING)) :-> ?tp ; DATE-TIME-LOGIC-WRAPPER
+  :documentation "Connects a STRING representation ?x of a time point to the actual
+internal representation which is a date/time quantity wrapper representing a time
+point.  Dates and times can be specified in a large number of different formats
+specified by the STELLA variable `*date-time-patterns*' (defined in
+stella/date-time.ste) which see.  Examples can also be found in the demo file
+timepoints.ste."
+  :computed TRUE ;; SHOULD BE INFERRED - NOT NECESSARILY - SEE timepoint-of*
+  :relation-constraint /timepoint-support/timepoint-of-constraint
+  :relation-specialist /pl-kernel-kb/constraint-specialist)
+
+(deffunction /timepoint-kb/duration-of ((?x STRING)) :-> ?tp ;  DATE-TIME-LOGIC-WRAPPER
+  :documentation "Connects a STRING representation ?x of a time duration to the
+actual internal representation which is a date/time quantity wrapper representing
+a duration or relative date.  The syntax for time duration strings is
+`{plus|minus} N days[; M ms]' where N and M are integer values for days and
+milliseconds."
+  :computed TRUE ;; SHOULD BE INFERRED
+  :relation-constraint /timepoint-support/duration-of-constraint
+  :relation-specialist /pl-kernel-kb/constraint-specialist)
+
+(deffunction /timepoint-kb/time- (?t1 ?t2 ?t3) 
+  :documentation "Subtract ?t2 from ?t1 resulting in ?t3.  If both ?t1 and
+?t2 are time points, ?t3 will be a duration.  If both are durations, ?t3
+will be a duration.  If ?t1 is a time point and ?t2 a duration, ?t3 will be
+a time point.  All other combinations will lead to failure.  Note that this
+is a computed constraint which can generate any argument from the other two,
+which means it can also do addition."
+  :computed TRUE
+  :relation-constraint /timepoint-support/time-minus-constraint
+  :relation-specialist /pl-kernel-kb/constraint-specialist) ;; SHOULD BE INFERRED
+
+(deffunction /timepoint-kb/time+ (?t1 ?t2 ?t3) 
+  :documentation "Add ?t2 to ?t1 resulting in ?t3.  If both ?t1 and ?t2
+are durations, ?t3 will be a duration.  If one of them is a duration and
+the other is a time point, ?t3 will be a time point.  All other combinations
+will lead to failure.  Note that this is a computed constraint which can
+generate any argument from the other two, which means it can also do subtraction."
+  :computed TRUE
+  :relation-constraint /timepoint-support/time-plus-constraint
+  :relation-specialist /pl-kernel-kb/constraint-specialist)
+
+(deffunction /timepoint-kb/timepoint-of* ((?year INTEGER)
+                                          (?month INTEGER)
+                                          (?day INTEGER)
+                                          (?hour INTEGER)
+                                          (?minute INTEGER)
+                                          (?second NUMBER)
+                                          ?zone
+                                          ?timepoint)
+  :documentation "Maps time components into a timepoint or vice versa.
+Variables ?year, ?month, ?day, ?hour and ?minute are integers.
+Variable ?second is a number, either integer or float with resolution 0.001.
+Variable ?zone is the time zone.  It is represented as a floating point offset
+from UTC in hours.  As an input value common strings (used in the United States)
+are also recognized, for example `PST, `EDT', `UTC', `GMT', `local' etc.
+Variable ?timepoint is the internal timepoint representation.  Either all
+of ?year to ?zone must be given to define a ?timepoint, or a ?timepoint
+must be given to generate all its individual components.  If a ?timepoint
+and a ?zone are given, the individual components are generated relative to
+that time zone."
+  :relation-evaluator timepoint-of*-evaluator
+  :relation-specialist /timepoint-support/timepoint-of*-specialist)
+
+
+(deffunction /timepoint-kb/timepoint-year (?tp ?zone (?year INTEGER))
+  :documentation "The year component of ?tp evaluated in time zone ?zone.
+Variable ?zone is represented as a floating point offset from UTC in hours.
+As a ?zone input value common strings are also recognized (see timepoint-of*)."
+  :computed TRUE
+  :relation-computation /timepoint-support/timepoint-year-computation
+  :relation-specialist /pl-kernel-kb/computation-specialist)
+
+(deffunction /timepoint-kb/timepoint-month (?tp ?zone (?month INTEGER))
+  :documentation "The month component of ?tp evaluated in time zone ?zone.
+Variable ?zone is represented as a floating point offset from UTC in hours.
+As a ?zone input value common strings are also recognized (see timepoint-of*)."
+  :computed TRUE
+  :relation-computation /timepoint-support/timepoint-month-computation
+  :relation-specialist /pl-kernel-kb/computation-specialist)
+
+(deffunction /timepoint-kb/timepoint-day (?tp ?zone (?day INTEGER))
+  :documentation "The day component of ?tp evaluated in time zone ?zone.
+Variable ?zone is represented as a floating point offset from UTC in hours.
+As a ?zone input value common strings are also recognized (see timepoint-of*)."
+  :computed TRUE
+  :relation-computation /timepoint-support/timepoint-day-computation
+  :relation-specialist /pl-kernel-kb/computation-specialist)
+
+(deffunction /timepoint-kb/timepoint-day-of-week (?tp ?zone (?dow /TIMEPOINT-KB/DAY-OF-WEEK))
+  :documentation "The day-of-week component of ?tp evaluated in time zone ?zone.
+Variable ?zone is represented as a floating point offset from UTC in hours.
+As a ?zone input value common strings are also recognized (see timepoint-of*)."
+  :computed TRUE
+  :relation-computation /timepoint-support/timepoint-day-of-week-computation
+  :relation-specialist /pl-kernel-kb/computation-specialist)
+
+(deffunction /timepoint-kb/timepoint-hour (?tp ?zone (?hour INTEGER))
+  :documentation "The hour component of ?tp evaluated in time zone ?zone.
+Variable ?zone is represented as a floating point offset from UTC in hours.
+As a ?zone input value common strings are also recognized (see timepoint-of*)."
+  :computed TRUE
+  :relation-computation /timepoint-support/timepoint-hour-computation
+  :relation-specialist /pl-kernel-kb/computation-specialist)
+
+(deffunction /timepoint-kb/timepoint-minute (?tp ?zone (?minute INTEGER))
+  :documentation "The minute component of ?tp evaluated in time zone ?zone.
+Variable ?zone is represented as a floating point offset from UTC in hours.
+As a ?zone input value common strings are also recognized (see timepoint-of*)."
+  :computed TRUE
+  :relation-computation /timepoint-support/timepoint-minute-computation
+  :relation-specialist /pl-kernel-kb/computation-specialist)
+
+(deffunction /timepoint-kb/timepoint-second (?tp ?zone (?second NUMBER))
+  :documentation "The second component of ?tp evaluated in time zone ?zone.
+Variable ?zone is represented as a floating point offset from UTC in hours.
+As a ?zone input value common strings are also recognized (see timepoint-of*)."
+  :computed TRUE
+  :relation-computation /timepoint-support/timepoint-second-computation
+  :relation-specialist /pl-kernel-kb/computation-specialist)
+
+(deffunction /timepoint-kb/timepoint-date (?tp ?zone (?date STRING))
+  :documentation "The date component of ?tp evaluated in time zone ?zone.
+Variable ?zone is represented as a floating point offset from UTC in hours.
+As a ?zone input value common strings are also recognized (see timepoint-of*)."
+  :computed TRUE
+  :relation-computation /timepoint-support/timepoint-date-computation
+  :relation-specialist /pl-kernel-kb/computation-specialist)
+
+(deffunction /timepoint-kb/timepoint-time (?tp ?zone (?time STRING))
+  :documentation "The time component of ?tp evaluated in time zone ?zone.
+Variable ?zone is represented as a floating point offset from UTC in hours.
+As a ?zone input value common strings are also recognized (see timepoint-of*)."
+  :computed TRUE
+  :relation-computation /timepoint-support/timepoint-time-computation
+  :relation-specialist /pl-kernel-kb/computation-specialist)
+
+(deffunction /timepoint-kb/format-timepoint (?tp ?zone (?control STRING) (?formatted STRING))
+  :documentation "Format ?tp relative to ?zone according to the format ?control string whose
+syntax supports most directives of the Unix `date' command (see also the STELLA function
+`format-date').  Variable ?zone is represented as a floating point offset from UTC in hours.
+As a ?zone input value common strings are also recognized (see timepoint-of*)."
+  :computed TRUE
+  :relation-computation /timepoint-support/format-timepoint-computation
+  :relation-specialist /pl-kernel-kb/computation-specialist)
+
+(defrelation /timepoint-kb/current-time (?tp)
+  :documentation "Convenience relation to access the current time ?tp.  Every time this is evaluated
+in a query with an unbound ?tp variable, this will bind ?tp to the newly measured current time.  This
+relation shields some of the idiosyncrasies of a changing time value in a logic system where the same
+function should never evaluate to different values based on the same input arguments.  Do never use this
+function in an assertion!  Instead, retrieve the current time via a query and pipe the resulting value
+into an assertion via `assert-from-query'.  For example:
+    (assert-from-query (retrieve (current-time ?now)) :pattern (kappa (?now) (mytimeof t1 ?now)))"
+  :<<= (exists ?spec
+         (and (member-of ?spec (listof "now"))
+              (/timepoint-kb/timepoint-of ?spec ?tp))))
+
+(process-definitions)
+))  ; End startup-time-progn
+
+;;;;
+;;;; TESTS
+;;;;
+
+#|
+;;; TO DO: FOLD THESE INTO NEW `timepoints.plm' demo?
+
+(in-module PL-USER)
+
+
+(ask (< (/timepoint-kb/timepoint-of "1/1/2002")
+	(/timepoint-kb/timepoint-of "2/2/2002")))
+ ;; => TRUE
+(ask (< (/timepoint-kb/timepoint-of "2/2/2002")
+	(/timepoint-kb/timepoint-of "1/1/2002")))
+ ;; => FALSE
+(ask (> (/timepoint-kb/timepoint-of "2/2/2002")
+	(/timepoint-kb/timepoint-of "1/1/2002")))
+ ;; => TRUE
+
+(deffunction bar (?x) :-> ?y)
+
+(assert (= (bar fred) (/timepoint-kb/timepoint-of "2/2/2002")))
+(assert (= (bar barney) (/timepoint-kb/timepoint-of "2/2/2002")))
+(assert (= (bar wilma) (/timepoint-kb/timepoint-of "2/5/2002")))
+
+(ask (= (bar fred) (bar barney)))
+  ;; => TRUE
+(ask (= (bar fred) (bar wilma)))
+  ;; => FALSE
+
+(ask (< (bar fred) (bar wilma)))
+  ;; => TRUE
+(ask (< (bar fred) (bar barney)))
+  ;; => FALSE
+(ask (< (bar wilma) (bar fred)))
+  ;; => FALSE
+(ask (< (bar wilma) (bar bill)))
+  ;; => UNKNOWN
+
+(retrieve ?x (= (/timepoint-kb/timepoint-of ?x)
+		(/timepoint-kb/timepoint-of "2/5/2002")))
+  ;; => "2002-FEB-05 8:00:00.000 UTC"
+(retrieve ?x (= (/timepoint-kb/timepoint-of ?x)  (bar fred)))
+  ;; => "2002-FEB-02 8:00:00.000 UTC"
+(retrieve ?x (= (/timepoint-kb/timepoint-of "2/5/2002")
+		(/timepoint-kb/timepoint-of ?x)))
+  ;; => "2002-FEB-02 8:00:00.000 UTC"
+(retrieve ?x (= (/timepoint-kb/timepoint-of ?x)  (bar bill)))
+  ;; No solutions.
+
+
+(retrieve (= (/timepoint-kb/timepoint-year
+              (/timepoint-kb/timepoint-of "2/5/2002 00:25:30 EST") "PST")
+             ?y))
+   ;; => 2002
+(retrieve (= (/timepoint-kb/timepoint-day
+              (/timepoint-kb/timepoint-of "2/5/2002 00:25:30 EST") "EST")
+             ?d))
+   ;; => 5
+(retrieve (= (/timepoint-kb/timepoint-day
+              (/timepoint-kb/timepoint-of "2/5/2002 00:25:30 EST") "PST")
+             ?D))
+   ;; => 4
+(retrieve (/timepoint-kb/timepoint-date
+              (/timepoint-kb/timepoint-of "2/5/2002 00:25:30 EST") "PST" ?y))
+   ;;  "2002-FEB-04"
+(retrieve (/timepoint-kb/timepoint-time
+              (/timepoint-kb/timepoint-of "2/5/2002 00:25:30 EST") "EST" ?y))
+   ;;  "00:25:30.000 -5.0"
+(retrieve (= (/timepoint-kb/timepoint-time
+              (/timepoint-kb/timepoint-of "2/5/2002 00:25:30 EST") -8.0)
+             ?y))
+   ;;  "21:25:30.000 -8.0"
+
+(retrieve (= (/timepoint-kb/timepoint-of* ?y ?m ?d ?hh ?mm ?ss -8.0)
+             (/timepoint-kb/timepoint-of "2/5/2002 15:25:30 EST")))
+  ;; => ?Y=2002, ?M=2, ?D=5, ?HH=12, ?MM=25, ?SS=30.0
+
+(retrieve (= (/timepoint-kb/timepoint-of* ?y ?m ?d ?hh ?mm ?ss "PST")
+             (/timepoint-kb/timepoint-of "2/5/2002 15:25:30 EST")))
+  ;; =>?Y=2002, ?M=2, ?D=5, ?HH=12, ?MM=25, ?SS=30.0,
+
+(retrieve (= (/timepoint-kb/timepoint-of* ?y ?m ?d ?hh ?mm ?ss "PST")
+             (/timepoint-kb/timepoint-of "2/5/2002 00:25:30 EST")))
+  ;; => ?Y=2002, ?M=2, ?D=4, ?HH=21, ?MM=25, ?SS=30.0
+
+(retrieve (= (/timepoint-kb/timepoint-of* ?y ?m ?d ?hh ?mm ?ss ?tz)
+             (/timepoint-kb/timepoint-of "2/5/2002 00:25:30 EST")))
+  ;; => ?Y=2002, ?M=2, ?D=5, ?HH=5, ?MM=25, ?SS=30.0 ?TZ=0.0
+
+(retrieve (= (/timepoint-kb/timepoint-of* 2003 12 10 18 35 45 "PST")
+             ?tp))
+  ;; =>  ?TP="2003-DEC-11 2:35:45.000 UTC"
+(retrieve (= ?dow (/timepoint-kb/timepoint-day-of-week
+                   (/timepoint-kb/timepoint-of* 2003 12 10 18 35 45 "PST")
+                   "PST")))
+  ;; => ?DOW=/TIMEPOINT-KB/WEDNESDAY
+
+
+
+
+(retrieve (/timepoint-kb/time- (/timepoint-kb/timepoint-of "5/12/2004")
+                               (/timepoint-kb/timepoint-of "5/1/2004")
+                               ?x))
+  ;; =>  ?X=<plus 11 days; 0 ms>
+
+(retrieve (/timepoint-kb/time+ (/timepoint-kb/timepoint-of "12/25/2004 UTC")
+                               (/timepoint-kb/duration-of "12 days")
+                               ?x))
+  ;; =>  ?X="2005-JAN-06 0:00:00.000 UTC"
+
+(retrieve (/timepoint-kb/time+ (/timepoint-kb/timepoint-of "12/25/2004 UTC")
+                               (/timepoint-kb/duration-of "12 days; 10 ms")
+                               ?x))
+  ;; =>  ?X="2005-JAN-06 0:00:00.010 UTC"
+|#

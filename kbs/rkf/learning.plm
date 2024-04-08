@@ -1,0 +1,112 @@
+;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                          ;
+;  COPYRIGHT (C) UNIVERSITY OF SOUTHERN CALIFORNIA, 2003                   ; 
+;  University of Southern California, Information Sciences Institute       ;
+;  4676 Admiralty Way                                                      ;
+;  Marina Del Rey, California 90292                                        ;
+;  All rights reserved.                                                    ;
+;                                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(IN-PACKAGE "STELLA")
+
+(DEFMODULE "PL-USER/LEARNING" :case-sensitive? TRUE)
+
+(IN-MODULE "PL-USER/LEARNING")
+
+(IN-DIALECT :KIF)
+
+(ASSERT 
+  (DOCUMENTATION LEARNING 
+		 "Example ontology for testing out rule learning.
+
+KB version: $Id$"))
+
+
+(DEFCONCEPT physical-object)
+
+(DEFCONCEPT StatusType
+  :AXIOMS (AND (StatusType status-Normal)
+               (StatusType status-Damaged)
+               (StatusType status-Destroyed)))
+
+
+(DEFCONCEPT Facility ((?f physical-object))
+  ;; :~> (facilityStatus ?f status-Normal)
+  )
+
+(DEFFUNCTION facilityStatus ((?f Facility)) :-> (?s StatusType))
+
+
+;; For now, use specialized relations rather than try to hook
+;; up the units package with Cyc's units representation.
+
+(DEFFUNCTION widthOfObject-m ((?o physical-object) ?w)
+  :DOCUMENTATION "Width of object in meters")
+(DEFFUNCTION lengthOfObject-m ((?o physical-object) ?w)
+  :DOCUMENTATION "Length of object in meters")
+(DEFFUNCTION heightOfObject-m ((?o physical-object) ?w)
+  :DOCUMENTATION "Height of object in meters")
+(DEFFUNCTION areaOfObject-m2 ((?o physical-object) ?w)
+  :DOCUMENTATION "Area of object in square meters")
+
+(DEFFUNCTION widthOfObject-ft ((?o physical-object) ?w)
+  :DOCUMENTATION "Width of object in feet")
+(DEFFUNCTION lengthOfObject-ft ((?o physical-object) ?w)
+  :DOCUMENTATION "Length of object in feet")
+(DEFFUNCTION heightOfObject-ft ((?o physical-object) ?w)
+  :DOCUMENTATION "Height of object in feet")
+(DEFFUNCTION areaOfObject-ft2 ((?o physical-object) ?w)
+  :DOCUMENTATION "Area of object in square feet")
+
+(DEFFUNCTION orientationOfObject ((?o physical-object) ?w)
+  :DOCUMENTATION "The primary orientation of an object, in degrees.  N=000")
+
+(DEFCONCEPT RoadwaySurfaceType (?s)
+  :AXIOMS (AND (RoadwaySurfaceType hardRoadwaySurface)
+               (RoadwaySurfaceType softRoadwaySurface)))
+
+(DEFFUNCTION surfaceType ((?r Roadway) (?s RoadwaySurfaceType)))
+
+(DEFCONCEPT Roadway (?r Facility))
+
+(DEFCONCEPT Runway (?r Facility))
+
+(DEFRELATION hasRunway ((?a Airfield) (?r Runway)))
+
+(DEFCONCEPT Airfield (?r Facility)
+  :=> (RANGE-MIN-CARDINALITY hasRunway ?r 1))
+
+
+;;
+;; Unary properties of interest
+;;
+
+(DEFRELATION AirfieldSuitableForMilitaryUse ((?f Facility)))
+(DEFRELATION RoadwaySupportsMovementOfMilitaryForces ((?r Roadway)))
+
+
+
+
+#|
+;; Examples of default rules to learn:
+
+(conceive (~> (AND (Roadway ?r) (surfaceType ?r hardRoadwaySurface) (>= (widthOfObject-m ?r) 4))
+              (RoadwaySupportMovementOfMilitaryForces ?r)))
+
+;; Hard:
+(conceive (~> (AND (Airfield ?a)
+                   (EXISTS ?r (AND (hasRunway ?a ?r)
+                                   (> (widthOfObject-ft ?r) 60)
+                                   (> (lengthOfObject-ft ?r) 3500))))
+              (AirfieldSuitableForMilitaryUse ?a)))
+
+;; Easier
+(conceive (~> (AND (Runway ?r)
+                   (> (widthOfObject-ft ?r) 60)
+                   (> (lengthOfObject-ft ?r) 3500))
+              (AirfieldSuitableForMilitaryUse ?r)))
+
+|#

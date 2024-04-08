@@ -1,0 +1,51 @@
+;;; -*- Mode: Lisp; Package: STELLA; Syntax: COMMON-LISP; Base: 10 -*-
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                          ;
+;  COPYRIGHT (C) UNIVERSITY OF SOUTHERN CALIFORNIA, 2004                   ; 
+;  University of Southern California, Information Sciences Institute       ;
+;  4676 Admiralty Way                                                      ;
+;  Marina Del Rey, California 90292                                        ;
+;  All rights reserved.                                                                        ;                                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;; Version: $Id$
+
+(in-package "STELLA")
+
+(in-module "STELLA")
+
+  ;;
+;;;;;; POWERLOOM-SOAP-TOMCAT defsystem
+  ;;
+
+(defsystem POWERLOOM-SOAP-TOMCAT
+  :directory ("logic" "soap" "tomcat")
+  :required-systems ("stella" "logic" "webservices" "powerloom-soap")
+  :cardinal-module "LOGIC/PLSOAP/TOMCAT"
+  :production-settings (1 0 3 3)
+  :development-settings (3 2 3 3)
+  :java-only-files ("INSTALL.text"
+                    "powerloom-soap-server.xml"
+                    "web.xml"
+                    "PowerLoomSOAPServlet.java")
+  :files ()
+  :copyright-header
+  " +--------------------------------------------------------------------------+
+ |                                                                          |
+ |  COPYRIGHT (C) UNIVERSITY OF SOUTHERN CALIFORNIA, 2004-#$(YEAR)              |
+ |  University of Southern California, Information Sciences Institute       |
+ |  4676 Admiralty Way                                                      |
+ |  Marina Del Rey, California 90292                                        |
+ |  All rights reserved.                                                    |
+ |                                                                          |
+ +--------------------------------------------------------------------------+"
+  )			    ; end of POWERLOOM-SERVER-TOMCAT defsystem
+
+
+(defmodule "LOGIC/PLSOAP/TOMCAT"
+  :java-catchall-class "TomcatServer"
+  :uses ("STELLA" "LOGIC" "WEBSERVICES")
+  :code-only? TRUE)
+
+
