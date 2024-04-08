@@ -4547,11 +4547,12 @@ or if its value is the empty string and a `deflt' is provided, return the defaul
   (CL:CHECK-TYPE VARNAME CL:SIMPLE-STRING)
   (CL:LET*
    ((UNDEFINED STELLA::NULL-STRING)
-    (VALUE (CL:or #+allegro (sys:getenv varname)
+    (VALUE (CL:or  #+allegro (sys:getenv varname)
                    #+cmu (CL:cdr (CL:assoc varname ext:*environment-list* :test #'CL:string=))
                    #+lispworks (lispworks:environment-variable varname)
                    #+clisp (ext:getenv varname)
-                   #-(or allegro cmu lispworks clisp) (CL:error "getenv not implemented")
+                   #+sbcl (sb-ext:posix-getenv varname)
+                   #-(or allegro cmu lispworks clisp sbcl) (CL:error "getenv not implemented")
                    undefined)))
    (CL:DECLARE (CL:TYPE CL:SIMPLE-STRING UNDEFINED VALUE))
    (CL:WHEN

@@ -176,6 +176,7 @@ necessary to generate a newline.")
 
 (CL:DEFVAR STELLA-CHARSET (CL:or #+allegro (CL:ignore-errors (excl::find-external-format :iso-8859-1))
                                  #+cmu :iso-8859-1
+                                 #+sbcl :iso-8859-1
                                  :DEFAULT)
   "For STELLA we always assume an 8-bit transparent mapping from bytes to STRING characters
 such as ISO-8859-1 (ISO-LATIN-1), since that's what C++ natively supports.  For Java and some Lisps, we have
