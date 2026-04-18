@@ -1,0 +1,511 @@
+\documentclass[11pt,letterpaper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{parskip}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  urlcolor=blue!60!black,
+  citecolor=blue!60!black
+}
+
+% ---------- listings style for PowerLoom / STELLA ----------
+\definecolor{plkeyword}{RGB}{0,80,160}
+\definecolor{plcomment}{RGB}{100,120,100}
+\definecolor{plstring}{RGB}{160,40,40}
+\definecolor{plprompt}{RGB}{80,80,80}
+
+\lstdefinelanguage{PowerLoom}{
+  morekeywords={defmodule,defconcept,defrelation,deffunction,defrule,
+    assert,retract,ask,retrieve,in-module,in-package,in-dialect,
+    clear-module,reset-features,documentation,forall,exists,and,or,not,
+    implies,subset-of,subrelation-of,has-parent,has-child,true,false,
+    powerloom,load,demo,help,stop,save-kb,load-kb,print-object,
+    forward-chain,run-forward-rules},
+  sensitive=false,
+  morecomment=[l]{;},
+  morestring=[b]",
+  keywordstyle=\color{plkeyword}\bfseries,
+  commentstyle=\color{plcomment}\itshape,
+  stringstyle=\color{plstring}
+}
+
+\lstset{
+  language=PowerLoom,
+  basicstyle=\ttfamily\small,
+  showstringspaces=false,
+  columns=fullflexible,
+  breaklines=true,
+  frame=single,
+  framerule=0.3pt,
+  rulecolor=\color{black!30},
+  xleftmargin=0.5em,
+  xrightmargin=0.5em,
+  aboveskip=0.8em,
+  belowskip=0.8em
+}
+
+\lstdefinestyle{shell}{
+  language=bash,
+  keywordstyle=\color{plkeyword}\bfseries,
+  morekeywords={cd,sbcl}
+}
+
+\newcommand{\cmd}[1]{\texttt{#1}}
+\newcommand{\file}[1]{\texttt{#1}}
+\newcommand{\prompt}[1]{\textcolor{plprompt}{\texttt{#1}}}
+
+% ---------- metadata ----------
+\title{A Step-by-Step PowerLoom Tutorial}
+\author{For use with PowerLoom running under SBCL}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This tutorial walks a newcomer from a cold terminal to a working PowerLoom
+knowledge base. Every step is concrete: type the command, see the expected
+response, understand what just happened. By the end you will have defined
+modules, concepts, and relations; asserted and retrieved facts; written a
+rule; performed classification; and saved your work. The tutorial assumes
+no prior PowerLoom or STELLA experience, only a little comfort at a Lisp
+prompt.
+\end{abstract}
+
+\tableofcontents
+\bigskip\hrule
+
+% ==========================================================
+\section{Prerequisites}
+\label{sec:prereqs}
+
+Before starting, you need a PowerLoom that launches under SBCL. If you have
+not already got that working, follow \file{../StartUp.md} in the PowerLoom
+project directory --- it is a short, verified cold-start guide. The one-line
+summary is:
+
+\begin{lstlisting}[style=shell]
+cd <path-to>/PowerLoom
+sbcl --load load-powerloom.lisp
+\end{lstlisting}
+
+You should land at the SBCL prompt with the message
+\cmd{PowerLoom <version> loaded.}
+
+Throughout this tutorial:
+\begin{itemize}[nosep]
+  \item \prompt{*} marks the SBCL top-level prompt.
+  \item \prompt{PL-USER |=} marks the PowerLoom listener prompt.
+  \item Lines beginning with \cmd{;} are PowerLoom comments --- safe to copy.
+\end{itemize}
+
+% ==========================================================
+\section{Starting and Stopping the Listener}
+\label{sec:listener}
+
+From the SBCL \prompt{*} prompt, enter the PowerLoom listener:
+
+\begin{lstlisting}
+(powerloom)
+\end{lstlisting}
+
+\noindent The prompt changes to \prompt{PL-USER |=}. You are now inside the
+PowerLoom command loop, inside the default user module \cmd{PL-USER}. Try:
+
+\begin{lstlisting}
+(help)
+\end{lstlisting}
+
+\noindent PowerLoom prints a list of its top-level commands. To leave the
+listener and return to SBCL:
+
+\begin{lstlisting}
+(stop)
+\end{lstlisting}
+
+\noindent You are back at the \prompt{*} prompt, but PowerLoom remains
+loaded in memory --- so \cmd{(powerloom)} re-enters instantly. Use
+\cmd{(sb-ext:exit)} (or \cmd{Ctrl-D}) to quit SBCL entirely when you are
+done.
+
+For the rest of this tutorial, re-enter the listener and stay there unless
+told otherwise.
+
+% ==========================================================
+\section{Your First Module}
+\label{sec:modules}
+
+A \textbf{module} is a PowerLoom namespace: it holds concept, relation, and
+instance definitions, and it holds the assertions you make against them.
+Modules form a hierarchy. The out-of-the-box module is \cmd{PL-USER}, which
+inherits from \cmd{PL-KERNEL} (where the built-ins live).
+
+Before doing any real work, create a fresh module of your own so that this
+tutorial does not collide with PL-USER. At the \prompt{PL-USER |=} prompt:
+
+\begin{lstlisting}
+(defmodule "TUTORIAL"
+  :includes ("PL-USER"))
+\end{lstlisting}
+
+\noindent PowerLoom responds with something like \cmd{|MDL|TUTORIAL}. The
+\cmd{|MDL|} prefix just tells you ``this is a module object.''
+
+Now step into it:
+
+\begin{lstlisting}
+(in-module "TUTORIAL")
+\end{lstlisting}
+
+\noindent The prompt becomes \prompt{TUTORIAL |=}. Everything you define
+from here lands in \cmd{TUTORIAL}, and \cmd{TUTORIAL} can see everything in
+\cmd{PL-USER} and \cmd{PL-KERNEL}.
+
+\textit{Tip:} if you want to start over inside a module without restarting
+PowerLoom, use \cmd{(clear-module "TUTORIAL")} followed by the definitions
+you want to keep.
+
+% ==========================================================
+\section{Concepts and Relations}
+\label{sec:concepts}
+
+A \textbf{concept} is a named class of individuals. A \textbf{relation}
+connects individuals. We will model a small piece of a company ontology.
+
+\subsection{Defining concepts}
+
+\begin{lstlisting}
+(defconcept Person
+  :documentation "The class of persons.")
+
+(defconcept Employee (Person)
+  :documentation "A person who is employed somewhere.")
+
+(defconcept Manager (Employee)
+  :documentation "An employee who manages other employees.")
+
+(defconcept Company
+  :documentation "An organization that employs people.")
+\end{lstlisting}
+
+\noindent Each \cmd{defconcept} returns the concept object, e.g.\ \cmd{|C|Employee}.
+The parenthesised argument --- \cmd{(Person)} for \cmd{Employee} --- names
+parent concepts. \cmd{Employee} is therefore a subclass of \cmd{Person}.
+
+\subsection{Defining relations}
+
+\begin{lstlisting}
+(defrelation works-for ((?e Employee) (?c Company))
+  :documentation "True when ?e is employed by ?c.")
+
+(defrelation manages ((?m Manager) (?e Employee))
+  :documentation "True when ?m manages ?e.")
+
+(defrelation salary ((?e Employee) (?s INTEGER))
+  :documentation "?e's annual salary in dollars.")
+\end{lstlisting}
+
+\noindent Variables are written with a \cmd{?} prefix. The type after each
+variable declares the expected argument sort. \cmd{INTEGER} is one of the
+built-in STELLA types available in every module.
+
+% ==========================================================
+\section{Asserting Facts}
+\label{sec:assert}
+
+A fresh module has structure but no facts. Add some:
+
+\begin{lstlisting}
+(assert (Company Acme))
+(assert (Person  Alice))
+(assert (Person  Bob))
+(assert (Person  Carol))
+
+(assert (Employee Alice))
+(assert (Employee Bob))
+(assert (Manager  Carol))   ; Carol is automatically an Employee and a Person
+
+(assert (works-for Alice Acme))
+(assert (works-for Bob   Acme))
+(assert (works-for Carol Acme))
+
+(assert (manages Carol Alice))
+(assert (manages Carol Bob))
+
+(assert (= (salary Alice) 75000))
+(assert (= (salary Bob)   80000))
+(assert (= (salary Carol) 120000))
+\end{lstlisting}
+
+\noindent Every \cmd{assert} returns the proposition it just installed ---
+PowerLoom's way of confirming. If you assert something structurally
+inconsistent (wrong arity, wrong type), PowerLoom complains immediately.
+
+% ==========================================================
+\section{Asking Questions}
+\label{sec:ask}
+
+PowerLoom distinguishes two query styles:
+
+\begin{description}[nosep,style=nextline]
+  \item[\cmd{ask}] Yes/no. Returns \cmd{TRUE}, \cmd{FALSE}, or
+    \cmd{UNKNOWN}.
+  \item[\cmd{retrieve}] Produces bindings for free variables ---
+    PowerLoom's ``SELECT.''
+\end{description}
+
+\subsection{Yes/no queries}
+
+\begin{lstlisting}
+(ask (Employee Alice))            ; TRUE (Alice was asserted Employee)
+(ask (Employee Carol))            ; TRUE (via Manager -> Employee)
+(ask (Person Carol))              ; TRUE (via Employee -> Person)
+(ask (works-for Alice Acme))      ; TRUE
+(ask (manages Alice Carol))       ; FALSE (inverted)
+(ask (Manager Bob))               ; UNKNOWN -- never asserted or derivable
+\end{lstlisting}
+
+\noindent Notice how Carol's manager-ness cascades: \cmd{(Manager Carol)}
+was the only explicit class assertion, yet \cmd{(Person Carol)} holds
+because concept hierarchy is understood by the reasoner.
+
+\subsection{Bindings queries}
+
+\cmd{retrieve} takes a pattern with free variables and returns all matches.
+
+\begin{lstlisting}
+(retrieve all ?x (Employee ?x))
+\end{lstlisting}
+
+\noindent Prints each employee. The word \cmd{all} asks for every match; you
+can also write \cmd{(retrieve 5 ?x ...)} to cap at five, or leave it out
+for a single answer.
+
+Multi-variable retrieval looks natural:
+
+\begin{lstlisting}
+(retrieve all (?m ?e)
+  (manages ?m ?e))
+\end{lstlisting}
+
+\noindent Conjunctions and arithmetic work in retrieval too:
+
+\begin{lstlisting}
+(retrieve all ?e
+  (and (Employee ?e)
+       (> (salary ?e) 78000)))
+\end{lstlisting}
+
+% ==========================================================
+\section{Retraction}
+\label{sec:retract}
+
+Retraction removes a previously asserted fact:
+
+\begin{lstlisting}
+(retract (manages Carol Bob))
+(ask (manages Carol Bob))          ; FALSE (or UNKNOWN)
+(assert (manages Carol Bob))       ; put it back
+\end{lstlisting}
+
+\noindent Retraction removes only the direct assertion. Facts that can still
+be derived by inference remain true.
+
+% ==========================================================
+\section{Your First Rule}
+\label{sec:rules}
+
+A rule is an implication the reasoner applies on demand. Say we want every
+employee whose salary exceeds \$100{,}000 to be classified as a
+\cmd{HighEarner}:
+
+\begin{lstlisting}
+(defconcept HighEarner (Employee))
+
+(defrule high-earner-rule
+  (=> (and (Employee ?e) (> (salary ?e) 100000))
+      (HighEarner ?e)))
+\end{lstlisting}
+
+\noindent Verify the rule fires:
+
+\begin{lstlisting}
+(ask (HighEarner Carol))           ; TRUE
+(retrieve all ?x (HighEarner ?x))
+\end{lstlisting}
+
+\noindent PowerLoom's default reasoner is a backward chainer: it runs your
+rule only when a query needs it. If you prefer to push consequences
+eagerly, use \cmd{(run-forward-rules)}.
+
+% ==========================================================
+\section{Classification: A Family Ontology}
+\label{sec:classify}
+
+A signature PowerLoom feature is automatic classification. A concept
+defined with an ``if and only if'' body lets the reasoner decide
+membership for you. Clear the module and try the canonical family
+example:
+
+\begin{lstlisting}
+(clear-module "TUTORIAL")
+(in-module "TUTORIAL")
+
+(defconcept Human  :documentation "Human beings.")
+(defconcept Woman (Human))
+(defconcept Man   (Human))
+
+(defrelation has-child ((?p Human) (?c Human))
+  :inverse has-parent)
+
+(defconcept Mother (?m Woman)
+  :<=> (exists (?x Human) (has-child ?m ?x)))
+
+(defconcept Father (?f Man)
+  :<=> (exists (?x Human) (has-child ?f ?x)))
+
+(defconcept Parent (?p Human)
+  :<=> (or (Mother ?p) (Father ?p)))
+
+(defconcept Grandmother (?g Woman)
+  :<=> (exists (?c Parent) (has-child ?g ?c)))
+\end{lstlisting}
+
+\noindent Assert facts:
+
+\begin{lstlisting}
+(assert (Woman Elizabeth))
+(assert (Man   Charles))
+(assert (Man   William))
+(assert (has-child Elizabeth Charles))
+(assert (has-child Charles   William))
+\end{lstlisting}
+
+\noindent Now query \emph{derived} concept membership --- nothing below was
+ever asserted explicitly:
+
+\begin{lstlisting}
+(ask (Mother      Elizabeth))      ; TRUE
+(ask (Grandmother Elizabeth))      ; TRUE
+(ask (Father      Charles))        ; TRUE
+(ask (Parent      Charles))        ; TRUE
+\end{lstlisting}
+
+\noindent The reasoner also proves subclass relationships between concepts
+themselves, using just the definitions:
+
+\begin{lstlisting}
+(ask (subset-of Grandmother Mother))   ; TRUE
+(ask (subset-of Grandmother Parent))   ; TRUE
+\end{lstlisting}
+
+\noindent This is \emph{classification} --- arguably PowerLoom's most
+distinctive trick.
+
+% ==========================================================
+\section{Saving and Loading Your KB}
+\label{sec:persist}
+
+Edit and persist your work in a file rather than retyping into the
+listener. Create a file, say \file{my-company.plm}, with content like:
+
+\begin{lstlisting}
+(in-package "STELLA")
+
+(defmodule "MY-COMPANY"
+  :includes ("PL-USER"))
+
+(in-module "MY-COMPANY")
+
+(defconcept Employee)
+(defrelation works-for ((?e Employee) (?c OBJECT)))
+
+(assert (Employee Alice))
+(assert (works-for Alice Acme))
+\end{lstlisting}
+
+\noindent Then load it from the PowerLoom listener:
+
+\begin{lstlisting}
+(load "my-company.plm")
+(in-module "MY-COMPANY")
+(retrieve all ?x (Employee ?x))
+\end{lstlisting}
+
+\noindent To dump a module's current state to a file programmatically:
+
+\begin{lstlisting}
+(save-kb "snapshot.plm" "MY-COMPANY")
+\end{lstlisting}
+
+\noindent \cmd{save-kb} writes every definition and assertion in the named
+module; you can \cmd{(load "snapshot.plm")} in a future session to get
+back to exactly this state.
+
+% ==========================================================
+\section{Exploring the Bundled Demos}
+\label{sec:demos}
+
+Twenty-plus prepackaged demos ship with PowerLoom in
+\file{sources/logic/demos/}. From the listener, launch the picker:
+
+\begin{lstlisting}
+(demo)
+\end{lstlisting}
+
+\noindent Recommended order for a new user:
+
+\begin{enumerate}[nosep]
+  \item \file{basics.plm} --- modules, definitions, retrieval, retraction.
+  \item \file{family.plm} --- the classification example from
+        Section~\ref{sec:classify}, in more depth.
+  \item \file{relation-hierarchy.plm} --- subrelations and inheritance.
+  \item \file{constraints.plm} --- using rules to enforce invariants.
+  \item \file{kinship.plm} --- a larger family knowledge base.
+  \item \file{aircraft.plm} --- a realistic classification ontology.
+\end{enumerate}
+
+\noindent Each demo file is heavily commented; reading them is as valuable
+as running them.
+
+% ==========================================================
+\section{Where to Go Next}
+\label{sec:next}
+
+\begin{itemize}[nosep]
+  \item \textbf{The manual.} \file{sources/logic/doc/} in the PowerLoom
+        tree contains the reference manual in PDF and HTML.
+  \item \textbf{Course materials.} \file{PowerLoom-Course-Lecture.pdf}
+        and \file{PowerLoom-Overview-Slides.pdf} in this same
+        \file{tutorials/} directory give a lecture-paced introduction.
+  \item \textbf{The PLI API.} Embedding PowerLoom in a host application
+        (Lisp, C++, Java, or Python) is done through the PowerLoom
+        Language Interface; see \file{sources/logic/pli.ste} and the
+        Python bindings under \file{python/}.
+  \item \textbf{Extension systems.} RDBMS access, the web UI
+        (Ontosaurus), and others can be enabled by setting
+        \cmd{*load-all-extensions?*} to \cmd{t} before loading
+        PowerLoom (see \file{../StartUp.md} step~8).
+\end{itemize}
+
+% ==========================================================
+\section*{Appendix: Building This Document}
+
+This tutorial compiles with any standard LaTeX distribution:
+
+\begin{lstlisting}[style=shell]
+cd <path-to>/PowerLoom/tutorials
+pdflatex PowerLoom-Tutorial.tex
+pdflatex PowerLoom-Tutorial.tex     # second pass for the TOC
+\end{lstlisting}
+
+\noindent The output is \file{PowerLoom-Tutorial.pdf}.
+
+\end{document}
